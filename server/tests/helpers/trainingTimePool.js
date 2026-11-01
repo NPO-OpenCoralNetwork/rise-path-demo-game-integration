@@ -7,9 +7,9 @@
  * (AUTH_SQL: the tombstone read, and the stub insert with migration 018's rule: no stub for a deleted
  * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN snapshots,
- * ROLLBACK restores; the state's savepoint too). Any other statement throws, so a changed query fails
- * loudly; the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file
- * (npm test runs *.test.js).
+ * ROLLBACK restores; the state's savepoint too; each answered with node-pg's command tag). Any other
+ * statement throws, so a changed query fails loudly; the SQL itself runs on PostgreSQL 16 in
+ * scripts/db/verify-training.mjs. Not a test file (npm test runs *.test.js).
  */
 import { TRAINING_SQL } from '../../../tools/core/training.js';
 import { TRAINING_TIME_SQL } from '../../../tools/core/trainingTime.js';
@@ -20,6 +20,8 @@ const DAY_MAX_MS = 86_400_000;
 const previousDay = (day) => jstDayOf(jstDayRange(day).start - 1);
 /** @param {unknown[]} rows */
 const result = (rows) => ({ rowCount: rows.length, rows });
+/** A transaction statement's result with its command tag, as node-pg gives it (ROLLBACK TO SAVEPOINT is 'ROLLBACK'). @param {string} command */
+const ended = (command) => ({ command, rowCount: 0, rows: [] });
 /** A PostgreSQL error with its SQLSTATE. @param {string} code @param {string} message */
 const pgError = (code, message) => Object.assign(new Error(message), { code });
 
@@ -94,24 +96,24 @@ export function createTrainingTimePool(seed = {}) {
             case 'BEGIN':
                 snapshot = structuredClone(state);
                 savepoint = null;
-                return result([]);
+                return ended('BEGIN');
             case 'COMMIT':
                 snapshot = null;
                 savepoint = null;
-                return result([]);
+                return ended('COMMIT');
             case 'ROLLBACK':
                 if (snapshot) state = snapshot;
                 snapshot = null;
                 savepoint = null;
-                return result([]);
+                return ended('ROLLBACK');
             case TRAINING_TIME_SQL.savepointState:
                 if (!snapshot) throw pgError('25P01', 'SAVEPOINT can only be used in transaction blocks');
                 savepoint = structuredClone(state);
-                return result([]);
+                return ended('SAVEPOINT');
             case TRAINING_TIME_SQL.rollbackState:
                 if (!savepoint) throw pgError('3B001', 'savepoint "live_state" does not exist');
                 state = structuredClone(savepoint);
-                return result([]);
+                return ended('ROLLBACK');
             case AUTH_SQL.tombstone: {
                 const t = state.tombstones.get(String(p1).toLowerCase());
                 return result(t ? [{ deleted_at: new Date(t.deleted_at), reopened_at: t.reopened_at === null ? null : new Date(t.reopened_at) }] : []);

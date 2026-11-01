@@ -68,11 +68,12 @@
  *       function
  *   T13 the real write on the database clock: a first signal, a beat (its pair counted in the
  *       answer), too soon, a stop, after the stop; one stream and the flags; the GET's live values
- *   T14 a clock behind a closed day stores nothing; the GET (readStudyTime) closes and reads in one
- *       transaction under its locks: a close started on another connection between the GET's clock
- *       reading and its close waits for the GET's COMMIT and finds nothing final, the GET's total is
- *       the pure function's; control: without the GET's learner lock that close commits in between
- *       and the GET fails
+ *   T14 a clock behind a closed day stores nothing; the GET (readStudyTime) closes and reads under
+ *       its locks: a close started on another connection between the GET's clock reading and its
+ *       close, or during its read (after its close), waits for the GET's COMMIT and finds nothing
+ *       final, the GET's total is the pure function's; control: without the GET's learner lock the
+ *       first close commits in between and the GET fails. (That the close and the read are one
+ *       transaction is the statement order npm test pins.)
  *   T15 signalState's other columns: the clock guard's window end (the last closed day with the
  *       gapMs it was counted with; a marked row and a recompute row are not read), yesterday's gapMs,
  *       today's unit list, the places (each chain's last signal, yesterday's and today's streams)
@@ -972,43 +973,54 @@ async function t14(pool, { catalogId, ruleSetId }) {
     const r = await sendSignal(pool, user, cohort);
     check('T14', r.status === 'clock_behind' && await streamsOf(pool, user, false) === 0, `a clock not past a closed day's evidence window stores nothing: ${r.status ?? r.error_type}`);
 
-    // The GET (readStudyTime) closes and reads its live values in one transaction under the three
-    // locks, as of one clock reading: a close on another connection, started while the GET is held
-    // after its closeState, waits for the GET's COMMIT and then finds nothing final; the GET closed
-    // both days and its total is the pure function's. Control: the GET without its learner lock: the
-    // other close does not wait, it commits both days between the GET's clock reading and the GET's
-    // own close, and the GET (which could not write them) fails.
+    // The GET (readStudyTime) closes and reads its live values under the three locks, as of one clock
+    // reading: a close on another connection, started while the GET is held after its closeState
+    // (before its close), or after its currentDays (its read, after its close), on whichever
+    // connection the GET sends it, waits for the GET's COMMIT and then finds nothing final; the GET
+    // closed both days and its total is the pure function's. Control: the GET without its learner
+    // lock, held after closeState: the other close does not wait, it commits both days between the
+    // GET's clock reading and the GET's own close, and the GET (which could not write them) fails.
     const d1 = await dayFromToday(pool, -3);
     const d2 = nextDay(d1);
     const runs = [];
-    for (const learnerLock of [true, false]) {
+    for (const { learnerLock, holdAfter } of [
+        { learnerLock: true, holdAfter: TRAINING_TIME_SQL.closeState },
+        { learnerLock: false, holdAfter: TRAINING_TIME_SQL.closeState },
+        { learnerLock: true, holdAfter: TRAINING_TIME_SQL.currentDays },
+    ]) {
         const learner = uid('t14r');
         const c14 = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1, learners: [learner] });
         const signals = await storeChain(pool, { user: learner, cohort: c14, unit: 'unit-b', from: jstDayRange(d2).start + 3_600_000, n: 10 });
         /** @type {Promise<any> | null} */
         let other = null;
         let otherMs = 0;
-        const changed = changedConnections(pool, [{
+        /** @type {ConnectionChange} */
+        const change = {
             ...(learnerLock ? {} : { skip: [TRAINING_SQL.learnerLock] }),
-            holdAfter: TRAINING_TIME_SQL.closeState,
+            holdAfter,
             until: async () => {
+                if (other) return; // once, on whichever of its connections the GET sends the statement
                 const t0 = Date.now();
                 other = close(pool, learner, c14).then((r) => { otherMs = Date.now() - t0; return r; });
                 await Promise.race([other, sleep(HOLD_MS)]);
             },
-        }]);
+        };
+        const changed = changedConnections(pool, [change, change]);
         const read = /** @type {any} */ (await readStudyTime({ userId: learner, cohortId: c14, pool: changed }));
         const closed = /** @type {any} */ (await other);
         const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days.reduce((n, d) => n + d.countedMs, 0);
         const closers = (await pool.query('SELECT computed_by FROM training_time_days WHERE user_id = $1 AND cohort_id = $2 ORDER BY day, id', [learner, c14])).rows.map((r) => String(r.computed_by));
         runs.push({ read, closed, otherMs, want, closers });
     }
-    const [locked, control] = runs;
+    const [locked, control, reading] = runs;
     check('T14', locked.read.status === 'read' && locked.read.time.totalMs === locked.want && locked.want > 0 && locked.read.time.days.every((/** @type {any} */ d) => d.final)
         && locked.closed?.status === 'nothing' && locked.closed.reason === 'nothing_final' && locked.otherMs >= BLOCKED_MS && locked.closers.join() === 'api,api',
         `the GET's close and read under its locks: a close started between them waited ${locked.otherMs} ms, then ${locked.closed?.status} (${locked.closed?.reason}); the GET ${locked.read.status ?? locked.read.error_type} with the days it closed (${locked.closers.join(', ')}), total ${locked.read.time?.totalMs / S} s (the pure function ${locked.want / S} s)`);
     check('T14', control.closed?.status === 'closed' && control.closed.days === 2 && control.otherMs < BLOCKED_MS && control.read.error_type === 'unknown' && control.closers.join() === 'verify,verify',
         `control, the GET without its learner lock: the other close did not wait (${control.otherMs} ms; ${control.closed?.status} ${control.closed?.days} days between the GET's clock reading and its close); the GET ${control.read.status ?? control.read.error_type}`);
+    check('T14', reading.read.status === 'read' && reading.read.time.totalMs === reading.want && reading.want > 0 && reading.read.time.days.every((/** @type {any} */ d) => d.final)
+        && reading.closed?.status === 'nothing' && reading.closed.reason === 'nothing_final' && reading.otherMs >= BLOCKED_MS && reading.closers.join() === 'api,api',
+        `the GET's read under its locks: a close started during the read (after currentDays, the GET's close done) waited ${reading.otherMs} ms, then ${reading.closed?.status} (${reading.closed?.reason}); the GET ${reading.read.status ?? reading.read.error_type}, total ${reading.read.time?.totalMs / S} s (the pure function ${reading.want / S} s)`);
 }
 
 /** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */

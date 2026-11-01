@@ -322,17 +322,24 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
 }
 
 /**
- * The other open pages' next signals, pending at `now`: their time since their last signal is not
- * stored yet but will be (open pages go on). Each chain's last signal that is not a stop and is
- * before now, again at now with its last flags and no input, except for a chain that maxPlaces
- * newer open chains push out (admitSignal's other_place, with today's gapMs: its next signal is not
- * stored). Whether a day credits a pending pair is the counting's (that day's gapMs and creditCapMs).
- * @param {{ now: number, signals: Signal[], gapMs: number, maxPlaces?: number, except?: string | null }} input
+ * The other open pages' next signals, pending at `now`: open pages go on, so the time since a
+ * page's last signal is not stored yet but will be. Each chain's last signal that is not a stop and
+ * is before now, again at now with its last flags and no input. Left out, as admitSignal would not
+ * store that next signal (a beat): a chain that maxPlaces newer open chains push out (other_place,
+ * with today's gapMs; the answer's nextInMs is null and the page sends no more signals of that
+ * chain, not even a stop), and a chain of a unit today's unit list does not have (unit_unknown, a
+ * stop too). A pushed-out chain's last pair is still stored when its next signal is a stop (the
+ * page was hidden or closed before its next beat: a stop passes) or a beat after the chains that
+ * pushed it out stopped; answers given before that judged without it. Whether a day credits a
+ * pending pair is the counting's (that day's gapMs and creditCapMs).
+ * @param {{ now: number, signals: Signal[], gapMs: number, maxPlaces?: number, unitKnown?: (unit: string) => boolean, except?: string | null }} input
  *   signals: the stored evidence up to now; gapMs: today's (admitSignal's open places); maxPlaces:
- *   the collection's (default: no chain is pushed out); except: a chain left out (the page asking)
+ *   the collection's (default: no chain is pushed out); unitKnown: whether today's unit list has the
+ *   unit (default: every unit; a chain of an unlisted unit still holds an open place); except: a
+ *   chain left out (the page asking)
  * @returns {Signal[]}
  */
-export function pendingSignals({ now, signals, gapMs, maxPlaces = Infinity, except = null }) {
+export function pendingSignals({ now, signals, gapMs, maxPlaces = Infinity, unitKnown = () => true, except = null }) {
   /** @type {Map<string, Signal>} */
   const last = new Map();
   for (const s of signals) {
@@ -343,7 +350,7 @@ export function pendingSignals({ now, signals, gapMs, maxPlaces = Infinity, exce
   /** How many open places are newer than `p` (admitSignal's other_place rule for p's next signal). @param {Signal} p */
   const newer = (p) => places.filter((q) => q.chain !== p.chain && (q.born > p.born || (q.born === p.born && q.chain < p.chain))).length;
   return [...last.values()]
-    .filter((l) => l.chain !== except && !l.stop && l.at < now && newer(l) < maxPlaces)
+    .filter((l) => l.chain !== except && !l.stop && l.at < now && unitKnown(l.unit) && newer(l) < maxPlaces)
     .map((l) => ({ ...l, seq: l.seq + 1, at: now, stop: false, input: false }));
 }
 
@@ -359,7 +366,7 @@ export function pendingSignals({ now, signals, gapMs, maxPlaces = Infinity, exce
  * it), as countSpan counts x with the rules of x's day, with the other open pages' pending signals
  * (pendingSignals: their time since their last signal will be stored). A page that replaced its
  * chain without a stop still looks open until gapMs passes, so the page sends a stop for a chain it
- * ends. First match:
+ * ends while it keeps it (its last answer's nextInMs not null). First match:
  *   'not_in_session' now is outside the cohort's dates (a known chain's signal after the last day):
  *                    nothing counts from now on (the part of its last pair before the end still does);
  *   'cap_reached'    the unit's time through now (unitMs, with the same pending signals) reached its
@@ -379,18 +386,20 @@ export function pendingSignals({ now, signals, gapMs, maxPlaces = Infinity, exce
  *   counting: CountingRules,
  *   countingOf?: (day: string) => CountingRules | null,
  *   maxPlaces?: number,
+ *   unitKnown?: (unit: string) => boolean,
  *   setMs: number,
  *   unitMs: number,
  *   cohort: Range | null,
  * }} input chain: this page's chain, prevAt its previous stored signal (null for seq 0); signals: the
  *   learner's stored evidence in the cohort up to now (this signal included); counting: today's
  *   rules, and countingOf a day's (null: none that day; default: today's for every day); maxPlaces:
- *   the collection's (default: no page is pushed out); setMs: the unit's set time today; unitMs: its
- *   counted time through now (closed days and the live ones, with the pending signals of the other
- *   open pages: tools/core/trainingTime.js liveTime's unitNowMs)
+ *   the collection's (default: no page is pushed out); unitKnown: whether today's unit list has a
+ *   unit (default: every unit); setMs: the unit's set time today; unitMs: its counted time through
+ *   now (closed days and the live ones, with the pending signals of the other open pages:
+ *   tools/core/trainingTime.js liveTime's unitNowMs)
  * @returns {StudyReason | null}
  */
-export function studyReason({ now, chain, signal, signals, counting, countingOf = () => counting, maxPlaces = Infinity, setMs, unitMs, cohort }) {
+export function studyReason({ now, chain, signal, signals, counting, countingOf = () => counting, maxPlaces = Infinity, unitKnown = () => true, setMs, unitMs, cohort }) {
   if (!cohort || now < cohort.from || now >= cohort.to) return 'not_in_session';
   if (unitMs >= setMs) return 'cap_reached';
   if (chain.prevAt === null) return 'starting';
@@ -412,7 +421,7 @@ export function studyReason({ now, chain, signal, signals, counting, countingOf 
   if (!rules) return 'gap';
   // admitSignal decides a page's next signal with today's rules: its open places are today's. A
   // pending pair longer than x's day's gapMs is a break there, so it counts nothing at x.
-  const pending = pendingSignals({ now, signals, gapMs: counting.gapMs, maxPlaces, except: chain.id });
+  const pending = pendingSignals({ now, signals, gapMs: counting.gapMs, maxPlaces, unitKnown, except: chain.id });
   const at = countSpan({ a: x, b: x + 1, signals: [...signals, ...pending], rules: { counting: rules }, setMs: new Map(), carriedMs: new Map(), cohort });
   const mine = at.units.find((u) => u.unit === chain.unit);
   if (mine && mine.countedMs + mine.overCapMs === 1) return null;

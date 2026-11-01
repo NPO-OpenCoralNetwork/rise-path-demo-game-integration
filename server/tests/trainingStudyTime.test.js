@@ -477,15 +477,15 @@ describe('studyReason: why a page\'s time is not counting', () => {
   const COHORT = cohortRange('2026-11-01', '2026-11-30');
   const SET_MS = 100 * 3600 * S;
   const first = (i) => i === 0;
-  /** The answer right after the last signal of chain `id` was stored, with the evidence up to it (countingOf and maxPlaces only when given: else the defaults). */
-  const reasonAfter = (signals, id, { counting = RULES.counting, countingOf, maxPlaces, setMs = SET_MS, unitMs = 0, cohort = COHORT } = {}) => {
+  /** The answer right after the last signal of chain `id` was stored, with the evidence up to it (countingOf, maxPlaces and unitKnown only when given: else the defaults). */
+  const reasonAfter = (signals, id, { counting = RULES.counting, countingOf, maxPlaces, unitKnown, setMs = SET_MS, unitMs = 0, cohort = COHORT } = {}) => {
     const own = signals.filter((s) => s.chain === id).sort((x, y) => x.seq - y.seq);
     const s = own[own.length - 1];
     const prev = own.length > 1 ? own[own.length - 2] : null;
     return studyReason({
       now: s.at, chain: { id, unit: s.unit, prevAt: prev ? prev.at : null }, signal: { focus: s.focus, input: s.input },
       signals: signals.filter((g) => g.at <= s.at), counting, setMs, unitMs, cohort,
-      ...(countingOf === undefined ? {} : { countingOf }), ...(maxPlaces === undefined ? {} : { maxPlaces }),
+      ...(countingOf === undefined ? {} : { countingOf }), ...(maxPlaces === undefined ? {} : { maxPlaces }), ...(unitKnown === undefined ? {} : { unitKnown }),
     });
   };
 
@@ -543,7 +543,7 @@ describe('studyReason: why a page\'s time is not counting', () => {
     assert.equal(reasonAfter([...exact, ...quiet(T0 - 1)], 'a'), null, 'one millisecond older: b is not open');
   });
 
-  it('pendingSignals: each other chain\'s last signal (not a stop, before now) again at now, with its last flags and no input; not the asking chain, a stopped one, one whose last signal is now, or one maxPlaces newer open chains push out (open by today\'s gapMs); a quiet one stays (its pair is the counting\'s to judge)', () => {
+  it('pendingSignals: each other chain\'s last signal (not a stop, before now) again at now, with its last flags and no input; not the asking chain, a stopped one, one whose last signal is now, one maxPlaces newer open chains push out (open by today\'s gapMs), or one of a unit today\'s unit list does not have (it still holds an open place); a quiet one stays (its pair is the counting\'s to judge)', () => {
     const now = T0 + 30 * S;
     const signals = [
       ...chain('a', 'u1', [0, 7, 14], { input: first }), // the asking page
@@ -561,6 +561,11 @@ describe('studyReason: why a page\'s time is not counting', () => {
     assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 1, except: 'a' }), []);
     assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 2, except: 'a' }).map((s) => s.chain), ['b']);
     assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S }).map((s) => s.chain), ['a', 'b', 'e'], 'no chain left out: the asking one too');
+    // Unit u2 no longer listed today: b is not pending, yet it still holds an open place (admitSignal
+    // counts it), so with maxPlaces 2 e stays pushed out by b and d.
+    const listed = (unit) => unit !== 'u2';
+    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, unitKnown: listed, except: 'a' }).map((s) => s.chain), ['e']);
+    assert.deepEqual(pendingSignals({ now, signals, gapMs: 23 * S, maxPlaces: 2, unitKnown: listed, except: 'a' }), []);
   });
 
   it('another page of the same unit counts the instant: this idle page reads counting', () => {
@@ -762,6 +767,23 @@ describe('studyReason: why a page\'s time is not counting', () => {
       assert.equal(nextSignal(signals, 'd', now, placesOf(2, counting)).verdict, 'accept', counting.overlap);
       assert.equal(reasonAfter(signals, 'a', { counting, maxPlaces: 2 }), 'other_tab', `${counting.overlap}: d is pending`);
       assert.equal(reasonAfter([...UNFOCUSED, ...OLD_PAGE, ...pushers(1)], 'a', { counting, maxPlaces: 2 }), null, `${counting.overlap}: p0 (no input) in d's place`);
+    }
+  });
+
+  it('unitKnown: a page of a unit today\'s unit list does not have is not pending (admitSignal refuses its next signal, a stop too: unit_unknown): the page counts where it was other_tab', () => {
+    const now = T0 + 24 * S;
+    const [b5] = lastSignals(OLD_PAGE);
+    for (const counting of OVERLAPS) {
+      const signals = [...UNFOCUSED, ...OLD_PAGE];
+      for (const stop of [false, true]) {
+        const next = admitSignal({
+          now, cohortId: 'c1', signal: { chainId: 'b5', seq: b5.seq + 1, unitKey: 'u2', stop }, configured: true, session: { from: -Infinity, to: Infinity }, unitKnown: false,
+          chain: { cohortId: 'c1', unitKey: 'u2', bornAt: b5.born, lastSeq: b5.seq, lastAt: b5.at, lastStop: false }, places: [], rules: placesOf(3, counting),
+        });
+        assert.deepEqual(next, { verdict: 'refuse', reason: 'unit_unknown' }, `${counting.overlap}: b5's next signal (stop ${stop})`);
+      }
+      assert.equal(reasonAfter(signals, 'a', { counting }), 'other_tab', `${counting.overlap}: u2 listed, b5 is pending`);
+      assert.equal(reasonAfter(signals, 'a', { counting, unitKnown: (unit) => unit !== 'u2' }), null, `${counting.overlap}: u2 not listed today, b5 is not pending`);
     }
   });
 

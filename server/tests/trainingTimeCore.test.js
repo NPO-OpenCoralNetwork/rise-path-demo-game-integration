@@ -19,7 +19,8 @@
 //   the gapMs it was counted with); the state as of the signal's clock, read in its transaction under
 //   its locks behind a savepoint whose failure keeps the signal (none for a stop), with the pure
 //   function's numbers and reason (each day's rules for a pair across 00:00; no look-ahead for a page
-//   maxPlaces pushes out; the cap with the other open pages going on); then a close (computed by
+//   maxPlaces pushes out or of a unit today's unit list no longer has; the cap with the other open
+//   pages going on, without those); then a close (computed by
 //   'api') only once a day is final (with yesterday's gapMs, as closeRange), whose failure keeps the
 //   signal;
 // - reading study time (readStudyTime): learners only (the membership read decides before any
@@ -1608,6 +1609,79 @@ describe('tools/core/trainingTime.js: the live values up to the settled instant 
         // 63 + 49 + 7 s through now at 00:00:08: counting; 63 + 49 + 14 s at 00:00:15: over 120 s.
         assert.equal(answers.get(`${chainId(1)}#1`)?.state.reason, null);
         assert.deepEqual(answers.get(`${chainId(1)}#2`)?.state, { counting: false, reason: 'cap_reached', todayMs: 7 * S, unit: { unitKey: U1, countedMs: 118 * S, setMs: 120 * S, capReached: false } });
+    });
+
+    it('the reason\'s cap check leaves out a page that maxPlaces pushed out (it got other_place, nextInMs null, and sends nothing more): the newer page of the same unit counts below the set time, as the final count gives', async () => {
+        const T0 = at('2026-11-04T03:00:00Z');
+        const { pool } = await seeded({ clock: T0, rulesIn: { ...RULES_IN, collection: { ...RULES_IN.collection, maxPlaces: 1 } } });
+        chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-03T01:00:00Z'), n: 16 }); // 105 s of unit 1 on 11-03 (closed by the first signal's close)
+        const answers = await play(pool, [
+            [T0, { chainId: chainId(1), seq: 0 }], // page P (unit 1): T0, + 7 s
+            [T0 + 7 * S, { chainId: chainId(1), seq: 1, input: false }],
+            [T0 + 9 * S, { chainId: chainId(2), seq: 0 }], // page Q (unit 1, newer): pushes P out
+            [T0 + 14 * S, { chainId: chainId(1), seq: 2, input: false }],
+            [T0 + 16 * S, { chainId: chainId(2), seq: 1, input: false }],
+        ]);
+        assert.deepEqual(answers.get(`${chainId(1)}#2`), { status: 'ignored', reason: 'other_place', nextInMs: null });
+        // 105 + 7 s (P) + 7 s (Q) = 119 s through now. P's pair going on to now (T0 + 7 s to + 16 s) would
+        // make it 121 s: cap_reached. P's last signal still holds the numbers back at 112 s.
+        assert.deepEqual(answers.get(`${chainId(2)}#1`)?.state, { counting: true, reason: null, todayMs: 7 * S, unit: { unitKey: U1, countedMs: 112 * S, setMs: 120 * S, capReached: false } });
+        pool.setClock(T0 + 40 * S); // every page quiet for more than gapMs: the numbers are settled to now
+        const read = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.deepEqual(read.time.units.find((u) => u.unitKey === U1), { unitKey: U1, title: COURSE.units[0].title, setMs: 120 * S, countedMs: 119 * S, capReached: false });
+    });
+
+    /**
+     * A cohort under drop_conflicts whose unit list loses unit 2 from 11-05 (a new version of the same
+     * course, set on 11-04 at noon), and two pages across 00:00: P (unit 2) at 23:59:46 and :53, whose
+     * next signal and stop at 00:00 are refused, and C (unit 1) at 23:59:48, :55 and then `after`
+     * (seconds from 00:00). seedS: seconds of unit 1 stored on 11-03. Returns the pool, 00:00 and the answers.
+     */
+    async function unitDropped({ seedS = 0, after }) {
+        const midnight = jstDayRange('2026-11-05').start;
+        const { pool, rules } = await seeded({ clock: at('2026-11-04T03:00:00Z'), rulesIn: countingWith({ overlap: 'drop_conflicts' }) });
+        if (seedS) chain(pool, { id: chainId(9), unit: U1, from: at('2026-11-03T01:00:00Z'), n: seedS / 6 + 1, every: 6 * S });
+        const withoutU2 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [COURSE.units[0]] }, loadedBy: 'staff-a', note: 'unit 2 dropped', pool }));
+        const set = /** @type {any} */ (await setCohortTime({ cohortSlug: SLUG, catalogSha256: withoutU2.sha256, rulesSha256: rules.sha256, effectiveFrom: '2026-11-05', setBy: 'staff-a', reason: 'unit 2 dropped from tomorrow', pool }));
+        assert.equal(set.status, 'set');
+        const answers = await play(pool, [
+            [midnight - 14 * S, { unitKey: U2, chainId: chainId(2), seq: 0 }],
+            [midnight - 7 * S, { unitKey: U2, chainId: chainId(2), seq: 1, input: false }],
+            [midnight - 12 * S, { chainId: chainId(1), seq: 0 }],
+            [midnight - 5 * S, { chainId: chainId(1), seq: 1, input: false }],
+        ]);
+        for (const [clock, stop] of [[midnight, false], [midnight + 1, true]]) {
+            pool.setClock(clock);
+            assert.deepEqual(await unstored(pool, { unitKey: U2, chainId: chainId(2), seq: 2, input: false, stop }), { status: 'refused', reason: 'unit_unknown' }, `P's ${stop ? 'stop' : 'beat'}`);
+        }
+        const later = await play(pool, after.map((t, k) => [midnight + t * S, { chainId: chainId(1), seq: 2 + k, input: false }]));
+        return { pool, midnight, answers: new Map([...answers, ...later]) };
+    }
+
+    it('the reason leaves out a page of a unit today\'s unit list no longer has (its next signal and its stop are refused: unit_unknown): after 00:00 under drop_conflicts the other page counts (null), as the final count gives it x', async () => {
+        const { pool, midnight, answers } = await unitDropped({ after: [2, 9] });
+        // Before 00:00 P could still store its next signal: its pending pair wins nothing, both lose x.
+        assert.equal(answers.get(`${chainId(1)}#1`)?.state.reason, 'other_tab');
+        // At 00:00:02 P can store nothing more: C counts. P's last signal (23:59:53) still holds 11-04 back.
+        assert.deepEqual(answers.get(`${chainId(1)}#2`)?.state, { counting: true, reason: null, todayMs: 0, unit: { unitKey: U1, countedMs: 0, setMs: 120 * S, capReached: false } });
+        assert.equal(answers.get(`${chainId(1)}#3`)?.state.reason, null);
+        const x = midnight + 2 * S - 1;
+        const counted = countSpan({ a: x, b: x + 1, signals: storedSignals(pool), rules: /** @type {any} */ (parseTimeRules(countingWith({ overlap: 'drop_conflicts' }))).rules, setMs: new Map(), carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30') });
+        assert.deepEqual(counted.units.map((u) => [u.unit, u.countedMs + u.overCapMs]), [[U1, 1]], 'the final count gives unit 1 x = 00:00:01.999');
+        pool.setClock(midnight + 60 * S);
+        const read = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        // 11-04: P 2 s (23:59:46 to :48) and C 7 s (23:59:53 to 00:00; the 5 s both pairs cover are lost); 11-05: C 9 s.
+        assert.deepEqual([read.time.units.map((u) => [u.unitKey, u.countedMs]), read.time.days.slice(0, 2)], [[[U1, 16 * S]], [{ day: '2026-11-05', countedMs: 9 * S, final: false }, { day: '2026-11-04', countedMs: 9 * S, final: true }]]);
+    });
+
+    it('the reason\'s cap check leaves out a page of a unit today\'s unit list no longer has: after 00:00 the other page\'s unit has reached its set time through now (cap_reached), as the final count gives', async () => {
+        const { pool, midnight, answers } = await unitDropped({ seedS: 114, after: [2] });
+        // 114 s from 11-03, 7 s of C on 11-04 and 2 s on 11-05: past 120 s at 23:59:59. With P's pair
+        // going on to now, C's 9 s would be lost (drop_conflicts) and the unit would stay at 114 s.
+        assert.deepEqual(answers.get(`${chainId(1)}#2`)?.state, { counting: false, reason: 'cap_reached', todayMs: 0, unit: { unitKey: U1, countedMs: 114 * S, setMs: 120 * S, capReached: false } });
+        pool.setClock(midnight + 60 * S);
+        const read = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.deepEqual(read.time.units, [{ unitKey: U1, title: COURSE.units[0].title, setMs: 120 * S, countedMs: 120 * S, capReached: true }]);
     });
 
     it('liveTime: a live day counts only once the days before it are settled to their end: a page that holds yesterday back (its next pair cannot reach today) keeps today at 0 while a unit\'s set time carries across 00:00, so no number goes down', async () => {

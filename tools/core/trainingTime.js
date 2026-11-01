@@ -32,7 +32,8 @@
  * transaction that holds the three locks (no signal or close of the learner commits meanwhile): the
  * closed days' current rows, and the days not closed yet counted from the evidence with the function
  * a close uses, never stored, up to the instant no other open page's next signal can change
- * (settledUntil): no number goes down.
+ * (settledUntil): no number goes down while the database clock does not go back (a signal stored at
+ * an earlier clock can fall inside a counted span; only a closed day's evidence window is guarded).
  *
  * Closing (closeDays): a learner's days, from the first one not closed yet up to the last final one
  * (the database clock passed its end + gapMs) and at most the cohort's last day, counted from the
@@ -516,8 +517,8 @@ export function settledUntil({ day, nowMs, signals, counting }) {
  * closed yet counted from `signals` with each unit's time carried from the closed days, as the close
  * will count them, each up to its settledUntil and a day only once the days before it are settled to
  * their end (its set times carry their time); never stored. So no number goes down from one answer
- * to the next (a recount aside): what another open page's next signal can still change is not
- * counted yet.
+ * to the next (a recount aside, and while the database clock does not go back): what another open
+ * page's next signal can still change is not counted yet.
  * status: 'not_configured' (no setting today, so nothing was ever counted), 'not_in_session'
  * (outside the cohort's dates, or a date missing) or 'ready'. units: today's unit list in its order,
  * each with its time over every day (closed and live). days: the newest LIVE_DAYS days from today
@@ -550,13 +551,16 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
         heldBack ||= until < Math.min(end, nowMs);
     }
     // Each unit's time through nowMs, every live day counted from all its evidence up to nowMs and the
-    // other open pages' pending signals (open pages go on; pendingSignals, as studyReason judges x):
-    // what the reason's cap check reads. The same as the settled count unless another open page held
-    // it back (only such a page has a pending pair a day can credit).
+    // other open pages' pending signals (open pages go on, but not one whose next signal admitSignal
+    // would not store: pendingSignals, as studyReason judges x): what the reason's cap check reads.
+    // The same as the settled count unless another open page held it back (only such a page has a
+    // pending pair a day can credit).
     const unitNowMs = heldBack && range?.live && setting
         ? countDays({
             ...range.live,
-            signals: [...signals, ...pendingSignals({ now: nowMs, signals, gapMs: setting.rules.counting.gapMs, maxPlaces: setting.rules.collection.maxPlaces })],
+            signals: [...signals, ...pendingSignals({
+                now: nowMs, signals, gapMs: setting.rules.counting.gapMs, maxPlaces: setting.rules.collection.maxPlaces, unitKnown: (unit) => setting.setMs.has(unit),
+            })],
             rulesOf: (day) => of(day).rules, setMsOf: (day) => of(day).setMs, carriedMs: unitTotals, cohort,
         }).carriedAfterMs
         : counted.carriedAfterMs;
@@ -607,15 +611,17 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
  * @returns {SignalState | null}
  */
 export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, settings }) {
-    const setMs = time.setting?.setMs.get(signal.unitKey);
-    if (!time.setting || setMs === undefined) return null;
+    const setting = time.setting;
+    const setMs = setting?.setMs.get(signal.unitKey);
+    if (!setting || setMs === undefined) return null;
     const countedMs = time.unitMs.get(signal.unitKey) ?? 0;
-    const today = time.setting.rules.counting;
+    const today = setting.rules.counting;
     const reason = studyReason({
         now: nowMs, chain: { id: signal.chainId, unit: signal.unitKey, prevAt }, signal, signals,
         counting: today,
         countingOf: (day) => (settings ? settingOf(settings, day)?.rules.counting ?? null : today),
-        maxPlaces: time.setting.rules.collection.maxPlaces,
+        maxPlaces: setting.rules.collection.maxPlaces,
+        unitKnown: (unit) => setting.setMs.has(unit),
         setMs, unitMs: time.unitNowMs.get(signal.unitKey) ?? 0, cohort: time.cohort,
     });
     return { counting: reason === null, reason, todayMs: time.todayMs, unit: { unitKey: signal.unitKey, countedMs, setMs, capReached: countedMs >= setMs } };
@@ -903,8 +909,9 @@ async function readLive(db, userId, cohortId, at) {
  * list as stored, so a stored unit list that no longer parses with this code keeps signals (the
  * evidence) while the close and the state fail with invalid_setting; today's rules that no longer
  * parse refuse the signal. nextInMs: beatMs while the page keeps the chain (accepted, duplicate,
- * too_soon, while the cohort is in session and the chain goes on); null otherwise: the page ends it
- * (a stop, the cohort's end) or reacts to the reason (a new chain, or it stops).
+ * too_soon, while the cohort is in session and the chain goes on); null otherwise: the page sends
+ * no more signals of that chain, not even a stop (it ended: a stop, the cohort's end; or it reacts
+ * to the reason: a new chain, or it stops sending).
  * @param {{ userId: unknown, cohortId: unknown, signal: unknown, pool?: TrainingPool | null }} params
  * @returns {Promise<{ status: 'accepted', nextInMs: number | null, state: SignalState | null, closeError?: string, stateError?: string }
  *   | { status: 'ignored', reason: string, nextInMs: number | null }

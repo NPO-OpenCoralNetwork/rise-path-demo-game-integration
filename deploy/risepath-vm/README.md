@@ -481,7 +481,7 @@ docker compose --env-file stack.env exec -T api node scripts/training-time.mjs -
 
 終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい（ファイルを流していないときも。5 秒待っても何も届かなければ止まります）、2 = 断った（`TRAINING_ENABLED` が `true` でない、ファイルの形がちがう、期や版がない、日付が範囲の外、今日すでに設定が効いている、今日効いている設定とちがうコースの単元表、保存した版をこのコードで読めない）、3 = いまは使えない（DB。ロックが 10 秒空かないときも。あとでもう一度実行します）。
 
-- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と、設定の決まり・日を閉じる処理・合図の書き込み（削除・日を閉じる処理・設定の追加との重なり、0 時をまたぐ続き、DB の時計での書き込み、閉じた日まで戻った時計）・受講時間を読む API（閉じる処理と読み出しをロックの下の 1 つのトランザクションで）・合図の書き込みが読む列・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 と 022 の行）。VM の DB には決して向けないでください。
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と、設定の決まり・日を閉じる処理・合図の書き込み（削除・日を閉じる処理・設定の追加との重なり、0 時をまたぐ続き、DB の時計での書き込み、閉じた日まで戻った時計）・受講時間を読む API（閉じる処理の前と読み出しの最中に始めたほかの閉じる処理が、GET のコミットまで待つこと）・合図の書き込みが読む列・状態の読み出しが失敗しても合図が残ること・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 と 022 の行）。VM の DB には決して向けないでください。
 
 ## CI での予行（Phase 7）
 
