@@ -458,8 +458,13 @@ bk_manifest_counts() {
 }
 # bk_manifest_count <file> <key> <table>: that table's count in countsBefore or countsAfter (a checked whole number),
 # or nothing when the manifest has no such table or its counts cannot be read. Always exits 0.
+# awk reads to the end and never `exit`s: an awk that stops at the first match closes the pipe while
+# bk_manifest_counts may still be writing, which kills the writer with SIGPIPE. With pipefail the 141 stopped the
+# drill at DR5 as an unexpected error, and restore-db.sh's RS4 line showed 不明 for a count the manifest has. gawk
+# reads a pipe line by line, so it lost that race on the CI runner; mawk (Ubuntu's default awk) fills its buffer
+# first and usually hid it.
 bk_manifest_count() {
-  { bk_manifest_counts "$1" "$2" || true; } | awk -v t="$3" '$1 == t { print $2; exit }'
+  { bk_manifest_counts "$1" "$2" || true; } | awk -v t="$3" '!found && $1 == t { print $2; found = 1 }'
 }
 # bk_check_manifest <file>: 0 when every field that drives a decision has its fixed form (format, times, key id,
 # commit, SHA-256, sizes, file count, migration names). The counts are checked apart (bk_check_counts): the drill

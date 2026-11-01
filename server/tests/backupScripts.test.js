@@ -291,6 +291,41 @@ describe('backup scripts: static pins (design §5.10)', () => {
   });
 });
 
+// PR #82's first CI run: bk_manifest_count's awk stopped at the first match (`exit`) while bk_manifest_counts was still
+// writing, so the writer died of SIGPIPE and pipefail made the drill stop at DR5 with 141. The CI runner's gawk reads a
+// pipe line by line and lost that race; mawk fills its buffer first and hid it locally. Here every write is slow and
+// awk reads line by line (mawk with -W interactive), so an early exit always loses the race.
+describe('bk_manifest_count under pipefail: a slow writer and an awk that reads line by line (SIGPIPE)', { skip }, () => {
+  it('reads each table\'s count, the first one included, and exits 0', () => {
+    const fn = (/** @type {string} */ name) => new RegExp(`^${name}\\(\\) \\{[\\s\\S]*?^\\}$`, 'm').exec(SCRIPT.common)?.[0];
+    const value = (/** @type {string} */ name) => new RegExp(`^${name}=.*$`, 'm').exec(SCRIPT.common)?.[0];
+    const parts = [value('BK_COUNT_RE'), value('BK_TABLE_RE'), ...['bk_manifest_list', 'bk_manifest_tables', 'bk_manifest_counts', 'bk_manifest_count'].map(fn)];
+    assert.ok(parts.every(Boolean), 'the functions and patterns found in backup-common.sh');
+    assert.doesNotMatch(code(SCRIPT.common), /\|\s*awk\b[^\n]*\bexit\b/, 'no awk after a pipe stops early');
+    const realAwk = spawnSync('bash', ['-c', 'command -v awk'], { encoding: 'utf8' }).stdout.trim();
+    assert.ok(realAwk, 'awk');
+    const dir = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || '/tmp'), 'bk-count-'));
+    try {
+      // awk in line-by-line mode, as gawk reads a pipe; mawk needs -W interactive for that.
+      fs.writeFileSync(path.join(dir, 'awk'), `#!/bin/sh\ncase "$(readlink -f '${realAwk}')" in *mawk*) exec '${realAwk}' -W interactive "$@";; esac\nexec '${realAwk}' "$@"\n`, { mode: 0o755 });
+      const manifest = path.join(dir, 'manifest.json');
+      fs.writeFileSync(manifest, '{\n  "tables": ["auth.users","user_profiles","lesson_progress"],\n  "countsBefore": [4,0,3],\n  "countsAfter": [5,0,3]\n}\n');
+      const script = [
+        'set -Eeuo pipefail', ...parts,
+        // Every printf of the writer waits after writing, so an awk that stops at the first line has gone by the next write.
+        'printf() { builtin printf "$@"; sleep 0.05; }',
+        'out=""; for t in auth.users user_profiles lesson_progress; do v="$(bk_manifest_count "$1" countsAfter "$t")"; out+="${t}=${v} "; done',
+        'unset -f printf; printf \'%s\\n\' "${out}"',
+      ].join('\n');
+      const r = spawnSync('bash', ['-c', script, '_', manifest], { encoding: 'utf8', env: { ...process.env, PATH: `${dir}:${process.env.PATH}` } });
+      assert.equal(r.status, 0, `${r.status} ${r.stderr}`);
+      assert.equal(r.stdout, 'auth.users=5 user_profiles=0 lesson_progress=3 \n');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('provision-gce.sh with a gcloud stub (review round 1, finding 23)', { skip }, () => {
   /** Runs provision-gce.sh with a gcloud that logs its calls; `exists` answers describe for the VM. @param {Record<string, string>} env @param {boolean} exists */
   const provision = (env, exists) => {
