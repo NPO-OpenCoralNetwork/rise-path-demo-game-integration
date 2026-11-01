@@ -23,17 +23,19 @@ export const LLM_UNSUPPORTED_KEYWORDS = /** @type {const} */ ([
 /**
  * Metadata for the generator: `$defs` ids from the lesson registry, descriptions from
  * `.describe()` (global registry) or from the lesson registry. A schema's own description
- * wins over one inherited from the schema it was cloned from.
+ * wins over one inherited from the schema it was cloned from. The root being generated gets no
+ * id: zod 4.x would move a root with an id into `$defs` and leave only a `$ref` at the top.
  */
-const metadata = /** @type {z.core.$ZodRegistry<Record<string, any>>} */ (/** @type {unknown} */ ({
+const metadataFor = (/** @type {z.ZodType} */ root) => /** @type {z.core.$ZodRegistry<Record<string, any>>} */ (/** @type {unknown} */ ({
   /** @param {z.ZodType} schema */
   get(schema) {
     const local = schemaRegistry.has(schema) ? schemaRegistry.get(schema) : undefined;
     const ownGlobal = z.globalRegistry.has(schema) ? z.globalRegistry.get(schema) : undefined;
     const inherited = z.globalRegistry.get(schema) || schemaRegistry.get(schema);
     const description = (ownGlobal && ownGlobal.description) || (local && local.description) || (inherited && inherited.description);
-    if (!local?.id && !description) return undefined;
-    return { ...(local && local.id ? { id: local.id } : {}), ...(description ? { description } : {}) };
+    const id = schema === root ? undefined : local?.id;
+    if (!id && !description) return undefined;
+    return { ...(id ? { id } : {}), ...(description ? { description } : {}) };
   },
 }));
 
@@ -44,13 +46,21 @@ const metadata = /** @type {z.core.$ZodRegistry<Record<string, any>>} */ (/** @t
 function generate(schema) {
   const json = /** @type {Record<string, any>} */ (z.toJSONSchema(schema, {
     target: 'draft-2020-12',
-    metadata,
+    metadata: metadataFor(schema),
     unrepresentable: 'throw',
     cycles: 'throw',
   }));
   // zod copies the registry "id" into each $defs entry; it is not a JSON Schema keyword.
   for (const def of Object.values(json.$defs || {})) delete def.id;
   delete json.id;
+  // zod 4.x writes discriminated unions as oneOf. Keep anyOf as before: every branch has its own
+  // `type` literal, so at most one can match and the two mean the same here.
+  visitSchemas(json, (node) => {
+    if (node.oneOf) {
+      node.anyOf = node.oneOf;
+      delete node.oneOf;
+    }
+  });
   return json;
 }
 

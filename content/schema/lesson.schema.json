@@ -8,9 +8,9 @@
       "const": "risepath.lesson/v1"
     },
     "id": {
-      "description": "Lesson id; the file is named <id>.lesson.json.",
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "Lesson id; the file is named <id>.lesson.json."
     },
     "courseId": {
       "description": "Slug of the course this lesson belongs to.",
@@ -43,10 +43,10 @@
       ]
     },
     "estMinutes": {
-      "description": "Estimated minutes to finish (1–600).",
       "type": "integer",
       "minimum": 1,
-      "maximum": 600
+      "maximum": 600,
+      "description": "Estimated minutes to finish (1–600)."
     },
     "prerequisites": {
       "description": "What the learner should know first, e.g. an earlier lesson title.",
@@ -56,11 +56,11 @@
       }
     },
     "objectives": {
-      "description": "2–4 observable objectives.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/Objective"
-      }
+      },
+      "description": "2–4 observable objectives."
     },
     "sections": {
       "minItems": 1,
@@ -108,7 +108,6 @@
   "description": "A Rise Path lesson (risepath.lesson/v1).",
   "$defs": {
     "LText": {
-      "description": "Plain text. A string is in lesson.locale; an object holds one string per locale.",
       "anyOf": [
         {
           "type": "string"
@@ -128,7 +127,8 @@
           },
           "additionalProperties": false
         }
-      ]
+      ],
+      "description": "Plain text. A string is in lesson.locale; an object holds one string per locale."
     },
     "Locale": {
       "type": "string",
@@ -143,9 +143,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "text": {
           "description": "Observable outcome, e.g. \"…を説明できる\" / \"Explain …\".",
@@ -179,9 +179,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "title": {
           "$ref": "#/$defs/LText"
@@ -220,6 +220,7 @@
       "description": "Pedagogical role of a section."
     },
     "Block": {
+      "description": "A lesson block, discriminated by \"type\".",
       "anyOf": [
         {
           "$ref": "#/$defs/MarkdownBlock"
@@ -266,16 +267,15 @@
         {
           "$ref": "#/$defs/AskTutorBlock"
         }
-      ],
-      "description": "A lesson block, discriminated by \"type\"."
+      ]
     },
     "MarkdownBlock": {
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -289,9 +289,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -319,7 +319,6 @@
       "description": "Prose paragraph(s). Keep each paragraph within 160 JP characters / 80 EN words."
     },
     "Md": {
-      "description": "Inline markdown: **bold**, *italic*, `code`, [link](https://…), [[glossary term]], line breaks.",
       "anyOf": [
         {
           "type": "string"
@@ -339,15 +338,16 @@
           },
           "additionalProperties": false
         }
-      ]
+      ],
+      "description": "Inline markdown: **bold**, *italic*, `code`, [link](https://…), [[glossary term]], line breaks."
     },
     "CalloutBlock": {
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -361,9 +361,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -402,9 +402,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -418,9 +418,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -455,9 +455,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -471,9 +471,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -513,9 +513,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -529,9 +529,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -572,9 +572,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -588,9 +588,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -598,9 +598,9 @@
           "const": "code"
         },
         "lang": {
-          "description": "Language id for highlighting, e.g. ts, bash, json, python.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Language id for highlighting, e.g. ts, bash, json, python."
         },
         "code": {
           "type": "string",
@@ -633,9 +633,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -649,9 +649,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -681,9 +681,9 @@
             "type": "object",
             "properties": {
               "name": {
-                "description": "Variable name as written inside {{ }} in the prompt.",
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "description": "Variable name as written inside {{ }} in the prompt."
               },
               "hint": {
                 "$ref": "#/$defs/LText"
@@ -715,9 +715,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -731,9 +731,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -774,9 +774,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -790,9 +790,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -834,9 +834,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -850,9 +850,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -860,13 +860,13 @@
           "const": "quiz"
         },
         "mode": {
-          "description": "inline = a check while reading (確認しよう); exam = end-of-lesson test; predict = an ungraded prediction in the hook (the pick is not scored; the explanation is revealed after answering).",
           "type": "string",
           "enum": [
             "inline",
             "exam",
             "predict"
-          ]
+          ],
+          "description": "inline = a check while reading (確認しよう); exam = end-of-lesson test; predict = an ungraded prediction in the hook (the pick is not scored; the explanation is revealed after answering)."
         },
         "title": {
           "$ref": "#/$defs/LText"
@@ -892,9 +892,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "kind": {
           "description": "Defaults to single.",
@@ -916,12 +916,12 @@
           }
         },
         "answer": {
-          "description": "Ids of the correct options.",
           "minItems": 1,
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Ids of the correct options."
         },
         "explanation": {
           "$ref": "#/$defs/Md"
@@ -974,9 +974,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -990,9 +990,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -1006,9 +1006,9 @@
             "type": "object",
             "properties": {
               "id": {
-                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
                 "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
               },
               "front": {
                 "$ref": "#/$defs/Md"
@@ -1038,9 +1038,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -1054,9 +1054,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -1070,9 +1070,9 @@
             "type": "object",
             "properties": {
               "id": {
-                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
                 "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
               },
               "title": {
                 "$ref": "#/$defs/LText"
@@ -1118,9 +1118,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -1134,9 +1134,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -1153,9 +1153,9 @@
             "type": "object",
             "properties": {
               "id": {
-                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
                 "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
               },
               "label": {
                 "$ref": "#/$defs/LText"
@@ -1184,9 +1184,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -1200,9 +1200,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -1232,9 +1232,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "slide": {
           "description": "false hides the block in Slides mode.",
@@ -1248,9 +1248,9 @@
           "description": "Ids of lesson.sources (or course.sources) that back this block.",
           "type": "array",
           "items": {
-            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
           }
         },
         "type": {
@@ -1277,9 +1277,9 @@
       "type": "object",
       "properties": {
         "lessonId": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "courseId": {
           "description": "Defaults to the same course.",
@@ -1320,9 +1320,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "title": {
           "type": "string",
@@ -1350,9 +1350,9 @@
       "type": "object",
       "properties": {
         "author": {
-          "description": "Who wrote it, e.g. human, claude-code, human+claude-code, migration.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Who wrote it, e.g. human, claude-code, human+claude-code, migration."
         },
         "model": {
           "type": "string"
@@ -1374,9 +1374,9 @@
           "type": "object",
           "properties": {
             "source": {
-              "description": "Repo-relative path of the legacy file.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "Repo-relative path of the legacy file."
             },
             "export": {
               "type": "string"

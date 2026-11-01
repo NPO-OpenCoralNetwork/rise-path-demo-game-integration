@@ -8,12 +8,11 @@
       "const": "risepath.course/v1"
     },
     "id": {
-      "description": "Course slug; also the folder name under content/courses/.",
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "Course slug; also the folder name under content/courses/."
     },
     "world": {
-      "description": "Accent world of the reader (data-world).",
       "type": "string",
       "enum": [
         "vibe",
@@ -24,7 +23,8 @@
         "pschool",
         "blender",
         "web"
-      ]
+      ],
+      "description": "Accent world of the reader (data-world)."
     },
     "title": {
       "$ref": "#/$defs/LText"
@@ -93,7 +93,6 @@
   "description": "A Rise Path course (risepath.course/v1).",
   "$defs": {
     "LText": {
-      "description": "Plain text. A string is in lesson.locale; an object holds one string per locale.",
       "anyOf": [
         {
           "type": "string"
@@ -113,10 +112,10 @@
           },
           "additionalProperties": false
         }
-      ]
+      ],
+      "description": "Plain text. A string is in lesson.locale; an object holds one string per locale."
     },
     "Md": {
-      "description": "Inline markdown: **bold**, *italic*, `code`, [link](https://…), [[glossary term]], line breaks.",
       "anyOf": [
         {
           "type": "string"
@@ -136,7 +135,8 @@
           },
           "additionalProperties": false
         }
-      ]
+      ],
+      "description": "Inline markdown: **bold**, *italic*, `code`, [link](https://…), [[glossary term]], line breaks."
     },
     "Locale": {
       "type": "string",
@@ -151,9 +151,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "title": {
           "$ref": "#/$defs/LText"
@@ -181,9 +181,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "title": {
           "$ref": "#/$defs/LText"
@@ -208,9 +208,9 @@
       "type": "object",
       "properties": {
         "lessonId": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "courseId": {
           "description": "Defaults to the same course.",
@@ -251,9 +251,9 @@
       "type": "object",
       "properties": {
         "id": {
-          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson.",
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Stable id: lowercase letters, digits, \".\", \"_\" or \"-\". Unique within the lesson."
         },
         "title": {
           "type": "string",
@@ -281,9 +281,9 @@
       "type": "object",
       "properties": {
         "author": {
-          "description": "Who wrote it, e.g. human, claude-code, human+claude-code, migration.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Who wrote it, e.g. human, claude-code, human+claude-code, migration."
         },
         "model": {
           "type": "string"
@@ -305,9 +305,9 @@
           "type": "object",
           "properties": {
             "source": {
-              "description": "Repo-relative path of the legacy file.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "Repo-relative path of the legacy file."
             },
             "export": {
               "type": "string"
