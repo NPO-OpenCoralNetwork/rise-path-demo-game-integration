@@ -1,8 +1,8 @@
 # Rise Path VM deploy (`risepath-vm`)
 
-正本: [`doc/guides/risepath_vm_deployment.md`](../../doc/guides/risepath_vm_deployment.md) / フロント（Vercel）と切り替え手順: [`deploy/vercel/README.md`](../vercel/README.md)
+新しい VM から公開までの手順: [`doc/guides/first-launch.ja.md`](../../doc/guides/first-launch.ja.md)（手順書）/ 正本: [`doc/guides/risepath_vm_deployment.md`](../../doc/guides/risepath_vm_deployment.md) / フロント（Vercel）と切り替え手順: [`deploy/vercel/README.md`](../vercel/README.md)
 
-2026-10-21 に、オーナーが GCP の `risepath-vm` を削除しました。新しい VM は下のクイックスタートで作り、DB は空から始まります。全体の順番（Cloudflare のゾーン追加を最初に始める、など）と Cloudflare・Vercel・Supabase の作業は、[`deploy/vercel/README.md`](../vercel/README.md) の「[新しい VM の順番](../vercel/README.md#新しい-vm-の順番)」に沿って進めます。
+2026-10-21 に、オーナーが GCP の `risepath-vm` を削除しました。新しい VM は下のクイックスタートで作り、DB は空から始まります。全体の順番（Cloudflare のゾーン追加を最初に始める、など）と Cloudflare・Vercel・Supabase の作業は、[手順書](../../doc/guides/first-launch.ja.md)の 2 章から順に進めます。
 
 ## 運用方針
 
@@ -13,7 +13,7 @@
 | 月額目安 | **推定**（未確認）。24 時間稼働の `asia-northeast1` で、`e2-medium` は約 $31/月、`e2-standard-2` は約 $63/月。50GB ディスクは別です。どれも第三者のサイト（[gcloud-compute.com](https://gcloud-compute.com/e2-medium.html)）の値で、Google の料金ページでは確かめていません。予算アラートを決める前に、[GCP の料金計算ツール](https://cloud.google.com/products/calculator)で確かめます |
 | DB | `pgvector/pgvector:0.8.7-pg16`（Postgres 16 + pgvector。タグと digest を固定）。新しい空のボリュームでは RAG のベクトル検索が有効です |
 | 公開 | API は Cloudflare Tunnel の `https://api.<domain>`。大人が自分の AI をつなぐリモート MCP（Compose のプロファイル `byoa`、`mcp-public`）を有効にしたときだけ、同じトンネルの `https://mcp.<domain>` も公開します。フロントは Vercel の `https://app.<domain>`。GCP ファイアウォールにアプリ用の受信ルールは作りません |
-| Mac | `npm run dev` + Tailscale で VM の db/mcp/kokoro（Hermes を有効にしたときは hermes も）に接続。`ORIGIN_SECRET` を設定したあとは、api（:3006）だけ `x-origin-secret` ヘッダーが要ります |
+| Mac | `npm run dev` と、Mac の中だけで動く開発用の DB（下の「3. Mac の `.env.local`（開発用の DB）」）。本番の DB には Mac からつなぎません（D8、手順書 18 章）。Tailscale で VM に届くのは、名前を決めた管理者の `npm run smoke:vm`（3006、3100）だけです。`ORIGIN_SECRET` を設定したあとは、api（:3006）に `x-origin-secret` ヘッダーが要ります |
 | AI | チューター・文章フィードバック・コース生成は Claude（`ANTHROPIC_API_KEY`。既定は安いモデル）。Gemini は使いません（`GEMINI_ALLOWED` を設定しない。下の表） |
 | Hermes | **学習者には提供しません。** 既定は `COMPOSE_PROFILES=tts`（`hermes` コンテナを起動しません）で、Vercel の `VITE_FEATURE_AGENT_CHAT` も設定しません。API も同じ `VITE_FEATURE_AGENT_CHAT` を読み、ちょうど `true` でないと `/api/v2/agent/chat` は 404 を返します（Hermes が動いていても使えません）。前の `stack.env` で `COMPOSE_PROFILES=full` のままなら、`tts`（トンネルを使うなら `tts,tunnel`）に変えて `deploy-stack.sh` を実行し直します。前のデプロイで残った `hermes` コンテナは、そのときに削除されます。自分で運用するときや開発のときだけ、Compose の **`--profile full`**（`nousresearch/hermes-agent`）で起動できます。Mac 単体開発は `hermes -p rise-path gateway` も可 |
 
@@ -41,10 +41,15 @@
 | `scripts/deploy-stack.sh` | 再デプロイ（pull → `stack.env`・tunnel・byoa・billing のガード → build → migrate → up → healthy を待つ → `api` コンテナ内で smoke） |
 | `hermes/config.yaml` | Hermes を有効にしたときのプロファイル（SSE MCP） |
 | `systemd/risepath-stack.service` | VM 起動時に compose up |
+| `scripts/preflight.sh`・`scripts/check-mode.sh` | 事前チェック（Phase 9）。下の「[事前チェックと事後の確かめ](#事前チェックと事後の確かめphase-9)」 |
+| `scripts/postdeploy-check.sh` | 事後の確かめ（Phase 9。デプロイの最後に動く） |
+| `launch-record.env.example` | 公開の記録のテンプレ → `launch-record.env`（git に入れません。手順書 14 章） |
+| `scripts/backup.sh`・`scripts/install-backup.sh`・`scripts/restore-drill.sh`・`scripts/restore-db.sh`・`scripts/backup-common.sh` | 控え（Phase 9）。下の「[控え（バックアップ）](#控えバックアップphase-9)」 |
+| `backup.env.example`・`systemd/risepath-backup*` | 控えの設定のテンプレ（VM では `/etc/risepath-backup/backup.env`）と、毎日・1 時間ごとのタイマー |
 
 ## クイックスタート
 
-新しい VM を作る手順です。始める前に、[`deploy/vercel/README.md`](../vercel/README.md) の「[新しい VM の順番](../vercel/README.md#新しい-vm-の順番)」にある次の 3 つを始めておきます（ゾーンが Active になるのを待つ必要はありません）。
+新しい VM を作る手順です（コマンドはここにあります。順番と、うまくいったときの見え方は[手順書](../../doc/guides/first-launch.ja.md)の 4〜6 章です）。始める前に、手順書の 2 章と 3 章にある次の 3 つを始めておきます（ゾーンが Active になるのを待つ必要はありません）。
 
 - Cloudflare にドメインを追加し、ネームサーバーを切り替える（Active まで最大 48 時間かかるので最初に始める）
 - GCP の予算アラートを作り、残っていれば `risepath-dev-schedule` を消す
@@ -57,9 +62,11 @@ Mac のリポジトリ直下で、`main` を pull してから実行します（
 ```bash
 export GCP_PROJECT=your-project-id
 cd deploy/risepath-vm/scripts
-./provision-gce.sh                                   # 既定: e2-medium（4 GB）+ 50GB
-# Memanto を使うとき: MACHINE_TYPE=e2-standard-2 ./provision-gce.sh   # 8 GB
+BACKUP_SA_EMAIL=<手順書 3.8 のアドレス> ./provision-gce.sh   # 既定: e2-medium（4 GB）+ 50GB
+# Memanto を使うとき: MACHINE_TYPE=e2-standard-2 BACKUP_SA_EMAIL=<手順書 3.8 のアドレス> ./provision-gce.sh   # 8 GB
 ```
+
+`BACKUP_SA_EMAIL` は、控え（バックアップ）用のサービスアカウントのアドレスです（手順書 3.8 で作ります）。付けないと、VM は GCE のふつうのサービスアカウントで動き、控えを送れません（手順書 6.4 の `install-backup.sh` が IB4 で止まります）。そのときは、スクリプトが出す 3 つのコマンドで、あとからアカウントを付けます（手順書 4.1 の 4）。
 
 `provision-gce.sh` は受信ルールを作りません。ただし GCP のファイアウォールルールはタグ `risepath-vm` に付くので、前の VM のルールが残っていれば新しい VM にも効きます。[`deploy/vercel/README.md`](../vercel/README.md) の手順 3 で確かめます。
 
@@ -72,7 +79,7 @@ gcloud compute ssh risepath-vm --zone=asia-northeast1-b
 
 # Tailscale（先に管理画面の Machines で旧 risepath-vm を Remove しておく）
 curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up --hostname=risepath-vm   # 表示された URL をブラウザで開いて認証する
+sudo tailscale up --hostname=risepath-vm --advertise-tags=tag:risepath   # 表示された URL をブラウザで開いて認証する（タグは手順書 3.4 の ACL のもの）
 tailscale status                           # この VM が risepath-vm と表示されること
 
 # リポジトリ（/opt は root 所有なので、先に自分のディレクトリとして作る）
@@ -84,7 +91,7 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 exit
 ```
 
-旧 `risepath-vm` が Tailscale の管理画面に残っていると、新しい VM は `risepath-vm-1` になります。旧 `risepath-vm` をあとで消しても、名前は戻りません。すでに `-1` になったら、旧 `risepath-vm` を Remove してから、新しいマシンの名前を管理画面で `risepath-vm` に変えます。Tailscale ACL に旧 VM の 100.x アドレスを書いていたら、新しいアドレスに直します。
+旧 `risepath-vm` が Tailscale の管理画面に残っていると、新しい VM は `risepath-vm-1` になります。旧 `risepath-vm` をあとで消しても、名前は戻りません。すでに `-1` になったら、旧 `risepath-vm` を Remove してから、新しいマシンの名前を管理画面で `risepath-vm` に変えます。ACL はタグ `tag:risepath` で書くので（手順書 3.4。下の「セキュリティ」）、VM のアドレスが変わっても直す必要はありません。旧 VM の 100.x アドレスを書いた古い ACL が残っていたら、タグの形に書きかえます。
 
 1 回目のあとは、いったん `exit` して SSH し直します。`docker` グループへの追加は、新しいログインから効くためです。同じセッションのまま 2 回目を実行すると、`bootstrap-vm.sh` は `docker group not active yet` と表示して止まります。
 
@@ -108,7 +115,7 @@ exit
 | `COMPOSE_PROFILES` | `tts` のまま（Memanto を使うなら `tts,memory`）。`full` は Hermes を有効にするときだけ（`full,memory`）。`tunnel` はトンネルを作ってから（下の「Cloudflare Tunnel」） |
 | `ORIGIN_SECRET`・`TRUST_PROXY`・`LLM_ALLOWED_ORIGINS` | まだ入れません。トンネルを作るときに入れます |
 
-`deploy-stack.sh` は、`POSTGRES_PASSWORD`・`DATABASE_URL_PHASE1`・`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY`・`RISE_PATH_BRIDGE_TOKEN` が空かテンプレの値のままだと、変数名だけを表示して build の前に止まります。`COMPOSE_PROFILES` に `full` があるとき（Hermes を有効にしたときだけ）は、`OPENROUTER_API_KEY` と `HERMES_API_KEY`（16 文字以上）も確かめます。`ANTHROPIC_API_KEY` は確かめないので、入れたかを自分で見ます。`GEMINI_API_KEY` と `GEMINI_ALLOWED` が空かも見ます。
+`deploy-stack.sh` は、`POSTGRES_PASSWORD`・`DATABASE_URL_PHASE1`・`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY`・`RISE_PATH_BRIDGE_TOKEN` が空かテンプレの値のままだと、変数名だけを表示して build の前に止まります。`COMPOSE_PROFILES` に `full` があるとき（Hermes を有効にしたときだけ）は、`OPENROUTER_API_KEY` と `HERMES_API_KEY`（16 文字以上）も確かめます。`ANTHROPIC_API_KEY` が空でないこと、`GEMINI_API_KEY` と `GEMINI_ALLOWED` が空であることは、事前チェック（`preflight.sh`）が確かめます（手順書 5.3）。
 
 #### 2 回目の実行
 
@@ -128,18 +135,9 @@ cd /opt/risepath/deploy/risepath-vm/scripts
 
 学習者がアップロードした教材のファイルは、`uploads` ボリューム（API のコンテナの `/app/uploads`）に置かれ、再デプロイしても残ります。以前の版は、コンテナの中の `public/uploads` に置いていたので、デプロイのたびに消えていました。アカウントの削除と保存期間の処理が、このボリュームのファイルも消します。
 
-### 3. Mac `.env.local`
+### 3. Mac の `.env.local`（開発用の DB）
 
-```env
-DATABASE_URL_PHASE1=postgresql://risepath_app:<stack.env の POSTGRES_PASSWORD>@risepath-vm:5432/risepath?sslmode=disable
-# 手元の API が VM の DB を、手元の設定で消さないように（stack.env の保存期間の設定は手元には届きません）
-RETENTION_ENABLED=false
-# Hermes を有効にしたときだけ
-# HERMES_API_URL=http://risepath-vm:8642
-# HERMES_API_KEY=<stack.env の HERMES_API_KEY>
-```
-
-VM を作り直したので、パスワード（と、Hermes を有効にしたなら `HERMES_API_KEY`）は新しい `stack.env` の値に替えます。旧 VM の値のままだと、DB への接続が認証エラーになります。Hermes を有効にしたとき、Mac から Hermes を呼ぶ名前は `risepath-vm:8642` です。
+試験運用から先は、Mac の `.env.local` を本番の DB に向けません（D8）。Mac の中だけで動く開発用の DB を使います。作り方（`docker run … -p 127.0.0.1:5433:5432 …`、`DATABASE_URL_PHASE1=…@127.0.0.1:5433/risepath…`、`npm run db:migrate`）は[手順書の 18 章](../../doc/guides/first-launch.ja.md)にあります。本番の DB の調べものとスタッフによる削除は、VM の中（SSH）でだけします。
 
 Mac の `~/.ssh/known_hosts` に旧 VM の鍵が残っていると、`scripts/setup-vm-ssh.sh` と `scripts/deploy-from-mac.sh` の ssh が止まります。先に消します。
 
@@ -148,9 +146,7 @@ ssh-keygen -R risepath-vm   # 旧 VM に 100.x アドレスで接続していた
 tailscale ping risepath-vm
 ```
 
-`stack.env` に `ORIGIN_SECRET` を入れる前に、Mac から Tailscale 経由の smoke を流しておきます（下の「[手動でスタック操作](#4-手動でスタック操作vm-上)」の `npm run smoke:vm -- --base …`。引数なしだと Mac の 127.0.0.1 を見ます）。
-
-API を VM 経由にする場合は、Vite プロキシの向き先を VM にします（`API_PROXY_TARGET=http://risepath-vm:3006 npm run dev`）。画面と同じオリジンで呼ぶので、CORS は要りません。ただし AI チューター（`/api/v2/llm` への POST）は、VM の `LLM_ALLOWED_ORIGINS` に `http://localhost:3007` がないと 403 になります。VM の API は本番モードで動くので、開発用のオリジンを自動では許可しません。`VITE_API_BASE_URL` で VM の API を直接呼ぶ場合は、CORS のためにも同じ設定が要ります。ただし `stack.env` に `ORIGIN_SECRET` があると、VM の :3006 は `x-origin-secret` の無いリクエストに 403 を返します。そのときは Mac のローカル API（`npm run dev`）を使います。
+`stack.env` に `ORIGIN_SECRET` を入れる前に、Mac から Tailscale 経由の smoke を流しておきます（下の「[手動でスタック操作](#4-手動でスタック操作vm-上)」の `npm run smoke:vm -- --base …`。`.env.local` は読みません。引数なしだと Mac の 127.0.0.1 を見ます）。ふだんの開発は、Mac のローカル API（`npm run dev`）と開発用の DB でします。
 
 ### 4. 手動でスタック操作（VM 上）
 
@@ -171,12 +167,10 @@ docker compose --env-file stack.env exec -T api node scripts/smoke-vm-stack.mjs 
 Mac から Tailscale 経由で検証できるのは、`stack.env` に `ORIGIN_SECRET` が無いあいだだけです。
 
 ```bash
-npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100 \
-  --kokoro http://risepath-vm:8880
-# Hermes を有効にしたときだけ、最後に --hermes http://risepath-vm:8642 を足す
+npm run smoke:vm -- --base http://risepath-vm:3006 --mcp http://risepath-vm:3100
 ```
 
-Mac のリポジトリ直下で流します。引数なしだと Mac の 127.0.0.1 を見るので、VM は確かめられません。
+Mac のリポジトリ直下で流します（手順書 6.3）。引数なしだと Mac の 127.0.0.1 を見るので、VM は確かめられません。Tailscale の ACL（手順書 3.4）は 8880（読み上げ）と 8642（Hermes）をだれにも開けないので、Kokoro・Hermes・Memanto は Mac からは確かめません。その 3 つの ⚠️ の行と、Front end の ℹ️ の行は出てよい行で、最後に「✅ VM stack smoke passed」が出れば通っています（読み上げは、`deploy-stack.sh` の smoke が `api` コンテナの中から `--require-kokoro` で確かめます）。Hermes を有効にし、ACL で 8642 を名前を決めた管理者に開けたときだけ、最後に `--hermes http://risepath-vm:8642` を足します。
 
 `npm run smoke:prod:e2e`（`E2E_API_URL=http://risepath-vm:3006`）と `npm run smoke:hermes:e2e:vm`（Hermes を有効にしたときだけ）も、Tailscale 経由で使えるのは `ORIGIN_SECRET` を設定する前だけです。設定したあとは 403 で失敗します（`scripts/setup-vm-ssh.sh` はこの E2E を飛ばします）。learner-memory の smoke は `api` コンテナ内で流せます（Bridge Token は `stack.env` から入ります）。
 
@@ -247,7 +241,7 @@ user id は、Supabase ダッシュボードの Authentication → Users に出�
 
 `ORIGIN_SECRET` が空のあいだも、Cloudflare を通ってきたリクエスト（`cf-ray`・`cf-connecting-ip` ヘッダー、`cloudflare` を含む `cdn-loop` ヘッダー）には API が 403 を返します。`COMPOSE_PROFILES` に `tunnel` があるのに `ORIGIN_SECRET` が空なら、`api` は起動しません。それ以外のリクエストには、スタックは今までどおりに動きます。
 
-ポートの公開は変えていません。db（5432）・mcp（3100）・kokoro（8880）と、Hermes を有効にしたときの hermes（8642）には、Tailscale から今までどおり届きます。api（3006）だけは、`ORIGIN_SECRET` を設定すると `x-origin-secret` が要ります。ヘッダーを付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届きません。VM の api はフロントを配信しません（`api` イメージに `dist/` はありません）。フロントは `app.<domain>` を使います。
+ポートの公開は変えていません。db（5432）・mcp（3100）・kokoro（8880）と、Hermes を有効にしたときの hermes（8642）のポートは VM で公開したままですが、Tailscale の ACL（手順書 3.4）で開けるのは、名前を決めた管理者への 3006 と 3100 だけです。5432（db）は、だれにも開けません（D8。本番の DB には VM の中からだけ触ります。手順書 18 章）。api（3006）だけは、`ORIGIN_SECRET` を設定すると `x-origin-secret` が要ります。ヘッダーを付けた呼び出しは edge 扱いなので、Bridge Token は使えず、edge のパス（`/api/*` など）にしか届きません。VM の api はフロントを配信しません（`api` イメージに `dist/` はありません）。フロントは `app.<domain>` を使います。
 
 `cloudflared` のイメージは `docker-compose.yml` でタグと digest を固定しています。更新は両方を一緒に上げ、利用の少ない時間に行います。再起動で流れているストリームが切れます。
 
@@ -354,6 +348,7 @@ docker compose --env-file stack.env logs api | grep '\[Billing\]'
 | `RETENTION_DELETION_PROOF_YEARS` | 5 | 削除したアカウントの同意の記録・保護者の同意の証拠・削除の記録を残す年数（1〜10） |
 | `RETENTION_AI_APP_RECORD_YEARS` | 3 | 削除したアカウントの、使っていた AI アプリの記録を残す年数（1〜10） |
 | `LEGAL_TERMS_REQUIRED` | 未設定（同意は画面だけで求める） | `true` で、今の利用規約に同意していない学習者の API の呼び出しを `403 terms_required` で断ります（Phase 8。断らない操作は `server/middleware/termsGate.js` の `TERMS_EXEMPT`）。文面が案のあいだは `true` でも効かず、起動時のログに出します。`mcp-public` は同じ名前を `mcp-public.env` から読みます（AI アプリからの呼び出しも断ります）。入れる順番：文面の公開 → Vercel の `VITE_FEATURE_LEGAL_PAGES=true` と同意の画面の確かめ → `byoa` なら `sql/mcp_remote_role.sql` を流し直す → `stack.env` と `mcp-public.env` に `true` → `deploy-stack.sh`。止めるときは逆の順番です（この切り替えから）。画面のフラグが止まったまま `true` にすると、同意する画面がないまま断られます。同意をお願いする新しい版を出すときは、先に両方で止め、同意の画面が出てから入れ直します（[`doc/legal/README.md`](../../doc/legal/README.md) の「改定するとき」） |
+| `PILOT_ACCOUNT_IDS` | 未設定（名簿なし。ログインできる人はだれでも使える） | 試験運用の名簿です（Phase 9、D1）。Supabase の User UID をカンマで区切って書くと、名簿にないアカウント（匿名のログインも）の API の呼び出しを `403 pilot_only` で断り、画面は「このアカウントは、いまの試験運用の対象ではありません」になります。断る呼び出しには例外がなく、断ったアカウントについて DB に何も書きません（`server/middleware/pilotGate.js`）。ID の形でない項目は使わず、ひとつも ID がないと全員を断ります（事前チェックの V2 がデプロイを止めます）。起動時のログに `[Pilot] on: N accounts` と出ます（ID は出しません）。AI アプリの接続（`mcp-public`）は名簿を読まないので、名簿があるあいだは `byoa` を使いません（V4）。Tailscale の中の MCP（`mcp`、3100）も、学習者のログインを名簿で確かめません。3100 は、Tailscale の ACL で名前を決めた管理者だけに開け、GCP のファイアウォールでは開けません（手順書 3.4・4.3）。入れる・足す・外す手順は手順書 10.1〜10.4（[`doc/guides/first-launch.ja.md`](../../doc/guides/first-launch.ja.md)）。一般の登録を開くときに、この行を消します（手順書 11.8） |
 
 保存期間の処理は、`api` の起動時と 1 時間ごとに動きます（2 つの `api` が同時に動いても、1 つだけが消します）。値がまちがっていると、その規則だけを止め、起動時のログに出します（`[Retention] …`）。
 
@@ -479,6 +474,38 @@ docker compose --env-file stack.env exec -T api node scripts/training-time.mjs -
 
 - **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と、設定の決まり・日を閉じる処理・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 と 022 の行）。VM の DB には決して向けないでください。
 
+## 事前チェックと事後の確かめ（Phase 9）
+
+- **事前チェック（`preflight.sh`）**: `deploy-stack.sh` は、`stack.env` を読む前に、まずこれを動かします。`stack.env`・`tunnel.env`・`mcp-public.env`・`billing.env`・`launch-record.env` と VM のいくつかの事実を確かめ、名前とコードと日本語の直し方だけを出します（値は出しません）。エラーがあると、何も変えずにデプロイを止めます。ルールは `scripts/deploy/preflight-rules.mjs`（node の組み込みだけ）で、`node:22-slim` のコンテナの中で、ネットワークなし、読み取りだけで動きます。
+- 単独でも動かせます: `cd /opt/risepath/deploy/risepath-vm && ./scripts/preflight.sh`（何も変えません）。**sudo は付けません**（root では X5 で止まります）。
+- **事後の確かめ（`postdeploy-check.sh`）**: デプロイの最後に動き、api・MCP・AI の設定・読み上げ・cloudflared・起動のユニットを確かめます。単独でも `./scripts/postdeploy-check.sh` で動かせます（sudo なし）。
+- コードの意味と直し方は[手順書の 13 章](../../doc/guides/first-launch.ja.md)、公開の記録（`launch-record.env`。オーナーが確かめた日を書きます。git に入れません）は 14 章です。
+- デプロイは、SSH でふつうにログインしたシェルから実行します。CI の手順にある `COMPOSE_PROJECT_NAME=risepath-ci` などを VM で `export` しません（事前チェックの F12 が止めます）。
+
+## 控え（バックアップ、Phase 9）
+
+- `scripts/backup.sh` が、毎日 3 時 23 分ごろ（日本時間。`systemd/risepath-backup.timer`）に DB とアップロードを控え、VM の鍵で暗号化して（`scripts/deploy/backup-crypt.mjs`）、Google Cloud のバケットに置きます。削除の記録は 1 時間ごとに控えます（`risepath-backup-journal.timer`）。失敗すると、`stack.env` の `AI_CAP_ALERT_WEBHOOK_URL` の Slack に知らせます。
+- 入れ方: `sudo ./scripts/install-backup.sh --new-key`（設定は `/etc/risepath-backup/backup.env`、鍵は `/etc/risepath-backup/backup.key`）。鍵の写しを VM の外にしまうことまで、[手順書の 6.4](../../doc/guides/first-launch.ja.md) にあります。バケットとサービスアカウントは 3.8、VM に付けるのは 4.1 です。
+- バケットとサービスアカウント（手順書 3.8）: サービスアカウント `risepath-backup` にプロジェクトの役割は付けません。バケット `<プロジェクト>-risepath-backup` は `asia-northeast1`、Standard、uniform bucket-level access、公開アクセスの防止を強制、バージョニングなしです。役割は、そのバケットにだけ 2 つ付けます: Storage Object Creator（`roles/storage.objectCreator`）と Storage Object Viewer（`roles/storage.objectViewer`）。消すことと上書きはできません（`backup.sh` は、同じ名前のオブジェクトを 2 度作りません）。ライフサイクルは「30 日より古いオブジェクトを削除する」で、`backup.env` の `BACKUP_RETENTION_DAYS` と同じ日数にします。
+- ディスクのスナップショット（手順書 4.2）: VM のディスクには、スナップショットのスケジュールを付けません。控えは、この暗号化したものだけです（スナップショットは、暗号化していない DB と秘密の値を、ライフサイクルの日数の外に残します）。
+- 戻す練習（4 週間ごと。前の練習から 35 日をこえると R3）: `sudo ./scripts/restore-drill.sh`（本番の DB は変えません。手順書 16.1）。
+- 本当に戻すとき: `sudo ./scripts/restore-db.sh`（エージェントと一緒に。控えのあとの削除を、学習者に出す前に当て直します。`scripts/replay-deletions.mjs`）。手順書 16.2・16.3。
+- デプロイは、控えの動く 3 時から 4 時（日本時間）を避けます。
+
+### 戻しが RS8 で止まったとき（保護者の同意の取り消しか、AI アプリの切断の記録）
+
+`scripts/replay-deletions.mjs` は、控えのあとに保護者の同意の取り消し（`consent`）か AI アプリの切断（`grant`）の記録があると、何も変えずに、終わりの番号 2 で止まります（「この版では自動で戻せません」。自動にするのは計画の 13.5 です）。DB は控えの中身に戻っていますが、削除はまだ当て直していません。戻しの途中の印は残り、学習者に向く部品は止まったまま、デプロイは R9 で止まります（手順書 16.2）。エージェントが、オーナーと一緒に、VM の tmux の中で、次の順に手で進めます。先に、止まったときの出力（「控えの始まり 日本時間 …（UTC: …）」の行と、`consent`・`grant` の行）を、事故の記録に写します。
+
+1. **記録を集め直す**（`sudo -i` の root のシェルで）: `cd /opt/risepath/deploy/risepath-vm` のあと、`SCRIPT_DIR=$PWD/scripts STACK_DIR=$PWD REPO_ROOT=/opt/risepath`、`source scripts/backup-common.sh`、`bk_tmp`、`OWNER="$(stat -c %U /opt/risepath)"`、`SINCE=<「控えの始まり」の UTC の時刻>`、`BUCKET="$(bk_bucket)"`、`WORK="${BK_TMP}"` を実行します。次に、`scripts/restore-db.sh` の、控えのあとの削除の記録を集める行（RS4 のおわりにあります。`FROM_STAMP=` の行から、`読んだ記録:` を出す `echo` の行まで）を、そのまま実行します。記録は `"${BK_TMP}/journal.csv"` にできます（`/run` の中の 0700 のフォルダです。ディスクには書きません）。途中で ❌ の行が出ると、root のシェルが閉じます。そのときは、出た行を直してから、`bk_tmp` が作ったフォルダ（`rm -rf /run/risepath-backup.??????`。ロックのファイルは消しません）を消し、1 からやり直します。
+2. **取り消しを手で当てる**: `grep -E '^(consent|grant),' "${BK_TMP}/journal.csv" | sort -u` から、止まったときに出た行（もとの時刻が同じもの）を探します。列は `kind,user_id,time,requested_by,reopened_at,course_slug,lesson_id,ref_id` です。その行ごとに、`runuser -u "${OWNER}" -- docker compose --env-file stack.env exec -T db psql -U risepath_app -d risepath -c "…"` で、次の文を実行します（`…` に、その種類の文をそのまま入れます。`grant` は 2 つの文を 1 つの `-c` に入れます）。
+   - `consent`（`ref_id` は同意の id）: `UPDATE account_consents SET revoked_at = now() WHERE id = '<ref_id>' AND user_id = '<user_id>' AND revoked_at IS NULL;`（`revoked_at IS NULL` の条件があるので、もう取り消してある同意には何もしません）
+   - `grant`（`ref_id` は AI アプリの client id。`server/routes/connectedApps.js` の取り消しと同じ形）: `INSERT INTO auth.users (id) VALUES ('<user_id>') ON CONFLICT (id) DO NOTHING; INSERT INTO mcp_oauth_grants (user_id, client_id, client_name, first_seen_at, last_used_at, revoked_at) VALUES ('<user_id>', '<ref_id>', NULL, NULL, NULL, now()) ON CONFLICT (user_id, client_id) DO UPDATE SET revoked_at = now();`（1 つ目の文は、学習者の ID の行（`auth.users`）を、ないときだけ作ります。`server/db.js` の `ensureAuthUser` と、`tools/core/accountDeletions.js` と同じ文です。控えのあとに、はじめてログインした学習者は、戻した DB にこの行がなく、2 つ目の文だけでは外部キーのエラー（`mcp_oauth_grants_user_id_fkey`）で止まって、取り消しが記録されません。2 つ目の文は、取り消しの時刻を、いつも今にします。`mcp-server/oauthVerifier.js` は、取り消しの時刻より前に出たトークンを断ります。戻した行に、控えより前の古い取り消しの時刻が残っているとき、その時刻のままにすると、古い時刻のあとに出たトークンが通ってしまうためです。取り消しのあとに AI アプリをつなぎ直していた学習者は、もう一度つなぎます）
+
+   `consent` では `UPDATE 1`（もう取り消してあったときや、控えのあとに作った同意のときは `UPDATE 0`）が出ます。`grant` では 2 行出ます。1 行目（ID の行）は `INSERT 0 1` か `INSERT 0 0`（もうあったとき）で、2 行目が `INSERT 0 1` なら、取り消しが記録されています。`ERROR` の行が出たら、何も変わっていません。その行を事故の記録に写して止めます（3 には進みません）。出た `UPDATE` と `INSERT` の数を、事故の記録に書きます（当て直した記録の時刻は、いまの時刻です。もとの時刻は、写した行にあります）。
+3. **ほかの削除を当て直す**: `grep -v -E '^(consent|grant),' "${BK_TMP}/journal.csv" > "${BK_TMP}/rest.csv"` のあと、`runuser -u "${OWNER}" -- docker compose --env-file stack.env run --rm --no-deps -T api node scripts/replay-deletions.mjs --since "${SINCE}" < "${BK_TMP}/rest.csv"` で数を見ます（何も変えません）。オーナーと数を見て、合っていれば、`--since "${SINCE}"` のうしろに `--yes` を足して、もう一度実行します。
+4. **RS10 を手でする**（`restore-db.sh` の RS10 と同じことを、この順に）: `if [[ "$(bk_restore_field stack)" == enabled ]]; then systemctl enable risepath-stack.service; fi`、`rm "${BK_RESTORE_MARK}"`（戻しの途中の印 `/var/lib/risepath-backup/restore-in-progress` を消します）、`for t in risepath-backup.timer risepath-backup-journal.timer; do if [[ "$(systemctl is-enabled "$t" 2> /dev/null)" == enabled ]]; then systemctl start "$t"; fi; done`（有効になっているタイマーだけを動かします。作り直した VM（手順書 16.3）には、まだタイマーがないので、何もしません。タイマーは 16.3 の 4 で入れます）、`./scripts/backup.sh daily`（戻した DB の控えを 1 つ作ります。タイマーがなくても動きます）。
+5. **RS11**: `bk_cleanup_tmp` で 1 のフォルダを消し、`exit` で root のシェルを抜けて、sudo を付けずに `./scripts/deploy-stack.sh` を実行します。「==> Done」と、事後の確かめの「エラー 0 件」が出れば、学習者が戻れます。
+
 ## CI での予行（Phase 7）
 
 GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プルリクエストのたびに、このディレクトリの `deploy-stack.sh` をダミーの値で動かします（チェック `Server stack deploy` と `Learner end-to-end`）。決定と理由は [`doc/brushup-2026/ai-access-plan.ja.md`](../../doc/brushup-2026/ai-access-plan.ja.md) の 11 章です。
@@ -488,14 +515,25 @@ GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プ
 - `deploy-stack.sh` は、環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` のときだけ git pull を飛ばします。**VM では設定しません。** `stack.env` に書いても効きません。
 - CI が確かめること: 空の DB への migration 000–022、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
 - 作り直した VM の最初のデプロイの前に、main の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）が緑であることを確かめます。
-- 手元で同じことを流すときは `npm run ci:stack`（`Server stack deploy`）と `npm run e2e:local`（`Learner end-to-end`）です（Docker が要ります。計画の 11.1 の「手元で流す」）。動いているあいだは 5432・3006・3100 を、すべてのネットワークに開くので、信頼できるネットワークでだけ流します。
+- 手元で同じことを流すときは `npm run ci:stack`（`Server stack deploy`）と `npm run e2e:local`（`Learner end-to-end`）です（Docker が要ります。計画の 11.1 の「手元で流す」）。docker のグループに入ったふつうのユーザーで流します（root で流すと、デプロイの中の事前チェックが X5 で止まります）。動いているあいだは 5432・3006・3100 を、すべてのネットワークに開くので、信頼できるネットワークでだけ流します。
 
 ## セキュリティ
 
 - GCP VPC ファイアウォールで **5432/3006/3100/8642/8880 を 0.0.0.0/0 に開放しない**。アプリ用の受信ルールは要りません（公開は Cloudflare Tunnel の外向き接続）
 - `ORIGIN_SECRET` を設定すると、API は `api` コンテナ内の loopback 以外から来て `x-origin-secret` が無いリクエストに 403 を返します。Tailscale から :3006 を呼ぶ場合も同じです
 - 正しいヘッダーを持つリクエストは edge 扱いです。Bridge Token は使えず、Supabase JWT が要ります。届くのは `/api/*`・`/audio/cache/`・`/generated/img_*` だけで、`/uploads` はインターネットから読めません
-- Tailscale ACL で `risepath-vm` へのアクセスを限定
+- Tailscale ACL で `risepath-vm` へのアクセスを限定する（手順書 3.4）。VM には `tailscale up` の `--advertise-tags=tag:risepath` でタグを付け、決まりはタグで書く（VM は ACL を書くときにはまだ tailnet にいないため）。3006 と 3100 は、名前を決めた管理者だけに開け、5432・8642・8880 はだれにも開けない。新しい tailnet にはじめからある `"src": ["*"], "dst": ["*:*"]` の行は、`tag:risepath` に届かない形に書きかえる。例（`<管理者のメールアドレス>` は置きかえる）:
+
+  ```json
+  {
+    "tagOwners": { "tag:risepath": ["autogroup:admin"] },
+    "acls": [
+      { "action": "accept", "src": ["<管理者のメールアドレス>"], "dst": ["tag:risepath:3006,3100"] }
+    ]
+  }
+  ```
+
+  確かめ方: Mac で `nc -z -w 3 risepath-vm 5432 && echo OPEN || echo closed` が `closed` を出す（8880 も同じ。手順書 6.3）
 - `stack.env`・`tunnel.env`・`mcp-public.env`・`billing.env` は `chmod 600`、Git に含めない（`.dockerignore` でビルドにも入れない）
 - Stripe の鍵（`sk_`・`rk_`・`whsec_`）は `billing.env` だけに入れる。`stack.env`・`mcp-public.env`・Vercel・`VITE_*` には入れない（ブラウザは Stripe の値を何も使わない）
 - `stack.env` にテンプレの値（`change-me` など）を残さない。DB・Bridge Token・Hermes の値は上の表のとおりに作る

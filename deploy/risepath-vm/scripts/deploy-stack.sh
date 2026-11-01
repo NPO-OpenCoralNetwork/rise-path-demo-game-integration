@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Redeploy Rise Path stack on risepath-vm (pull, check stack.env, build, migrate, up, wait, smoke)
-# Usage (on VM): ./deploy-stack.sh
+# Redeploy Rise Path stack on risepath-vm (事前チェック, pull, check stack.env, build, migrate, up, wait,
+# smoke, 事後の確かめ). Usage (on VM, without sudo: the 事前チェック refuses root, X5): ./deploy-stack.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,15 +9,48 @@ REPO_ROOT="$(cd "${STACK_DIR}/../.." && pwd)"
 
 cd "${STACK_DIR}"
 
-# CI only (.github/workflows/e2e.yml through scripts/ci/stack.sh deploy; owner decision P3): the job
-# deploys the commit it checked out, often a detached HEAD where `git pull` fails. Only exactly 1 skips
-# the pull (and so the re-run after it). Read from the caller's environment before stack.env is
-# sourced and kept read-only, so stack.env can never turn the pull off. Unset on the VM: every deploy
-# pulls and re-runs a moved script, as before.
-readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"
+# The caller's values, read once before stack.env is sourced and kept read-only, so a stack.env line can
+# never reach them (Phase 9, design §2.8):
+# - RISEPATH_DEPLOY_SKIP_PULL, CI only (.github/workflows/e2e.yml through scripts/ci/stack.sh deploy;
+#   owner decision P3): the job deploys the commit it checked out, often a detached HEAD where `git pull`
+#   fails. Only exactly 1 skips the pull (and so the re-run after it). Unset on the VM: every deploy
+#   pulls and re-runs a moved script, as before.
+# - COMPOSE_PROJECT_NAME, COMPOSE_PROFILES and the exported names: what the 事前チェック (preflight.sh)
+#   reads about the deploy shell (CI mode needs risepath-ci; F1, F11 and the profile rules).
+# The re-run after a pull starts with every stack.env name exported, so it takes only the copies the first
+# run forwarded on its exec line below, never these names from its own environment.
+if [[ "${RISEPATH_DEPLOY_REEXEC:-}" == 1 ]]; then
+  readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_REEXEC_SKIP_PULL:-}"
+  readonly RISEPATH_CALLER_PROJECT="${RISEPATH_REEXEC_PROJECT:-}"
+  readonly RISEPATH_CALLER_PROFILES="${RISEPATH_REEXEC_PROFILES:-}"
+  readonly RISEPATH_CALLER_EXPORTS="${RISEPATH_REEXEC_EXPORTS:-}"
+else
+  readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"
+  readonly RISEPATH_CALLER_PROJECT="${COMPOSE_PROJECT_NAME:-}"
+  readonly RISEPATH_CALLER_PROFILES="${COMPOSE_PROFILES:-}"
+  RISEPATH_CALLER_EXPORTS="$(compgen -e | tr '\n' ' ' || true)"
+  readonly RISEPATH_CALLER_EXPORTS
+fi
 
 if [[ ! -f stack.env ]]; then
   echo "Missing stack.env — copy stack.env.example and fill secrets"
+  exit 1
+fi
+
+# stack.env's SHA-256 before the 事前チェック reads it (sha256sum, or shasum on a Mac; empty if neither runs).
+# The deploy record (P13, written by the 事後の確かめ) holds a deploy only while stack.env still has it: an edit
+# made during the deploy, after the check, is never recorded as checked (P16). Read-only: stack.env cannot
+# replace it.
+RISEPATH_STACK_ENV_SHA="$({ sha256sum stack.env 2> /dev/null || shasum -a 256 stack.env 2> /dev/null; } | awk '{print $1}' || true)"
+readonly RISEPATH_STACK_ENV_SHA
+
+# 事前チェック (Phase 9, D2; doc/guides/first-launch.ja.md 13 章): before bash reads stack.env and before
+# anything is pulled, built, started or written. Errors stop the deploy here; names only, never values.
+# preflight.sh refuses root (X5) and selects CI mode only with all four conditions of check-mode.sh.
+if ! "${BASH}" "${SCRIPT_DIR}/preflight.sh" --from-deploy \
+    --caller-skip-pull "${RISEPATH_CALLER_SKIP_PULL}" --caller-project "${RISEPATH_CALLER_PROJECT}" \
+    --caller-profiles "${RISEPATH_CALLER_PROFILES}" --caller-exports "${RISEPATH_CALLER_EXPORTS}"; then
+  echo "❌ 事前チェックで止めました。上の直し方を見てください（何も変えていません）。"
   exit 1
 fi
 
@@ -33,11 +66,18 @@ elif [[ -d "${REPO_ROOT}/.git" ]]; then
   HEAD_BEFORE="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   git -C "${REPO_ROOT}" pull --ff-only
   # The pull may replace this file, but bash keeps reading the copy it opened. Re-run once so
-  # the steps below always come from the pulled version.
+  # the steps below always come from the pulled version, and the pulled 事前チェック runs first. The
+  # caller's values go along under re-run-only names: an assignment prefix wins over stack.env's exports.
   if [[ "$(git -C "${REPO_ROOT}" rev-parse HEAD)" != "${HEAD_BEFORE}" && -z "${RISEPATH_DEPLOY_REEXEC:-}" ]]; then
     echo "==> HEAD moved — re-running the pulled deploy-stack.sh"
-    RISEPATH_DEPLOY_REEXEC=1 exec "${BASH}" "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$@"
+    RISEPATH_DEPLOY_REEXEC=1 RISEPATH_REEXEC_SKIP_PULL="${RISEPATH_CALLER_SKIP_PULL}" \
+      RISEPATH_REEXEC_PROJECT="${RISEPATH_CALLER_PROJECT}" RISEPATH_REEXEC_PROFILES="${RISEPATH_CALLER_PROFILES}" \
+      RISEPATH_REEXEC_EXPORTS="${RISEPATH_CALLER_EXPORTS}" exec "${BASH}" "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$@"
   fi
+  # Only the run that deploys gets here (a moved HEAD re-ran above): the commit, for the owner's notes.
+  # --abbrev=7: the 7 characters GitHub shows, which the runbook asks the owner to compare (はじめに). git's
+  # automatic length grows with the clone (8 from about 16,000 objects).
+  echo "==> デプロイするコミット: $(git -C "${REPO_ROOT}" log -1 --abbrev=7 --format='%h（%cs・%s）')"
 fi
 
 if [[ -n "${OPENROUTER_API_KEY:-}" && "${OPENROUTER_API_KEY,,}" != *change-me* ]]; then
@@ -252,6 +292,25 @@ compose build
 echo "==> db up (wait until healthy)"
 compose up -d --wait db
 
+# DB0, DB1 (Phase 9; doc/guides/first-launch.ja.md 13 章): the Japanese search (#72) needs a UTF8 database.
+# A volume made with another encoding is never converted: it has to be made again, before any migration.
+# No answer (exec or psql failed: the db is slow, or POSTGRES_DB names another database) says nothing
+# about the encoding, so it is DB0, never DB1: the advice must not lead to making a healthy DB again.
+echo "==> DB の文字コードを確かめます（DB1）"
+DB_ENCODING="$(compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SHOW server_encoding"' 2> /dev/null | tr -d '[:space:]' || true)"
+if [[ -z "${DB_ENCODING}" ]]; then
+  echo "❌ [DB0] DB に文字コードをたずねましたが、答えがありませんでした（DB はまだ変わっていません）。"
+  echo "   直し方: 数分待ってから、\`./scripts/deploy-stack.sh\` をもう一度実行します。また出るときは、\`docker compose --env-file stack.env ps\` で出た行をエージェントに見せます（DB は作り直しません）。"
+  echo "   くわしく: 手順書 13 章の「DB0」"
+  exit 1
+fi
+if [[ "${DB_ENCODING}" != UTF8 ]]; then
+  echo "❌ [DB1] DB の文字コードが UTF8 ではありません（日本語の検索が動きません）。"
+  echo "   直し方: エージェントに相談します（作り直す前に、もう一度文字コードを確かめ、データの控えを取ります。手順書 16 章）。"
+  echo "   くわしく: 手順書 13 章の「DB1」"
+  exit 1
+fi
+
 echo "==> db:migrate (new api image, one-off container)"
 compose run --rm --no-deps -T api npm run db:migrate
 
@@ -297,8 +356,24 @@ fi
 if [[ ",${COMPOSE_PROFILES// /}," == *",byoa,"* ]]; then
   WAIT+=(mcp-public)
 fi
+# cloudflared answers its healthcheck once the tunnel reaches Cloudflare (P5 checks it again afterwards).
+if [[ ",${COMPOSE_PROFILES// /}," == *",tunnel,"* ]]; then
+  WAIT+=(cloudflared)
+fi
 echo "==> wait until healthy: ${WAIT[*]}"
-compose up -d --wait "${WAIT[@]}"
+if ! compose up -d --wait "${WAIT[@]}"; then
+  # Compose's own line is English. A tunnel that cannot reach Cloudflare (a wrong or replaced TUNNEL_TOKEN)
+  # stops the wait before the 事後の確かめ, so P5's lines (postdeploy-probe.mjs) are printed here.
+  if [[ ",${COMPOSE_PROFILES// /}," == *",tunnel,"* \
+      && "$(compose ps --format '{{.Health}}' cloudflared 2> /dev/null | head -n 1 || true)" != healthy ]]; then
+    echo "❌ [P5] 公開の入り口（cloudflared）が healthy ではありません。"
+    echo "   直し方: tunnel.env の \`TUNNEL_TOKEN\` と、Cloudflare の画面のトンネルの状態を確かめます（手順書 7.3）。直したら \`./scripts/deploy-stack.sh\` をもう一度実行します。また出るときは、出た行をエージェントに見せます（値は出ません）。"
+    echo "   くわしく: 手順書 13 章の「P5」"
+  fi
+  echo "❌ 待っていた部品が healthy になりませんでした（Rise Path は、もう新しい版に入れ替わっています）。"
+  echo "   上に [P5] があれば、手順書 13 章の「P5」を見ます。ないときは、数分待ってから \`./scripts/deploy-stack.sh\` をもう一度実行し、また出たら、出た行をエージェントに見せます。"
+  exit 1
+fi
 
 echo "==> stack smoke"
 # Always from inside the api container: there 127.0.0.1 is loopback, which the origin gate exempts.
@@ -309,6 +384,17 @@ compose exec -T api env \
   API_SERVER_PORT="${API_SERVER_PORT:-8642}" \
   MEMANTO_API_PORT="${MEMANTO_API_PORT:-8100}" \
   node scripts/smoke-vm-stack.mjs --target container "${SMOKE_FLAGS[@]}"
+
+# 事後の確かめ (Phase 9; doc/guides/first-launch.ja.md 13 章, P1-P16): the stack at CI strength, with the
+# caller values the 事前チェック got. Only in production mode, with no error and with stack.env unchanged
+# since the hash above does it write the deploy record (.deploy/last-green.json) the next 事前チェック reads
+# (A13, F5). The stack stays up either way.
+if ! "${BASH}" "${SCRIPT_DIR}/postdeploy-check.sh" --from-deploy \
+    --caller-skip-pull "${RISEPATH_CALLER_SKIP_PULL}" --caller-project "${RISEPATH_CALLER_PROJECT}" \
+    --stack-sha "${RISEPATH_STACK_ENV_SHA}" --profiles "${COMPOSE_PROFILES}"; then
+  echo "❌ デプロイは終わりましたが、確かめで問題が見つかりました。上のコードを手順書 13 章で見てください。"
+  exit 1
+fi
 
 echo "==> Done"
 compose ps

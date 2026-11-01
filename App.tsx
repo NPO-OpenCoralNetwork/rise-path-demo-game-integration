@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import { ViewState, GeneratedCourse, Course } from './types';
 import { ThemeProvider } from './context/ThemeContext';
@@ -18,6 +18,8 @@ import LegalNoticeBar from './components/legal/LegalNoticeBar';
 import Layout from './components/common/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoginView from './components/common/ExperienceLoginView';
+import PilotOnlyView from './components/common/PilotOnlyView';
+import { forgetPilotRefusal, pilotRefusedUserId, subscribePilotRefusal } from './services/pilotAccess';
 import LandingView from './components/common/ExperienceLandingView';
 import AuthCallbackView from './components/common/AuthCallbackView';
 import AuthConfirmPendingView from './components/common/AuthConfirmPendingView';
@@ -179,6 +181,15 @@ const AppContent: React.FC = () => {
   // Phase 4: whether the terms are accepted (components/legal/legalGateClient.ts; off unless
   // VITE_FEATURE_LEGAL_PAGES=true). Only `needed` blocks, and only outside LEGAL_GATE_EXEMPT.
   const legal = useLegalGate(features.legalPages);
+  // Phase 9 (D1): the server's pilot list refused this signed-in account (403 pilot_only,
+  // services/pilotAccess.ts): the notice page instead of the app, on every path.
+  const pilotRefused = useSyncExternalStore(subscribePilotRefusal, pilotRefusedUserId, () => null);
+  const pilotOnly = isLoggedIn && !user?.isGuest && pilotRefused !== null && pilotRefused === user?.id;
+  // The refusal answers for the account that was signed in: forget it once nobody (or a guest) is,
+  // so signing in again here asks the server afresh (the account may be on the list by then).
+  useEffect(() => {
+    if (!isLoggedIn || user?.isGuest) forgetPilotRefusal();
+  }, [isLoggedIn, user?.isGuest]);
   useEffect(() => {
     syncLegalGate(features.legalPages, user ? { id: user.id, email: user.email, isGuest: user.isGuest } : null);
   }, [user?.id, user?.email, user?.isGuest]);
@@ -264,6 +275,15 @@ const AppContent: React.FC = () => {
       .catch((error) => { console.warn('Logout failed:', error); navigate('/', { replace: true }); });
   };
 
+  // Phase 9 final review, finding 2: the pilot page signs out this browser only (scope 'local'). Everyone it
+  // refuses is an account of Nexloom or P-School on the shared project; a global sign-out would end their
+  // sessions there too, on every device.
+  const handlePilotSignOut = () => {
+    logout({ scope: 'local' })
+      .then((done) => { if (done !== false) navigate('/', { replace: true }); })
+      .catch((error) => { console.warn('Logout failed:', error); navigate('/', { replace: true }); });
+  };
+
   const handleCourseSelect = async (course: Course) => {
     if (course.id === 'vibe-coding') { navigate('/vibe'); return; }
     if (course.id === 'claude-code') { navigate('/claude-code'); return; }
@@ -325,6 +345,8 @@ const AppContent: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white/50 text-sm font-mono">
           Loading…
         </div>
+      ) : pilotOnly ? (
+        <PilotOnlyView onSignOut={handlePilotSignOut} />
       ) : isLoggedIn && legal.status === 'needed' && !LEGAL_GATE_EXEMPT.has(normalizePath(location.pathname)) ? (
         <Suspense fallback={<RouteLoading />}>
           <LegalConsentView />

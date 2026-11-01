@@ -252,11 +252,16 @@ describe('the sign-up form (ExperienceLoginView, VITE_FEATURE_LEGAL_PAGES)', () 
     assert.match(text, /If you are under 18, get your parent’s or guardian’s consent before you sign up\./);
   });
 
-  it('flag off: no checkbox, no purpose notice, no links to the texts (today\'s form)', () => {
+  it('flag off: sign-up closed (Phase 9, D1) — initialMode signup renders the sign-in form, no tab list, no checkbox, the closed notice', () => {
     const tokens = render(off, off.LoginView, signupProps);
+    const els = elementsOf(tokens);
     assert.equal(checkboxOf(tokens), undefined);
-    assert.ok(!elementsOf(tokens).some((el) => el.type === 'Link' && /^\/(terms|privacy)/.test(el.props.to)));
+    assert.ok(!els.some((el) => el.type === 'Link' && /^\/(terms|privacy)/.test(el.props.to)));
     assert.doesNotMatch(textOf(tokens), /利用目的|利用規約/);
+    assert.ok(!els.some((el) => el.type === 'div' && /^flex rounded-full/.test(String(el.props.className ?? ''))), 'no tab list');
+    assert.deepEqual(els.filter((el) => el.type === 'input' && el.props.type === 'password').map((el) => el.props.autoComplete), ['current-password'], 'the sign-in form: one password, no confirmation');
+    assert.ok(!els.some((el) => el.type === 'button' && /新規登録|アカウントを作成/.test(textOfElement(el))), 'no sign-up button');
+    assert.match(textOf(tokens), /まだ新しいアカウントの登録は受け付けていません。試験運用に参加している方は、担当者から案内されたアカウントでログインしてください。/);
   });
 
   /** Renders once to learn which useState index each input writes, then again with values. */
@@ -321,10 +326,23 @@ describe('the sign-up form (ExperienceLoginView, VITE_FEATURE_LEGAL_PAGES)', () 
     }
   });
 
-  it('flag off: the sign-up goes as today (legalAccepted false)', async () => {
-    const result = await submitWith(off, { ticked: false });
-    assert.equal(result.calls.length, 1);
-    assert.deepEqual(result.calls[0][2], { displayName: undefined, legalAccepted: false });
+  it('flag off (Phase 9, D1): the form asked for in signup mode submits a sign-in, never a sign-up', async () => {
+    const calls = { login: 0, signUp: 0 };
+    const auth = {
+      login: async () => { calls.login += 1; },
+      loginAsGuest() {},
+      logout: async () => {},
+      signUp: async () => { calls.signUp += 1; return { status: 'session_ready' }; },
+    };
+    const tokens = render(off, off.LoginView, signupProps, { __auth: auth });
+    const form = elementsOf(tokens).find((el) => el.type === 'form');
+    Object.assign(globalThis, { __sets: [], __auth: auth });
+    try {
+      await form.props.onSubmit({ preventDefault() {} });
+    } finally {
+      delete globalThis.__auth;
+    }
+    assert.deepEqual(calls, { login: 1, signUp: 0 });
   });
 
   it('AuthContext.signUp writes the marker only with the flag and a ticked box, before supabase.auth.signUp', () => {
@@ -437,9 +455,22 @@ describe('AuthContext.signUp and the sign-up marker (bundled)', () => {
     assert.equal(after, null, 'no account was made: the owner\'s later sign-in here must not count this tick');
   });
 
-  it('no tick, or the flag off: no marker at all', async () => {
+  it('no tick: no marker; the flag off (Phase 9, D1): signUp rejects signup_closed before any marker and never calls supabase.auth.signUp', async () => {
     assert.equal((await signUpWith(authOn, { data: { user: newUser, session: null }, error: null }, { legalAccepted: false })).during, null);
-    assert.equal((await signUpWith(authOff, { data: { user: newUser, session: null }, error: null })).during, null);
+    const storage = memoryStorage();
+    let supabaseCalls = 0;
+    globalThis.window = { location: { origin: 'http://localhost:3007' }, localStorage: storage };
+    globalThis.__main = { auth: { signUp: async () => { supabaseCalls += 1; return { data: { user: newUser, session: null }, error: null }; } } };
+    try {
+      const { signUp } = authOff.AuthProvider({ children: null }).props.value;
+      await assert.rejects(signUp(EMAIL, 'a-long-password', { legalAccepted: true }), (error) => error instanceof Error && error.message === 'signup_closed');
+    } finally {
+      delete globalThis.window;
+      delete globalThis.__main;
+    }
+    assert.equal(supabaseCalls, 0, 'no account is made');
+    assert.equal(storage.getItem('rp:legal:signupAcceptance'), null, 'the throw comes before the marker');
+    assert.equal(storage.map.size, 0, 'nothing written on the device');
   });
 
   it('signUpMadeNoAccount: only a user with an empty identities list', () => {

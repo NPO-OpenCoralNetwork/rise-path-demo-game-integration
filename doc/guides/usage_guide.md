@@ -399,7 +399,7 @@ npm install
 
 ### 2. 環境変数
 
-`.env.local` を作成（テンプレ: `env.local.template`、手順: [`env_local_setup_issue15.md`](./env_local_setup_issue15.md)）：
+`.env.local` を作成（テンプレ: `.env.example`。`cp .env.example .env.local`、手順: [`env_local_setup_issue15.md`](./env_local_setup_issue15.md)）：
 
 ```env
 # --- Supabase Auth（必須 — データ DB には使わない）---
@@ -408,11 +408,11 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# --- データ DB（risepath-vm 推奨）---
-DATABASE_URL_PHASE1=postgresql://risepath_app:***@risepath-vm:5432/risepath?sslmode=disable
+# --- データ DB（Mac の中だけの開発用の DB。本番の risepath-vm の DB は使いません。doc/guides/first-launch.ja.md 18 章）---
+DATABASE_URL_PHASE1=postgresql://risepath_app:<開発用のパスワード>@127.0.0.1:5433/risepath?sslmode=disable
 
-# --- Hermes Agent（オプション）---
-HERMES_API_URL=http://risepath-vm:8642
+# --- Hermes Agent（オプション。手元の gateway だけ）---
+HERMES_API_URL=http://127.0.0.1:8642
 HERMES_API_KEY=change-me-local-dev
 
 # --- MCP 外部接続用（オプション）---
@@ -424,10 +424,12 @@ VITE_API_ENABLED=true
 
 ### 3. データベースマイグレーション
 
-データ DB は **専用 VM `risepath-vm` の Postgres `risepath`**（Docker Compose。Supabase Auth は別）。詳細: [`risepath_vm_deployment.md`](./risepath_vm_deployment.md)
+開発のデータ DB は、Mac の中だけで動く開発用の Postgres（`127.0.0.1:5433`、DB 名 `risepath`。作り方: [手順書の 18 章](./first-launch.ja.md)）です。`npm run db:migrate` は、`.env.local` の `DATABASE_URL_PHASE1` に当たるので、この開発用の DB に当たります。Mac から本番に `npm run db:migrate` はしません（D8）。
+
+本番のデータ DB は、専用 VM `risepath-vm` の Postgres `risepath` です（Supabase Auth は別）。その migration は、VM の `deploy/risepath-vm/scripts/deploy-stack.sh` が当てます。詳細: [`risepath_vm_deployment.md`](./risepath_vm_deployment.md)
 
 ```bash
-# .env.local に DATABASE_URL_PHASE1 を設定後
+# .env.local の DATABASE_URL_PHASE1 が開発用の DB（127.0.0.1:5433）であることを確かめてから
 npm run db:migrate:status
 npm run db:migrate
 ```

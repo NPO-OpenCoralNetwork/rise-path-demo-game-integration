@@ -1,3 +1,4 @@
+# 古い計画です（Phase 9 より前）。公開の手順は doc/guides/first-launch.ja.md です（本番の API は deploy/risepath-vm/Dockerfile）。
 # === Rise Path Production Dockerfile ===
 # Multi-stage build: build frontend, then serve via Express
 

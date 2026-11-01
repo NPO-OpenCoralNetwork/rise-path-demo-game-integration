@@ -1,13 +1,9 @@
--- Rise Path — dedicated DB on nexloom-gce (run once as postgres superuser)
+-- 古い手順です（nexloom-gce）。新しい VM では使いません。公開の手順は doc/guides/first-launch.ja.md です。
+-- Rise Path — dedicated DB on nexloom-gce (run once as postgres superuser). Legacy only: the Docker stack in
+-- deploy/risepath-vm/ makes its own role. A development .env.local never points at a production database
+-- (doc/guides/first-launch.ja.md 18 章).
 --
--- 1) Edit the password below, then on VM:
---      sudo -u postgres psql -f /tmp/postgres_risepath_bootstrap.sql
---
--- 2) Mac .env.local:
---      DATABASE_URL_PHASE1=postgresql://risepath_app:<password>@nexloom-gce:5432/risepath?sslmode=disable
---
--- 3) Mac からスキーマ適用:
---      npm run db:migrate
+-- Edit the password below, then on that VM run this file with psql as the postgres user.
 
 CREATE ROLE risepath_app LOGIN PASSWORD 'CHANGE_ME_STRONG_PASSWORD';
 

@@ -18,6 +18,7 @@
  */
 
 import fs from 'fs/promises';
+import { realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,13 +27,14 @@ const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_ENV = path.join(ROOT, '.env.local');
 const INVENTORY = path.join(ROOT, 'secrets.inventory.template');
 
-const PLACEHOLDER_PATTERNS = [
+// change-me (the templates' hyphen), change_me and CHANGE_ME all count as placeholders (Phase 9, D19).
+export const PLACEHOLDER_PATTERNS = [
   /^YOUR_/i,
   /your-project/i,
   /your-anon-key/i,
   /your-service-role-key/i,
   /your-gemini-api-key/i,
-  /CHANGE_ME/i,
+  /change[-_]me/i,
   /^\*\*\*$/,
   /placeholder/i,
 ];
@@ -103,7 +105,7 @@ function extractInventoryKeys(text, scope) {
   return [...keys].sort();
 }
 
-function classify(value) {
+export function classify(value) {
   if (value === undefined || value === '') return 'MISSING';
   if (PLACEHOLDER_PATTERNS.some((re) => re.test(value))) return 'PLACEHOLDER';
   return 'SET';
@@ -158,7 +160,17 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
+const isMainModule = (() => {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}

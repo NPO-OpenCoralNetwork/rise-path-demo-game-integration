@@ -71,6 +71,8 @@ const copy = {
     timeLeft: (min: number) => `This request is open for about ${min} more minute${min === 1 ? '' : 's'}.`,
     signUpHint:
       'If you create an account, open the confirmation email in this browser. We will bring you back here while the request is still open.',
+    // Phase 9 (D1): while the app's sign-up is closed (VITE_FEATURE_LEGAL_PAGES not "true").
+    signUpClosed: 'New accounts are not open yet. Sign in with an account you already have.',
     nameLabel: 'App name',
     nameUnverified: 'The app chose this name itself. Rise Path has not checked it.',
     impersonation:
@@ -180,6 +182,7 @@ const copy = {
     signUp: 'アカウントを作る',
     timeLeft: (min: number) => `このリクエストは、あと約 ${min} 分有効です。`,
     signUpHint: 'アカウントを作る場合は、確認メールをこのブラウザで開いてください。リクエストが有効なうちは、この画面に戻ります。',
+    signUpClosed: 'まだ新しいアカウントの登録は受け付けていません。お持ちのアカウントでサインインしてください。',
     nameLabel: 'アプリの名前',
     nameUnverified: 'この名前はアプリ自身が付けたものです。Rise Path は確認していません。',
     impersonation:
@@ -583,11 +586,18 @@ const SignedOut: React.FC<{ t: T; minutesLeft: number; onSignIn: (mode: AuthMode
       </p>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <Button onClick={() => onSignIn('login')}>{t.signIn}</Button>
-        <Button variant="secondary" onClick={() => onSignIn('signup')}>
-          {t.signUp}
-        </Button>
+        {/* Phase 9 (D1): no sign-up while the app's sign-up is closed (config/features.ts). */}
+        {features.legalPages && (
+          <Button variant="secondary" onClick={() => onSignIn('signup')}>
+            {t.signUp}
+          </Button>
+        )}
       </div>
-      <p className="mt-4 text-small text-fg-3">{t.signUpHint}</p>
+      {features.legalPages ? (
+        <p className="mt-4 text-small text-fg-3">{t.signUpHint}</p>
+      ) : (
+        <p className="mt-4 text-small text-fg-2">{t.signUpClosed}</p>
+      )}
     </section>
   );
 };

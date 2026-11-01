@@ -78,7 +78,9 @@ const VoiceOptionRow: React.FC<VoiceOptionRowProps> = ({
                 </button>
             </div>
             {previewError && (
-                <p className="text-sm text-red-600 px-1">{previewError}</p>
+                // role="alert": a screen reader hears the preview's error when it appears; text-danger is the design
+                // token (about 6:1 on this page, which keeps the default theme). Phase 9 rehearsal, item 28.
+                <p role="alert" className="text-sm text-danger px-1">{previewError}</p>
             )}
         </div>
     );

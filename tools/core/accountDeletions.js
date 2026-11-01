@@ -109,6 +109,30 @@ export async function readAccountState(pool, userId, authTime, { mayReopen = fal
 }
 
 /**
+ * Read only: whether a session that signed in at authTime belongs to a deleted account, the first
+ * refusal of readAccountState (a tombstone, and a sign-in no later than deleted_at + 30 s or no
+ * sign-in time; also after a re-open). Never re-opens and never writes. For a caller that refuses the
+ * session before the account check (the pilot list, server/middleware/auth.js refusePilotSession), so
+ * a device still holding a session older than the deletion gets 401 account_deleted and forgets the
+ * account (Phase 4 §5.11; Phase 9 final review, finding 19). No pool: false. A query error throws.
+ * @param {AccountPool | null | undefined} pool
+ * @param {unknown} userId the token's user id (any case)
+ * @param {number | null} authTime tools/core/oauthToken.js sessionAuthTime
+ * @returns {Promise<boolean>}
+ */
+export async function sessionPredatesDeletion(pool, userId, authTime) {
+    if (!pool) return false;
+    const id = canonicalUserId(userId);
+    if (!id) return false;
+    const result = await pool.query(
+        'SELECT deleted_at, reopened_at FROM account_deletions WHERE user_id = $1::uuid',
+        [id],
+    );
+    const row = result?.rows?.[0];
+    return Boolean(row) && signedInBeforeDeletion(authTime, row.deleted_at);
+}
+
+/**
  * Re-opens a deleted account for a session that signed in after the deletion, in one transaction:
  * the shared account lock first (the deletion holds it exclusively until COMMIT: same lock order,
  * no deadlock), then reopened_at = now(); only when that UPDATE returned the row, the auth.users

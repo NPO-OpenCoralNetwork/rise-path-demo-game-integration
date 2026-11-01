@@ -8,6 +8,9 @@
 export const UI = Object.freeze({
   /** components/common/ExperienceLandingView.tsx (signIn) and Layout's login form. */
   login: 'ログイン',
+  /** components/common/ExperienceLoginView.tsx (tabSignup, signupClosed): the sign-up is closed (Phase 9, D1). */
+  signupTab: '新規登録',
+  signupClosed: 'まだ新しいアカウントの登録は受け付けていません。試験運用に参加している方は、担当者から案内されたアカウントでログインしてください。',
   /** components/lesson/blocks/FlashcardsBlock.tsx (gotIt). */
   gotIt: '覚えた',
   /** components/common/Layout.tsx (logOut, reviewDue). */

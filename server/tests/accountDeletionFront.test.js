@@ -1242,7 +1242,8 @@ describe('wiring (static)', () => {
 
   it('apiFetch passes every 401 through the account_deleted check', () => {
     const client = stripComments(read('services/apiClient.ts'));
-    assert.match(client, /const res = await fetch\(`\$\{API_BASE\}\$\{path\}`, \{ \.\.\.options, headers \}\);\s*if \(res\.status === 401\) await noteAccountDeleted\(res\);\s*return res;/);
+    // Phase 9 (D1): then every 403 through the pilot_only check (services/pilotAccess.ts; pilotGate.test.js).
+    assert.match(client, /const res = await fetch\(`\$\{API_BASE\}\$\{path\}`, \{ \.\.\.options, headers \}\);\s*if \(res\.status === 401\) await noteAccountDeleted\(res\);\s*if \(res\.status === 403\) await notePilotOnly\(res, headers\['Authorization'\]\);\s*return res;/);
   });
 
   it('routes: /account/deleted is public and in both blocks; /settings/delete-account in the Layout; ViewState and VIEW_PATHS', () => {

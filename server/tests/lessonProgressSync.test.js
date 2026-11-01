@@ -1486,7 +1486,7 @@ describe('progress sync: wiring (static)', () => {
     const logout = text.slice(text.indexOf('const logout'));
     const aiLine = logout.indexOf('clearSharedDeviceAiData({ keepDrafts: user?.isGuest === true })');
     const progressLine = logout.indexOf('await signOutProgressSync()');
-    const remoteSignOut = logout.indexOf('auth.signOut()');
+    const remoteSignOut = logout.indexOf('auth.signOut(signOutOptions)');
     assert.ok(aiLine >= 0 && aiLine < progressLine && progressLine < remoteSignOut);
     // Phase 5 (G12, owner O4): the unsaved-learning question comes first; "stay signed in" returns
     // before anything is cleared.
