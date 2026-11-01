@@ -331,7 +331,7 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
  * countSpan counts it, with each other open page's time since its last signal (not stored yet, but
  * it will be) as a pending signal at `now` without input. First match:
  *   'not_in_session' now is outside the cohort's dates (a known chain's signal after the last day):
- *                    nothing counts;
+ *                    nothing counts from now on (the part of its last pair before the end still does);
  *   'cap_reached'    the unit's counted time reached its set time: nothing more of it counts;
  *   'starting'       the chain's first signal: no pair yet;
  *   'gap'            the last pair is a break (longer than gapMs);

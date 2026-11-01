@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {
-  admitSignal, cohortRange, countDay, countDays, countSpan, countWhole, evidenceWindow, jstDayOf, jstDayRange, nextDay, STUDY_TIME_ALGORITHM,
+  admitSignal, cohortRange, countDay, countDays, countSpan, countWhole, evidenceWindow, jstDayOf, jstDayRange, nextDay, STUDY_TIME_ALGORITHM, studyReason,
 } from '../../shared/training/studyTime.js';
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { COURSE_MANIFEST_SCHEMA, manifestCanonical, parseCourseManifest, setMsOf } from '../../shared/training/courseManifest.js';
@@ -468,5 +468,202 @@ describe('properties on random evidence', () => {
         assert.ok(total(signals.map((s) => ({ ...s, input: true, focus: true }))) >= base, `seed ${seed}`);
       }
     }
+  });
+});
+
+// ---- studyReason: the answer to an accepted signal (scenes, then properties on random evidence) ----
+
+describe('studyReason: why a page\'s time is not counting', () => {
+  const COHORT = cohortRange('2026-11-01', '2026-11-30');
+  const SET_MS = 100 * 3600 * S;
+  const first = (i) => i === 0;
+  /** The answer right after the last signal of chain `id` was stored, with the evidence up to it. */
+  const reasonAfter = (signals, id, { counting = RULES.counting, setMs = SET_MS, unitMs = 0, cohort = COHORT } = {}) => {
+    const own = signals.filter((s) => s.chain === id).sort((x, y) => x.seq - y.seq);
+    const s = own[own.length - 1];
+    const prev = own.length > 1 ? own[own.length - 2] : null;
+    return studyReason({
+      now: s.at, chain: { id, unit: s.unit, prevAt: prev ? prev.at : null }, signal: { focus: s.focus, input: s.input },
+      signals: signals.filter((g) => g.at <= s.at), counting, setMs, unitMs, cohort,
+    });
+  };
+
+  it('starting: the first signal of a chain (no pair yet); the next pair counts', () => {
+    assert.equal(reasonAfter(chain('a', 'u1', [0], { input: always }), 'a'), 'starting');
+    assert.equal(reasonAfter(chain('a', 'u1', [0, 7], { input: first }), 'a'), null);
+  });
+
+  it('idle: judged at the pair\'s last credited millisecond, idleMs after the last input; an input on this signal is starting, then counting', () => {
+    const secs = every(0, 119, 7);
+    const upTo = (t, inputs) => chain('a', 'u1', secs.filter((v) => v <= t), { input: (i) => inputs.includes(secs[i]) });
+    assert.equal(reasonAfter(upTo(98, [0]), 'a'), null, 'x = 97.999 s, inside [0, 101 s)');
+    assert.equal(reasonAfter(upTo(105, [0]), 'a'), 'idle', 'x = 104.999 s');
+    assert.equal(reasonAfter(upTo(112, [0, 112]), 'a'), 'starting', 'x = 111.999 s; the input at 112 s counts from now');
+    assert.equal(reasonAfter(upTo(119, [0, 112]), 'a'), null);
+    const edge = (ms) => chain('a', 'u1', [...every(0, 98, 7), 101], { input: first }).map((s) => (s.seq === 15 ? { ...s, at: s.at + ms } : s));
+    assert.equal(reasonAfter(edge(0), 'a'), null, 'x = 100.999 s, the last millisecond of [0, 101 s)');
+    assert.equal(reasonAfter(edge(1), 'a'), 'idle', 'x = 101 s');
+  });
+
+  it('idle: a restart of the page\'s own (seq 0 without input) makes no presence', () => {
+    assert.equal(reasonAfter(chain('a', 'u1', [0, 7, 14]), 'a'), 'idle');
+  });
+
+  it('gap: the last pair is longer than gapMs; a pair of exactly gapMs and a late pair are judged at their last credited millisecond', () => {
+    assert.equal(reasonAfter(chain('a', 'u1', [0, 7, 31], { input: first }), 'a'), 'gap', '24 s > 23 s');
+    assert.equal(reasonAfter(chain('a', 'u1', [0, 7, 30], { input: first }), 'a'), null, 'exactly gapMs');
+    const late = chain('a', 'u1', [0, 7, 27], { input: first });
+    assert.equal(reasonAfter(late, 'a'), null, 'x = 7 s + 13 s - 1 ms');
+    assert.equal(reasonAfter([...late, ...chain('b', 'u2', [20, 24], { input: first })], 'a'), null, 'a newer page of another unit from 20 s on does not reach x');
+  });
+
+  it('focus: with requireFocus, a signal without focus (\'gap\' comes first); without requireFocus the pair counts', () => {
+    const signals = chain('a', 'u1', [0, 7, 14], { input: first }).map((s) => (s.seq === 2 ? { ...s, focus: false } : s));
+    const focusRequired = rulesWith({ requireFocus: true }).counting;
+    assert.equal(reasonAfter(signals, 'a', { counting: focusRequired }), 'focus');
+    assert.equal(reasonAfter(signals, 'a'), null);
+    assert.equal(reasonAfter(chain('a', 'u1', [0, 7, 31], { input: first, focus: false }), 'a', { counting: focusRequired }), 'gap');
+  });
+
+  it('other_tab: a newer open page of another unit wins x with its pending pair, or both lose (drop_conflicts); not a page of the same unit, a stopped one or one without focus', () => {
+    const pageA = chain('a', 'u1', [0, 7, 14, 21], { input: first });
+    const pageB = (unit, extra = {}) => chain('b', unit, [3, 10, 17], { input: first, ...extra });
+    assert.equal(reasonAfter([...pageA, ...pageB('u2')], 'a'), 'other_tab', 'b\'s pending pair 17 s to 21 s covers x = 20.999 s, and b began later');
+    const x = T0 + 21 * S - 1;
+    const stored = countSpan({ a: x, b: x + 1, signals: [...pageA, ...pageB('u2')], rules: RULES, setMs: BIG, carriedMs: NONE });
+    assert.deepEqual(stored.units.map((u) => u.unit), ['u1'], 'the stored signals alone still give a the instant: the pending pair decides');
+    assert.equal(reasonAfter([...pageA, ...pageB('u2')], 'a', { counting: rulesWith({ overlap: 'drop_conflicts' }).counting }), 'other_tab');
+    assert.equal(reasonAfter([...pageA, ...pageB('u1')], 'a'), null, 'the same unit counts once');
+    assert.equal(reasonAfter([...pageA, ...pageB('u2', { stopAt: 18 })], 'a'), null, 'b stopped at 18 s');
+    assert.equal(reasonAfter([...pageA, ...pageB('u2', { focus: false })], 'a'), null, 'the focused page wins');
+    const exact = chain('a', 'u1', [0, 7, 30], { input: first }); // a pair of exactly gapMs: x = 19.999 s
+    const quiet = (base) => chain('b', 'u2', [3, 7], { input: first, base });
+    assert.equal(reasonAfter([...exact, ...quiet(T0)], 'a'), 'other_tab', 'b\'s last signal exactly gapMs old: still open, its pending pair credits 7 s to 20 s');
+    assert.equal(reasonAfter([...exact, ...quiet(T0 - 1)], 'a'), null, 'one millisecond older: b is not open');
+  });
+
+  it('another page of the same unit counts the instant: this idle page reads counting', () => {
+    const pageA = chain('a', 'u1', every(0, 105, 7), { input: first });
+    const pageB = chain('b', 'u1', [100, 104, 108], { input: first });
+    assert.equal(reasonAfter([...pageA, ...pageB], 'a'), null, 'b\'s pending pair 104 s to 105 s covers x = 104.999 s');
+    assert.equal(reasonAfter(pageA, 'a'), 'idle');
+  });
+
+  it('cap_reached: the unit\'s time reached its set time (before starting); below it, the other reasons', () => {
+    const one = chain('a', 'u1', [0], { input: always });
+    const pair = chain('a', 'u1', [0, 7], { input: always });
+    assert.equal(reasonAfter(one, 'a', { setMs: 59 * S, unitMs: 59 * S }), 'cap_reached');
+    assert.equal(reasonAfter(one, 'a', { setMs: 59 * S, unitMs: 61 * S }), 'cap_reached');
+    assert.equal(reasonAfter(one, 'a', { setMs: 59 * S, unitMs: 59 * S - 1 }), 'starting');
+    assert.equal(reasonAfter(pair, 'a', { setMs: 59 * S, unitMs: 59 * S }), 'cap_reached');
+    assert.equal(reasonAfter(pair, 'a', { setMs: 59 * S, unitMs: 59 * S - 1 }), null);
+  });
+
+  it('not_in_session: now outside the cohort\'s dates, or a date missing; checked first', () => {
+    const lastDay = cohortRange('2026-11-01', DAY);
+    const end = lastDay.to;
+    // a known chain after the last day: the answer is about now, though its pair's part before the end counts
+    const known = chain('a', 'u1', [-19, 2], { input: first, base: end });
+    assert.equal(reasonAfter(known, 'a', { cohort: lastDay }), 'not_in_session');
+    assert.equal(day(known, RULES, BIG, NONE, DAY, lastDay).countedMs, 13 * S);
+    assert.equal(reasonAfter(known, 'a', { cohort: lastDay, unitMs: SET_MS }), 'not_in_session', 'before cap_reached');
+    assert.equal(reasonAfter(chain('a', 'u1', [-7, 0], { input: first, base: end }), 'a', { cohort: lastDay }), 'not_in_session', 'at the end');
+    assert.equal(reasonAfter(chain('a', 'u1', [-7, 0], { input: first, base: end - 1 }), 'a', { cohort: lastDay }), null, '1 ms before the end');
+    const later = cohortRange(nextDay(DAY), '2026-11-30');
+    assert.equal(reasonAfter(chain('a', 'u1', [0], { input: always }), 'a', { cohort: later }), 'not_in_session', 'before the first day');
+    assert.equal(reasonAfter(chain('a', 'u1', [0], { input: always, base: later.from }), 'a', { cohort: later }), 'starting', 'from 00:00 of the first day');
+    assert.equal(reasonAfter(chain('a', 'u1', [0, 7], { input: always }), 'a', { cohort: null }), 'not_in_session', 'a date missing');
+  });
+
+  // Properties: every signal of random evidence that is not a stop, answered as the server answers it.
+  const REASONS = [null, 'not_in_session', 'cap_reached', 'starting', 'gap', 'focus', 'idle', 'other_tab'];
+  const REASON_RULES = [
+    RULES,
+    rulesWith({ requireFocus: true }),
+    rulesWith({ overlap: 'drop_conflicts', idleMs: 29 * S }),
+    rulesWith({ creditCapMs: 5 * S }), // shorter than beatMs (7 s): x often falls before now - 1 ms
+    rulesWith({ overlap: 'drop_conflicts', requireFocus: true, creditCapMs: 5 * S }),
+  ];
+  /** Whether countSpan gives `unit` the millisecond [x, x + 1) of these signals (counted or over the cap). */
+  const getsAt = (x, unit, signals, counting, cohort) => {
+    const u = countSpan({ a: x, b: x + 1, signals, rules: { counting }, setMs: NONE, carriedMs: NONE, cohort }).units.find((v) => v.unit === unit);
+    return u !== undefined && u.countedMs + u.overCapMs === 1;
+  };
+  /** The pending signal at now of each other open chain (last signal not a stop, before now, at most gapMs old): its last flags, no input, no stop. */
+  const pendingAt = (signals, id, now, gapMs) => {
+    const last = new Map();
+    for (const g of signals) if (!last.has(g.chain) || g.seq > last.get(g.chain).seq) last.set(g.chain, g);
+    return [...last.values()]
+      .filter((l) => l.chain !== id && !l.stop && l.at < now && now - l.at <= gapMs)
+      .map((l) => ({ ...l, seq: l.seq + 1, at: now, stop: false, input: false }));
+  };
+  /** A seed's answers: rules, cohort (every fourth seed's ends at the midnight inside its evidence) and set times by seed; the unit's time through now as the server reads it. */
+  const answers = (seed) => {
+    const signals = randomEvidence(seed);
+    const { counting } = REASON_RULES[seed % REASON_RULES.length];
+    const cohort = seed % 4 === 0 ? cohortRange(DAY, DAY) : cohortRange(DAY, nextDay(DAY));
+    const setMs = new Map([['u1', (seed % 7) * 60 * S + 1], ['u2', 90 * 60 * S]]);
+    return signals.filter((s) => !s.stop).map((s) => {
+      const ev = signals.filter((g) => g.at <= s.at);
+      const prev = ev.find((g) => g.chain === s.chain && g.seq === s.seq - 1) ?? null;
+      const unitMs = countDays({ fromDay: DAY, toDay: jstDayOf(s.at), signals: ev, rulesOf: () => ({ counting }), setMsOf: () => setMs, carriedMs: NONE, cohort }).carriedAfterMs.get(s.unit) ?? 0;
+      const reason = studyReason({
+        now: s.at, chain: { id: s.chain, unit: s.unit, prevAt: prev ? prev.at : null }, signal: { focus: s.focus, input: s.input },
+        signals: ev, counting, setMs: setMs.get(s.unit), unitMs, cohort,
+      });
+      return { s, ev, prev, unitMs, setMs: setMs.get(s.unit), reason, counting, cohort };
+    });
+  };
+  /** seed → its reasons, for the coverage check */
+  const reasonsOf = new Map();
+
+  for (let seed = 1; seed <= 300; seed += 1) {
+    it(`seed ${seed}: null exactly when countSpan gives the unit the pair's last credited millisecond (pending pairs included); otherwise the first match`, () => {
+      const cases = answers(seed);
+      reasonsOf.set(seed, cases.map((c) => c.reason));
+      for (const { s, ev, prev, unitMs, setMs, reason, counting, cohort } of cases) {
+        const where = `${s.chain}#${s.seq} → ${reason}`;
+        assert.ok(REASONS.includes(reason), where);
+        if (s.at < cohort.from || s.at >= cohort.to) { assert.equal(reason, 'not_in_session', where); continue; }
+        if (unitMs >= setMs) { assert.equal(reason, 'cap_reached', where); continue; }
+        if (!prev) { assert.equal(reason, 'starting', where); continue; }
+        if (s.at - prev.at > counting.gapMs) { assert.equal(reason, 'gap', where); continue; }
+        // from here the cap does not decide (unitMs < setMs)
+        const x = prev.at + Math.min(s.at - prev.at, counting.creditCapMs) - 1;
+        const evidence = [...ev, ...pendingAt(ev, s.chain, s.at, counting.gapMs)];
+        assert.equal(reason === null, getsAt(x, s.unit, evidence, counting, cohort), `${where}: null exactly when the unit gets x`);
+        const own = ev.filter((g) => g.chain === s.chain);
+        const covered = own.some((g) => g.input && g.at <= x && x < g.at + counting.idleMs);
+        assert.equal(covered, getsAt(x, s.unit, own, { ...counting, requireFocus: false }, cohort), `${where}: the page's presence as countSpan has it`);
+        if (reason === 'focus') assert.ok(counting.requireFocus && !s.focus, where);
+        if (reason === 'idle' || reason === 'starting') {
+          assert.equal(covered, false, `${where}: no input of the page covers x`);
+          assert.equal(reason === 'starting', s.input, `${where}: starting exactly when this signal brings an input`);
+        }
+        if (reason === 'other_tab') assert.equal(covered, true, `${where}: the page's presence covers x`);
+        if (reason !== null) assert.equal(reason, counting.requireFocus && !s.focus ? 'focus' : covered ? 'other_tab' : s.input ? 'starting' : 'idle', `${where}: the first match`);
+        // who has x: a page of the unit (null); a page of another unit that wins, or both lose (other_tab)
+        const pages = [...new Set(ev.map((g) => g.chain))].map((id) => ({ id, unit: ev.find((g) => g.chain === id).unit }));
+        const alone = (page) => getsAt(x, page.unit, evidence.filter((g) => g.chain === page.id), counting, cohort);
+        if (reason === null) assert.ok(pages.some((p) => p.unit === s.unit && alone(p)), `${where}: from this page or another page of the unit`);
+        if (reason === 'other_tab') {
+          assert.ok(alone({ id: s.chain, unit: s.unit }), `${where}: alone, this page would count x`);
+          assert.ok(pages.some((p) => p.unit !== s.unit && alone(p)), `${where}: a page of another unit has x`);
+          const units = countSpan({ a: x, b: x + 1, signals: evidence, rules: { counting }, setMs: NONE, carriedMs: NONE, cohort }).units.map((u) => u.unit);
+          if (counting.overlap === 'drop_conflicts') assert.deepEqual(units, [], `${where}: both lose`);
+          else assert.ok(units.length === 1 && units[0] !== s.unit, `${where}: another unit wins`);
+        }
+      }
+    });
+  }
+
+  it('every reason occurs across the seeds and rule variants (each a valid rules file)', () => {
+    for (const rules of REASON_RULES) assert.ok(parseTimeRules(rules).ok, JSON.stringify(rules.counting));
+    const tally = new Map(REASONS.map((r) => [r, 0]));
+    for (let seed = 1; seed <= 300; seed += 1) {
+      for (const r of reasonsOf.get(seed) ?? answers(seed).map((c) => c.reason)) tally.set(r, (tally.get(r) ?? 0) + 1);
+    }
+    const shown = JSON.stringify(Object.fromEntries([...tally].map(([r, n]) => [String(r), n])));
+    for (const reason of REASONS) assert.ok(tally.get(reason) > 0, `${reason} never occurred: ${shown}`);
   });
 });
