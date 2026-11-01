@@ -1039,7 +1039,7 @@ describe('tools/core/trainingTime.js: after a stored signal, the close and the s
             const signals = storedSignals(pool);
             const pure = (countingOf) => studyReason({
                 now: from + 26 * S, chain: { id: chainId(1), unit: U1, prevAt: from }, signal: { focus: true, input: false }, signals,
-                counting: settings[1].rules.counting, ...countingOf, maxPlaces: 3, setMs: 120 * S, unitMs: days[0] + days[1], cohort,
+                counting: settings[1].rules.counting, ...countingOf, setMs: 120 * S, unitMs: days[0] + days[1], cohort,
             });
             assert.equal(pure({ countingOf: (day) => settingOf(settings, day)?.rules.counting ?? null }), reason, `${label}: the pure function`);
             assert.equal(pure({}), todays, `${label}: today's rules for both days`);
@@ -1067,7 +1067,7 @@ describe('tools/core/trainingTime.js: after a stored signal, the close and the s
         const counting = /** @type {any} */ (parseTimeRules(DROP)).rules.counting;
         const pure = (maxPlaces) => studyReason({
             now: t0 + 10 * S, chain: { id: chainId(4), unit: U1, prevAt: t0 + 3 * S }, signal: { focus: true, input: true }, signals: storedSignals(pool),
-            counting, admitOf: () => ({ beatMs: 7 * S, maxPlaces, gapMs: counting.gapMs, unitKnown: () => true }), setMs: 120 * S, unitMs: 0, cohort: cohortRange('2026-11-01', '2026-11-30'),
+            counting, admitOf: () => ({ beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces, gapMs: counting.gapMs, unitKnown: () => true }), setMs: 120 * S, unitMs: 0, cohort: cohortRange('2026-11-01', '2026-11-30'),
         });
         assert.deepEqual([pure(3), pure(Infinity)], [null, 'other_tab'], 'with page 1 pending, its pair of unit 2 up to now conflicts with x');
     });
@@ -1768,25 +1768,98 @@ describe('tools/core/trainingTime.js: the live values up to the settled instant 
         }
     });
 
+    it('the cap check judges a beat still to come with the places at its instant: a page refused at 00:00 (its unit dropped) sends nothing more, so its place lapses before the older page\'s beat, which is stored: the unit is at its set time through now (cap_reached), as the final count gives', async () => {
+        const rulesIn = { ...RULES_IN, collection: { ...RULES_IN.collection, maxPlaces: 2 }, counting: { ...RULES_IN.counting, gapMs: 9 * S, creditCapMs: 9 * S, idleMs: 60 * S } };
+        const { pool, midnight } = await fromMidnight({ rulesIn, dropU2: true, seedS: 60 });
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        for (let k = 0; k <= 9; k += 1) events.push([midnight + (7 * k - 58) * S, { chainId: chainId(1), seq: k }]); // page P (unit 1): 23:59:02 to 00:00:05, every 7 s
+        events.push([midnight - 12 * S, { unitKey: U2, chainId: chainId(2), seq: 0, focus: false }]); // page Q (unit 2, no focus): 23:59:48, :55; refused at 00:00:02
+        events.push([midnight - 5 * S, { unitKey: U2, chainId: chainId(2), seq: 1, focus: false, input: false }]);
+        events.push([midnight + 2 * S, { unitKey: U2, chainId: chainId(2), seq: 2, focus: false, input: false }]);
+        events.push([midnight + 3 * S, { chainId: chainId(3), seq: 0 }]); // page C (unit 1): 00:00:03
+        const answers = await play(pool, events);
+        assert.deepEqual(answers.get(`${chainId(2)}#2`), { status: 'refused', reason: 'unit_unknown' });
+        assert.equal(answers.get(`${chainId(1)}#9`)?.status, 'accepted', 'P\'s beat at 00:00:05: Q\'s place (last 23:59:55) lapsed at 00:00:04');
+        // At 00:00:03 Q is open now (8 s), but not at P's beat: 60 + 56 s and P's pair to now (5 s) pass
+        // 120 s. Q's last signal still holds the numbers back at 23:59:55 (60 + 53 s).
+        assert.deepEqual(answers.get(`${chainId(3)}#0`)?.state, { counting: false, reason: 'cap_reached', todayMs: 0, unit: { unitKey: U1, countedMs: 113 * S, setMs: 120 * S, capReached: false } });
+        pool.setClock(midnight + 30 * S);
+        const read = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.deepEqual(read.time.units, [{ unitKey: U1, title: COURSE.units[0].title, setMs: 120 * S, countedMs: 120 * S, capReached: true }]);
+    });
+
+    it('the reason judges a beat still to come with the places at its instant: a page pushed out at its own beat sends nothing more, so once its last signal is gapMs old it no longer pushes out an older page\'s beat; under drop_conflicts the asking page is told other_tab, as the final count gives', async () => {
+        const T0 = at('2026-11-04T03:00:00Z');
+        const DROP = countingWith({ overlap: 'drop_conflicts' }); // maxPlaces 3, gapMs 23 s
+        const { pool } = await seeded({ clock: T0, rulesIn: DROP });
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        [79, 86, 93, 100, 107].forEach((t, seq) => events.push([T0 + t * S, { unitKey: U2, chainId: chainId(1), seq, input: seq === 0 }])); // page L (unit 2)
+        events.push([T0 + 82 * S, { unitKey: U2, chainId: chainId(2), seq: 0 }], [T0 + 89 * S, { unitKey: U2, chainId: chainId(2), seq: 1, input: false }]); // page C (unit 2): other_place at 89 s
+        [83, 90, 97, 104].forEach((t, seq) => events.push([T0 + t * S, { chainId: chainId(3), seq, input: seq === 0 }])); // page A (unit 1), asking at 104 s
+        events.push([T0 + 87 * S, { chainId: chainId(4), seq: 0 }], [T0 + 91 * S, { chainId: chainId(4), seq: 1, stop: true }]); // pages P1, P2: stop before
+        events.push([T0 + 87_500, { chainId: chainId(5), seq: 0 }], [T0 + 91_500, { chainId: chainId(5), seq: 1, stop: true }]);
+        events.push([T0 + 102 * S, { chainId: chainId(6), seq: 0 }]); // page B (unit 1)
+        const answers = await play(pool, events);
+        assert.deepEqual(answers.get(`${chainId(2)}#1`), { status: 'ignored', reason: 'other_place', nextInMs: null });
+        assert.equal(answers.get(`${chainId(1)}#4`)?.status, 'accepted', 'L\'s beat at 107 s: C (last at 82 s) is 25 s old');
+        assert.equal(answers.get(`${chainId(3)}#3`)?.state.reason, 'other_tab');
+        const x = T0 + 104 * S - 1;
+        assert.deepEqual(countSpan({ a: x, b: x + 1, signals: storedSignals(pool), rules: /** @type {any} */ (parseTimeRules(DROP)).rules, setMs: new Map(), carriedMs: new Map(), cohort: cohortRange('2026-11-01', '2026-11-30') }).units, [], 'units 1 and 2 both lose x');
+    });
+
+    it('the reason follows too_soon: a setting from 00:00 with a minSpacingMs above the old beatMs ignores a page\'s beat due at 00:00:02, and the page sends it again 15 s later; that pair is a break, so under drop_conflicts the other page counts at 23:59:58 (null), as the final count gives', async () => {
+        const counting = { idleMs: 60 * S, requireFocus: false, overlap: 'drop_conflicts' };
+        const FAST = { ...RULES_IN, collection: { beatMs: 6 * S, minSpacingMs: 3 * S, maxPlaces: 2 }, counting: { ...counting, gapMs: 10 * S, creditCapMs: 10 * S } };
+        const SLOW = { ...RULES_IN, collection: { beatMs: 15 * S, minSpacingMs: 8 * S, maxPlaces: 2 }, counting: { ...counting, gapMs: 20 * S, creditCapMs: 15 * S } };
+        const { pool, midnight } = await fromMidnight({ rulesIn: FAST, later: SLOW });
+        const answers = await play(pool, [
+            [midnight - 16 * S, { unitKey: U2, chainId: chainId(2), seq: 0 }], // page P (unit 2): 23:59:44, :50, :56
+            [midnight - 10 * S, { unitKey: U2, chainId: chainId(2), seq: 1, input: false }],
+            [midnight - 4 * S, { unitKey: U2, chainId: chainId(2), seq: 2, input: false }],
+            [midnight - 14 * S, { chainId: chainId(1), seq: 0 }], // page C (unit 1): 23:59:46, :52, :58
+            [midnight - 8 * S, { chainId: chainId(1), seq: 1, input: false }],
+            [midnight - 2 * S, { chainId: chainId(1), seq: 2, input: false }],
+        ]);
+        pool.setClock(midnight + 2 * S);
+        assert.deepEqual(await unstored(pool, { unitKey: U2, chainId: chainId(2), seq: 3, input: false }), { status: 'ignored', reason: 'too_soon', nextInMs: 15 * S });
+        pool.setClock(midnight + 17 * S);
+        assert.equal((/** @type {any} */ (await send(pool, { unitKey: U2, chainId: chainId(2), seq: 3, input: false }))).status, 'accepted');
+        assert.equal(answers.get(`${chainId(1)}#2`)?.state.reason, null);
+        assert.equal(finalGivesU1(pool, midnight - 2 * S - 1, FAST), true);
+    });
+
+    it('the cap check counts each live day with its own setting: yesterday\'s pairs with yesterday\'s creditCapMs (13 s), today\'s with today\'s (5 s); the unit is at its set time through now (cap_reached), as in the settled numbers', async () => {
+        const { pool, midnight } = await fromMidnight({ later: countingWith({ creditCapMs: 5 * S }), seedS: 90 });
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        for (let k = 0; k <= 5; k += 1) events.push([midnight + (7 * k - 30) * S, { unitKey: U2, chainId: chainId(2), seq: k, focus: false, input: k === 0 }]); // page b (unit 2, no focus): 23:59:30 to 00:00:05
+        for (let k = 0; k <= 5; k += 1) events.push([midnight + (7 * k - 28) * S, { chainId: chainId(1), seq: k, input: k === 0 }]); // page a (unit 1): 23:59:32 to 00:00:07
+        const answers = await play(pool, events);
+        // 90 + 4 x 7 s (11-04) + 5 s (11-05, cut to its creditCapMs) is past 120 s; with 11-05's 5 s cap for 11-04's pairs too, 115 s.
+        assert.deepEqual(answers.get(`${chainId(1)}#5`)?.state, { counting: false, reason: 'cap_reached', todayMs: 2 * S, unit: { unitKey: U1, countedMs: 120 * S, setMs: 120 * S, capReached: true } });
+    });
+
     it('a page of a unit today\'s unit list dropped still holds an open place in the reason and its cap check, as in admitSignal: with it and a newer page an older page was pushed out at its beat, so the newest page (no focus, requireFocus) is told focus, as the final count gives', async () => {
         const rulesIn = { ...RULES_IN, collection: { ...RULES_IN.collection, maxPlaces: 2 }, counting: { ...RULES_IN.counting, requireFocus: true } };
-        for (const seedS of [0, 106]) {
+        // Page Q (unit 1): its beat at 00:00:02 is other_place. Page P (unit 2, no focus, newer than Q):
+        // its beat 7 s after its last signal is refused. Page R (unit 1, no focus): 00:00:01, :08. In the
+        // last case P's last signal is 9 s old at Q's beat: open by gapMs (23 s), not by beatMs.
+        for (const [seedS, qAt, pAt] of [[0, [-12, -5], [-10, -3]], [106, [-12, -5], [-10, -3]], [0, [-19, -12, -5], [-14, -7]]]) {
+            const label = `${seedS} s before, P's last signal ${-pAt[pAt.length - 1]} s before 00:00`;
             const { pool, midnight } = await fromMidnight({ rulesIn, dropU2: true, seedS });
-            const answers = await play(pool, [
-                [midnight - 12 * S, { chainId: chainId(1), seq: 0 }], // page Q (unit 1): 23:59:48, :55; its beat at 00:00:02 is other_place
-                [midnight - 5 * S, { chainId: chainId(1), seq: 1, input: false }],
-                [midnight + 2 * S, { chainId: chainId(1), seq: 2, input: false }],
-                [midnight - 10 * S, { unitKey: U2, chainId: chainId(2), seq: 0, focus: false }], // page P (unit 2, no focus): 23:59:50, :57; 00:00:04 refused
-                [midnight - 3 * S, { unitKey: U2, chainId: chainId(2), seq: 1, focus: false, input: false }],
-                [midnight + 4 * S, { unitKey: U2, chainId: chainId(2), seq: 2, focus: false, input: false }],
-                [midnight + 1 * S, { chainId: chainId(3), seq: 0, focus: false }], // page R (unit 1, no focus): 00:00:01, :08
-                [midnight + 8 * S, { chainId: chainId(3), seq: 1, focus: false, input: false }],
-            ]);
-            assert.deepEqual(answers.get(`${chainId(1)}#2`), { status: 'ignored', reason: 'other_place', nextInMs: null }, `${seedS} s before`);
-            assert.deepEqual(answers.get(`${chainId(2)}#2`), { status: 'refused', reason: 'unit_unknown' }, `${seedS} s before`);
+            /** @type {Array<[number, Record<string, unknown>]>} */
+            const events = [];
+            [...qAt, 2].forEach((t, seq) => events.push([midnight + t * S, { chainId: chainId(1), seq, input: seq === 0 }]));
+            [...pAt, pAt[pAt.length - 1] + 7].forEach((t, seq) => events.push([midnight + t * S, { unitKey: U2, chainId: chainId(2), seq, focus: false, input: seq === 0 }]));
+            events.push([midnight + 1 * S, { chainId: chainId(3), seq: 0, focus: false }], [midnight + 8 * S, { chainId: chainId(3), seq: 1, focus: false, input: false }]);
+            const answers = await play(pool, events);
+            assert.deepEqual(answers.get(`${chainId(1)}#${qAt.length}`), { status: 'ignored', reason: 'other_place', nextInMs: null }, label);
+            assert.deepEqual(answers.get(`${chainId(2)}#${pAt.length}`), { status: 'refused', reason: 'unit_unknown' }, label);
             // Q's pair from 23:59:55 would cover R's x (00:00:07.999) and, with 106 s before, take unit 1 past 120 s.
-            assert.equal(answers.get(`${chainId(3)}#1`)?.state.reason, 'focus', `${seedS} s before`);
-            assert.equal(finalGivesU1(pool, midnight + 8 * S - 1, rulesIn), false, `${seedS} s before: nothing counts at R's x`);
+            assert.equal(answers.get(`${chainId(3)}#1`)?.state.reason, 'focus', label);
+            assert.equal(finalGivesU1(pool, midnight + 8 * S - 1, rulesIn), false, `${label}: nothing counts at R's x`);
         }
     });
 

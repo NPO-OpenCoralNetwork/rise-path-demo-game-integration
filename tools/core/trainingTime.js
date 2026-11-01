@@ -315,13 +315,14 @@ export function settingOf(settings, day) {
 
 /**
  * What admitSignal decides a signal with under a setting (pendingSignals' AdmitRules): its beatMs,
- * maxPlaces and gapMs, and its unit list (as signalState's unit_known reads it).
+ * minSpacingMs, maxPlaces and gapMs, and its unit list (as signalState's unit_known reads it).
  * @param {Setting} setting
  * @returns {import('../../shared/training/studyTime.js').AdmitRules}
  */
 export function admitRules(setting) {
+    const { collection, counting } = setting.rules;
     return {
-        beatMs: setting.rules.collection.beatMs, maxPlaces: setting.rules.collection.maxPlaces, gapMs: setting.rules.counting.gapMs,
+        beatMs: collection.beatMs, minSpacingMs: collection.minSpacingMs, maxPlaces: collection.maxPlaces, gapMs: counting.gapMs,
         unitKnown: (unit) => setting.setMs.has(unit),
     };
 }

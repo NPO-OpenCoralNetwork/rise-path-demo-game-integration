@@ -42,7 +42,7 @@ const every = (from, to, step) => {
 };
 const always = () => true;
 /** AdmitRules for every day (pendingSignals' admitOf): today's gapMs, maxPlaces and unit list; beatMs 0, every next beat now. */
-const admitWith = ({ gapMs, maxPlaces = Infinity, unitKnown = () => true, beatMs = 0 }) => () => ({ beatMs, maxPlaces, gapMs, unitKnown });
+const admitWith = ({ gapMs, maxPlaces = Infinity, unitKnown = () => true, beatMs = 0, minSpacingMs = 0 }) => () => ({ beatMs, minSpacingMs, maxPlaces, gapMs, unitKnown });
 
 describe('the rules file (shared/training/timeRules.js)', () => {
   it('no defaults: empty, partial or unknown keys refuse the whole file; errors name fields, never values', () => {
@@ -811,10 +811,56 @@ describe('studyReason: why a page\'s time is not counting', () => {
     assert.deepEqual(pend([...p, ...page('q1', 'u3', [15]), ...q], 16, 'q'), [['q1', 22]], 'p: not pushed out at its beat (q1 opened later), pushed out now');
   });
 
+  it('pendingSignals judges a beat still to come with the places at its own instant: a page that goes on renews its place by its own beat before it; a page that sends nothing more (pushed out at its beat) holds its place only until its last signal is gapMs old', () => {
+    const page = (id, unit, secs, opts) => chain(id, unit, secs, { input: first, ...opts });
+    const pend = (signals, now, except, admitOf) => pendingSignals({ now: T0 + now * S, signals: signals.filter((g) => g.at <= T0 + now * S), admitOf, except }).map((g) => [g.chain, (g.at - T0) / S]);
+    // beatMs 20 s, gapMs 25 s, maxPlaces 3. At 20 s p's beat is due at 30 s, when q (last at 4 s, 26 s
+    // old) holds a place only by its own beat at 24 s: with a and r, three newer pages push p out.
+    const slow = admitWith({ gapMs: 25 * S, beatMs: 20 * S, minSpacingMs: 3 * S, maxPlaces: 3 });
+    const renewed = [...page('p', 'u2', [-10, 10]), ...page('a', 'u1', [0, 20]), ...page('q', 'u1', [4]), ...page('r', 'u3', [15])];
+    assert.deepEqual(pend(renewed, 20, 'a', slow), [['q', 24], ['r', 35]]);
+    // beatMs 7 s, gapMs 23 s, maxPlaces 3. c's beat at 89 s was pushed out (a, p1 and p2 newer): it
+    // sends nothing more, so at L's beat (107 s) its place (last at 82 s) has lapsed: L is stored.
+    const lapsed = [
+      ...page('L', 'u2', [79, 86, 93, 100]), ...page('c', 'u2', [82]), ...page('a', 'u1', [83, 90, 97, 104]),
+      ...page('p1', 'u1', [87], { stopAt: 91 }), ...page('p2', 'u1', [87.5], { stopAt: 91.5 }), ...page('b', 'u1', [102]),
+    ];
+    assert.deepEqual(pend(lapsed, 104, 'a', admitWith({ gapMs: 23 * S, beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces: 3 })), [['L', 107], ['b', 109]]);
+    // maxPlaces 2. z went quiet (its last signal 31 s old, more than gapMs): its late beat, if it came
+    // now, is pending (a break), but it does not renew z's place, so P's beat at 2 s has only a newer.
+    const quiet = [...page('P', 'u2', [-40, -33, -26, -19, -12, -5]), ...page('z', 'u3', [-38, -31]), ...page('a', 'u1', [-3, 0])];
+    assert.deepEqual(pend(quiet, 0, 'a', admitWith({ gapMs: 23 * S, beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces: 2 })), [['P', 2], ['z', 0]]);
+  });
+
+  it('pendingSignals lets a page go on beating after each beat it stores: with a shorter beatMs from 00:00, the asking page\'s later beats keep its place, so an older page\'s beat due later is pushed out (maxPlaces 1)', () => {
+    const before = { beatMs: 14 * S, minSpacingMs: 3 * S, maxPlaces: 1, gapMs: 19 * S, unitKnown: () => true };
+    const after = { beatMs: 3 * S, minSpacingMs: 3 * S, maxPlaces: 1, gapMs: 4 * S, unitKnown: () => true };
+    const admitOf = (d) => (d < nextDay(DAY) ? before : after);
+    const p = chain('p', 'u2', [-17, -3], { input: first, base: MIDNIGHT }); // its beat is due at 00:00:11
+    const a = chain('a', 'u1', [3], { input: first, base: MIDNIGHT }); // newer; it beats at 00:00:06, :09, :12
+    const pending = pendingSignals({ now: MIDNIGHT + 3 * S, signals: [...p, ...a], admitOf, except: 'a' });
+    assert.deepEqual(pending, [], 'a\'s beat at 00:00:09 keeps its place at 00:00:11: p is pushed out');
+    assert.deepEqual(pendingSignals({ now: MIDNIGHT + 3 * S, signals: [...p, ...a], admitOf: (d) => (d < nextDay(DAY) ? before : { ...after, gapMs: 1 * S }), except: 'a' }).map((g) => (g.at - MIDNIGHT) / S), [11],
+      'control: with a gapMs shorter than a\'s beat, a\'s place has lapsed at each later beat');
+  });
+
+  it('pendingSignals follows too_soon: a beat due after 00:00 sooner than that day\'s minSpacingMs is sent again nextInMs (that day\'s beatMs) later, so its pair is that much longer', () => {
+    const before = { beatMs: 6 * S, minSpacingMs: 3 * S, maxPlaces: 2, gapMs: 10 * S, unitKnown: () => true };
+    const after = { beatMs: 15 * S, minSpacingMs: 8 * S, maxPlaces: 2, gapMs: 20 * S, unitKnown: () => true };
+    const admitOf = (d) => (d < nextDay(DAY) ? before : after);
+    const p = chain('p', 'u2', [-16, -10, -4], { input: first, base: MIDNIGHT }); // its beat due at 00:00:02 is too soon (6 s < 8 s): again at 00:00:17
+    const c = chain('c', 'u1', [-14, -8, -2], { input: first, base: MIDNIGHT });
+    const pending = pendingSignals({ now: MIDNIGHT - 2 * S, signals: [...p, ...c], admitOf, except: 'c' });
+    assert.deepEqual(pending.map((g) => [g.chain, (g.at - MIDNIGHT) / S]), [['p', 17]]);
+    // Its pair from -4 s to 17 s (21 s) is a break on both days: c counts its x under drop_conflicts.
+    const drop = (r) => ({ ...rulesWith({ gapMs: r.gapMs, creditCapMs: r.gapMs, overlap: 'drop_conflicts' }).counting });
+    assert.equal(reasonAfter([...p, ...c], 'c', { counting: drop(before), countingOf: (d) => drop(admitOf(d)), admitOf }), null);
+  });
+
   it('pendingSignals with a day\'s rules: a beat due after 00:00 is judged with the next day\'s setting (its unit list, maxPlaces), and with none that day it is left out', () => {
     const p = chain('p', 'u2', [-14, -7], { input: first, base: MIDNIGHT }); // its beat is due at 00:00
     const c = chain('c', 'u1', [-12, -5], { input: first, base: MIDNIGHT });
-    const today = { beatMs: 7 * S, maxPlaces: 3, gapMs: 23 * S, unitKnown: () => true };
+    const today = { beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces: 3, gapMs: 23 * S, unitKnown: () => true };
     const pend = (tomorrow) => pendingSignals({ now: MIDNIGHT - 5 * S, signals: [...p, ...c], admitOf: (d) => (d < nextDay(DAY) ? today : tomorrow), except: 'c' }).map((g) => [g.chain, g.at - MIDNIGHT]);
     assert.deepEqual(pend(today), [['p', 0]]);
     assert.deepEqual(pend({ ...today, unitKnown: (unit) => unit !== 'u2' }), [], 'unit 2 not listed from 00:00');
@@ -949,8 +995,10 @@ describe('studyReason: why a page\'s time is not counting', () => {
   });
 
   // The same property with two settings that switch at the midnight inside the evidence (another
-  // gapMs and creditCapMs, so a pair across it is credited day by day) and a finite maxPlaces, as
-  // stateAfterSignal passes them: [yesterday's, today's] by seed.
+  // gapMs and creditCapMs, so a pair across it is credited day by day; countingOf as
+  // stateAfterSignal passes it: [yesterday's, today's] by seed) and a finite maxPlaces. The other
+  // pages' next beats come now, judged with today's gapMs and maxPlaces (admitWith, beatMs 0, as
+  // pendingAt): the beats' own instants and each day's AdmitRules are the core's tests'.
   const SWITCHES = [
     [rulesWith({ gapMs: 17 * S, creditCapMs: 11 * S }), rulesWith({ gapMs: 29 * S, creditCapMs: 19 * S })],
     [rulesWith({ gapMs: 29 * S, creditCapMs: 19 * S }), rulesWith({ gapMs: 17 * S, creditCapMs: 5 * S })],

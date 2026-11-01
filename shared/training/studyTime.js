@@ -49,10 +49,10 @@ const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
  * @typedef {{ algorithm: string, collection: CollectionRules, counting: CountingRules }} TimeRules
  * @typedef {{ from: number, to: number }} Range
  * @typedef {{ unit: string, countedMs: number, overCapMs: number }} UnitTime
- * @typedef {{ beatMs: number, maxPlaces: number, gapMs: number, unitKnown: (unit: string) => boolean }} AdmitRules
+ * @typedef {{ beatMs: number, minSpacingMs: number, maxPlaces: number, gapMs: number, unitKnown: (unit: string) => boolean }} AdmitRules
  *   what admitSignal decides a signal on a day with (pendingSignals): the collection's beatMs (the
- *   nextInMs a signal stored that day answers) and maxPlaces, the counting's gapMs (its open places)
- *   and whether the day's unit list has a unit
+ *   nextInMs a signal stored that day answers), minSpacingMs and maxPlaces, the counting's gapMs (its
+ *   open places) and whether the day's unit list has a unit
  */
 
 /** The Japan-time day (YYYY-MM-DD) of an instant. @param {number} ms */
@@ -327,23 +327,25 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
 
 /**
  * The other open pages' next signals: open pages go on, so the time since a page's last signal is
- * not stored yet but will be. Each other chain's last signal that is not a stop and is before now
- * comes again, with its last flags and no input, when its page's next beat comes: the beatMs of its
- * day after it (the nextInMs its answer gave), or now when that is past (a late beat). Left out
- * when admitSignal will not store that beat, judged with the rules of the day it comes on (admitOf):
- * no setting that day, a unit that day's unit list does not have (unit_unknown; a stop too), or
- * maxPlaces newer open chains (other_place: the answer's nextInMs is null, and the page sends no
- * more signals of that chain, not even a stop). A beat that was due by now (and is not stored) is
- * also judged as it was then: refused or pushed out then, the page sends nothing more. The open
- * places are the chains open at that instant in the evidence (for a beat still to come, the ones
- * open now, as they go on); a chain whose own beat will not be stored still holds one. Not foreseen:
- * pages opened or stopped after now, and a pushed-out page's stop before its beat was due (the
- * learner hid or closed it; a stop passes, and closes its last pair). Whether a day credits a
- * pending pair is the counting's (that day's gapMs and creditCapMs).
+ * not stored yet but will be. Each page sends its chain's next beat nextInMs after its last signal
+ * (the beatMs of that signal's day), and admitSignal decides it as it comes, with the setting of
+ * the day it comes on (admitOf), in time order: accepted, it is pending (its last signal again, with
+ * its last flags and no input); refused (no setting, a unit that day's list does not have) or
+ * ignored other_place, the page sends no more signals of that chain (nextInMs null, not even a
+ * stop); ignored too_soon (a setting from 00:00 with a larger minSpacingMs), the page sends it again
+ * nextInMs (that day's beatMs) later. A beat due by now and not stored was decided as it came: one
+ * admitSignal would have stored is late, and comes now. A page whose beat is stored goes on beating
+ * nextInMs (that day's beatMs) after it. A beat's places are the chains' last signals at its
+ * instant: the stored ones, and, for an instant after now, the beats this look-ahead stores before
+ * it (a late beat renews only a place still open now). Not foreseen: pages opened or stopped after
+ * now, a pushed-out page's stop before its beat (the learner hid or closed it; a stop passes, and
+ * closes its last pair), beats later than their nextInMs, pages closed without a stop, and the
+ * order of signals in the same millisecond. Whether a day credits a pending pair is the counting's
+ * (that day's gapMs and creditCapMs).
  * @param {{ now: number, signals: Signal[], admitOf: (day: string) => AdmitRules | null, except?: string | null }} input
  *   signals: the stored evidence up to now; admitOf: a day's rules (null: no setting that day;
- *   beatMs 0: the next beat is now); except: a chain left out (the page asking)
- * @returns {Signal[]}
+ *   beatMs 0: the next beat is now); except: a chain left out (the page asking; it still goes on)
+ * @returns {Signal[]} each other chain's pending signal (last signal before now), in the order of the evidence
  */
 export function pendingSignals({ now, signals, admitOf, except = null }) {
   /** @type {Map<string, Signal[]>} each chain's signals in order */
@@ -354,39 +356,81 @@ export function pendingSignals({ now, signals, admitOf, except = null }) {
     else chains.set(s.chain, [s]);
   }
   for (const list of chains.values()) list.sort((x, y) => x.seq - y.seq);
-  /**
-   * How many chains open at t (each by its last signal at or before t) are newer than p:
-   * admitSignal's other_place count for p's signal at t.
-   * @param {Signal} p @param {number} t @param {number} gapMs
-   */
-  const newerOpen = (p, t, gapMs) => {
-    let n = 0;
+  /** The beats this look-ahead stores at or after now, by chain. @type {Map<string, number>} */
+  const stored = new Map();
+  /** Every chain's place at t: its last signal at or before t; after now, a beat stored here up to t. @param {number} t */
+  const placesAt = (t) => {
+    const places = [];
     for (const [chain, list] of chains) {
-      if (chain === p.chain) continue;
       let q = null;
-      for (const s of list) {
-        if (s.at > t) break;
-        q = s;
+      for (const g of list) {
+        if (g.at > t) break;
+        q = g;
       }
-      if (q && !q.stop && t - q.at <= gapMs && (q.born > p.born || (q.born === p.born && q.chain < p.chain))) n += 1;
+      if (!q) continue;
+      const beat = t > now ? stored.get(chain) : undefined;
+      places.push(beat !== undefined && beat <= t
+        ? { chainId: chain, bornAt: q.born, lastAt: beat, lastStop: false }
+        : { chainId: chain, bornAt: q.born, lastAt: q.at, lastStop: q.stop });
     }
-    return n;
+    return places;
   };
-  /** Whether admitSignal stores p's next beat at t, its places as at `placesAt`. @param {Signal} p @param {number} t @param {number} placesAt */
-  const stored = (p, t, placesAt) => {
+  /**
+   * A page's beat: its chain l, seq, at t, after its last accepted signal at `from`; first: the
+   * beat whose pending pair is wanted (the other pages' next beat after their last stored signal),
+   * else one that only keeps its page's place (the asking page's, and each page's later beats).
+   * @typedef {{ l: Signal, seq: number, from: number, t: number, resent: number, first: boolean }} Beat
+   */
+  /** admitSignal on a beat, with the setting of its day. @param {Beat} beat */
+  const decide = ({ l, seq, from, t }) => {
     const rules = admitOf(jstDayOf(t));
-    return rules !== null && rules.unitKnown(p.unit) && newerOpen(p, placesAt, rules.gapMs) < rules.maxPlaces;
+    const verdict = admitSignal({
+      now: t, cohortId: '', signal: { chainId: l.chain, seq, unitKey: l.unit, stop: false },
+      configured: rules !== null, session: { from: -Infinity, to: Infinity }, unitKnown: rules !== null && rules.unitKnown(l.unit),
+      chain: { cohortId: '', unitKey: l.unit, bornAt: l.born, lastSeq: seq - 1, lastAt: from, lastStop: false },
+      places: placesAt(t),
+      rules: { collection: { minSpacingMs: rules?.minSpacingMs ?? 0, maxPlaces: rules?.maxPlaces ?? 0 }, counting: { gapMs: rules?.gapMs ?? 0 } },
+    });
+    return { verdict, rules };
   };
+  /** @type {Beat[]} each open page's next beat */
+  const beats = [];
+  for (const list of chains.values()) {
+    const l = list[list.length - 1];
+    if (l.stop) continue;
+    const own = admitOf(jstDayOf(l.at));
+    const due = l.at + (own ? own.beatMs : 0);
+    beats.push({ l, seq: l.seq + 1, from: l.at, t: due > l.at ? due : Math.max(now, l.at + 1), resent: 0, first: l.chain !== except && l.at < now });
+  }
+  /** @type {Map<string, number>} */
+  const pending = new Map();
+  // In time order, while a wanted beat is undecided: each page goes on beating nextInMs after each
+  // beat stored here, which keeps its place for the later ones.
+  while (beats.some((b) => b.first)) {
+    beats.sort((x, y) => x.t - y.t || x.l.born - y.l.born || (x.l.chain < y.l.chain ? -1 : x.l.chain > y.l.chain ? 1 : 0));
+    const beat = /** @type {Beat} */ (beats.shift());
+    const { verdict, rules } = decide(beat);
+    if (verdict.verdict === 'accept') {
+      if (beat.t < now) {
+        beats.push({ ...beat, t: now }); // due by now and not stored: late, it comes now
+        continue;
+      }
+      if (beat.first) pending.set(beat.l.chain, beat.t);
+      // A late beat keeps the place only of a page still open now (one silent for longer has gone).
+      if (rules && (beat.t > now || now - beat.from <= rules.gapMs)) {
+        stored.set(beat.l.chain, beat.t);
+        if (rules.beatMs > 0) beats.push({ l: beat.l, seq: beat.seq + 1, from: beat.t, t: beat.t + rules.beatMs, resent: 0, first: false });
+      }
+    } else if (verdict.reason === 'too_soon' && rules && beat.resent < 3) {
+      beats.push({ ...beat, t: beat.t + rules.beatMs, resent: beat.resent + 1 });
+    }
+  }
   /** @type {Signal[]} */
   const out = [];
   for (const list of chains.values()) {
     const l = list[list.length - 1];
-    if (l.chain === except || l.stop || l.at >= now) continue;
-    const own = admitOf(jstDayOf(l.at));
-    const due = l.at + (own ? own.beatMs : 0);
-    if (due > l.at && due <= now && !stored(l, due, due)) continue;
-    const at = Math.max(now, due);
-    if (!stored(l, at, now)) continue;
+    const at = pending.get(l.chain);
+    if (at === undefined || l.chain === except || l.at >= now) continue;
     out.push({ ...l, seq: l.seq + 1, at, stop: false, input: false });
   }
   return out;
@@ -438,7 +482,7 @@ export function pendingSignals({ now, signals, admitOf, except = null }) {
  */
 export function studyReason({
   now, chain, signal, signals, counting, countingOf = () => counting,
-  admitOf = () => ({ beatMs: 0, maxPlaces: Infinity, gapMs: counting.gapMs, unitKnown: () => true }), setMs, unitMs, cohort,
+  admitOf = () => ({ beatMs: 0, minSpacingMs: 0, maxPlaces: Infinity, gapMs: counting.gapMs, unitKnown: () => true }), setMs, unitMs, cohort,
 }) {
   if (!cohort || now < cohort.from || now >= cohort.to) return 'not_in_session';
   if (unitMs >= setMs) return 'cap_reached';
