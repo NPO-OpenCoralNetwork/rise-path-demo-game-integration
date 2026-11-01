@@ -844,6 +844,15 @@ describe('studyReason: why a page\'s time is not counting', () => {
       'control: with a gapMs shorter than a\'s beat, a\'s place has lapsed at each later beat');
   });
 
+  it('pendingSignals bounds its look-ahead: with a beatMs of 5 hours before 00:00 and 2 s after it, the pages stop going on past a budget, and the wanted beat is still decided', () => {
+    const before = { beatMs: 5 * 3600 * S, minSpacingMs: S, maxPlaces: 1, gapMs: 6 * 3600 * S, unitKnown: () => true };
+    const after = { beatMs: 2 * S, minSpacingMs: S, maxPlaces: 1, gapMs: 3 * S, unitKnown: () => true };
+    const p = chain('p', 'u2', [-3600], { input: first, base: MIDNIGHT }); // its beat is due at 04:00
+    const a = chain('a', 'u1', [1], { input: first, base: MIDNIGHT }); // newer, beating every 2 s
+    const pending = pendingSignals({ now: MIDNIGHT + S, signals: [...p, ...a], admitOf: (d) => (d < nextDay(DAY) ? before : after), except: 'a' });
+    assert.deepEqual(pending.map((g) => [g.chain, (g.at - MIDNIGHT) / S]), [['p', 4 * 3600]], 'a stopped going on long before 04:00, so p is not pushed out');
+  });
+
   it('pendingSignals follows too_soon: a beat due after 00:00 sooner than that day\'s minSpacingMs is sent again nextInMs (that day\'s beatMs) later, so its pair is that much longer', () => {
     const before = { beatMs: 6 * S, minSpacingMs: 3 * S, maxPlaces: 2, gapMs: 10 * S, unitKnown: () => true };
     const after = { beatMs: 15 * S, minSpacingMs: 8 * S, maxPlaces: 2, gapMs: 20 * S, unitKnown: () => true };

@@ -405,8 +405,11 @@ export function pendingSignals({ now, signals, admitOf, except = null }) {
   /** @type {Map<string, number>} */
   const pending = new Map();
   // In time order, while a wanted beat is undecided: each page goes on beating nextInMs after each
-  // beat stored here, which keeps its place for the later ones.
+  // beat stored here, which keeps its place for the later ones. A few beats per page in practice;
+  // past a budget (a beatMs of hours one day and of seconds the next) only the wanted ones go on.
+  let budget = 1000 + 8 * chains.size;
   while (beats.some((b) => b.first)) {
+    if (--budget < 0) for (let i = beats.length - 1; i >= 0; i -= 1) if (!beats[i].first) beats.splice(i, 1);
     beats.sort((x, y) => x.t - y.t || x.l.born - y.l.born || (x.l.chain < y.l.chain ? -1 : x.l.chain > y.l.chain ? 1 : 0));
     const beat = /** @type {Beat} */ (beats.shift());
     const { verdict, rules } = decide(beat);
