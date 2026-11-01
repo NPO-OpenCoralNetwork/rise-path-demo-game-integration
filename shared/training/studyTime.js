@@ -9,7 +9,8 @@
  * timer, or is told to start over. A signal: { chain, seq, unit, born, at, stop, focus, input }.
  *   born:  server time of the chain's first stored signal (seq 0), the same on every signal of it;
  *   at:    server time the signal was received (strictly increasing within a chain, see admitSignal);
- *   stop:  the page hid or left (nothing of the chain counts after it);
+ *   stop:  the page ended the chain: it hid, left, changed unit or started over (nothing of the
+ *          chain counts after it);
  *   focus: the page had the window focus since its previous signal;
  *   input: the learner acted on the page since its previous signal (key, pointer, scroll, touch;
  *          the page also reports one on the first signal of a chain it starts because the learner

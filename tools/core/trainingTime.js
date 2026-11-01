@@ -531,6 +531,7 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
     /** @type {{ days: Array<{ day: string, countedMs: number }>, carriedAfterMs: Map<string, number> }} */
     const counted = { days: [], carriedAfterMs: new Map(unitTotals) };
     let settled = true;
+    let heldBack = false;
     for (let day = range?.live?.fromDay ?? ''; range?.live && day <= range.live.toDay; day = nextDay(day)) {
         const { start, end } = jstDayRange(day);
         const daySetting = of(day);
@@ -539,7 +540,13 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
         counted.days.push({ day, countedMs: span.countedMs });
         counted.carriedAfterMs = span.carriedAfterMs;
         settled = until >= end;
+        heldBack ||= until < Math.min(end, nowMs);
     }
+    // Each unit's time through nowMs (every live day counted from all its evidence up to nowMs): what
+    // the reason's cap check reads. The same as the settled count unless another open page held it back.
+    const unitNowMs = heldBack && range?.live
+        ? countDays({ ...range.live, signals, rulesOf: (day) => of(day).rules, setMsOf: (day) => of(day).setMs, carriedMs: unitTotals, cohort }).carriedAfterMs
+        : counted.carriedAfterMs;
     /** @type {Map<string, LiveDay>} */
     const byDay = new Map(closedDays.map((d) => [d.day, { day: d.day, countedMs: d.countedMs, final: true }]));
     for (const d of counted.days) if (!byDay.has(d.day)) byDay.set(d.day, { day: d.day, countedMs: d.countedMs, final: false });
@@ -568,6 +575,7 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
         totalMs: closedDays.reduce((n, d) => n + d.countedMs, 0) + counted.days.reduce((n, d) => n + d.countedMs, 0),
         todayMs: byDay.get(today)?.countedMs ?? 0,
         unitMs: counted.carriedAfterMs,
+        unitNowMs,
     };
 }
 
@@ -577,7 +585,8 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
 
 /**
  * The state in a signal's answer (an accepted signal that is not a stop): today's counted time, the
- * unit's, and why it is not counting (studyReason, null while it counts). null without today's setting.
+ * unit's (settled, as every number of an answer, with capReached), and why it is not counting
+ * (studyReason with the unit's time through now, null while it counts). null without today's setting.
  * @param {{ nowMs: number, signal: SignalBody, prevAt: number | null, time: ReturnType<typeof liveTime>, signals: Signal[], settings?: Setting[] }} input
  *   prevAt: the chain's previous stored signal (null for its first); signals: the live evidence up to
  *   nowMs; settings: the cohort's (a pair across 00:00 is judged with each day's; default: today's)
@@ -593,7 +602,7 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
         counting: today,
         countingOf: (day) => (settings ? settingOf(settings, day)?.rules.counting ?? null : today),
         maxPlaces: time.setting.rules.collection.maxPlaces,
-        setMs, unitMs: countedMs, cohort: time.cohort,
+        setMs, unitMs: time.unitNowMs.get(signal.unitKey) ?? 0, cohort: time.cohort,
     });
     return { counting: reason === null, reason, todayMs: time.todayMs, unit: { unitKey: signal.unitKey, countedMs, setMs, capReached: countedMs >= setMs } };
 }
@@ -766,18 +775,36 @@ export async function closeDays({ userId: rawUserId, cohortId: rawCohortId, comp
     if (!userId || !cohortId) return { error: 'An account id and a cohort id (UUIDs) are required.', error_type: 'validation' };
     const by = textOf(computedBy, 100);
     if (!by) return { error: 'Who closes takes 1 to 100 characters.', error_type: 'validation' };
+    const closed = await closeAndClock({ userId, cohortId, by, pool });
+    return 'error_type' in closed ? closed : closed.result;
+}
+
+/**
+ * closeDays (canonical ids, a checked `by`) and the clock reading it closed with: null when it found
+ * no cohort. A read that follows can count up to that instant without missing a signal still in
+ * flight: a signal reads its clock under the learner's lock, so one not committed by then reads a
+ * later clock.
+ * @param {{ userId: string, cohortId: string, by: string, pool?: TrainingPool | null }} params
+ * @returns {Promise<CoreError | { result: any, nowMs: number | null }>}
+ */
+async function closeAndClock({ userId, cohortId, by, pool }) {
     return transaction(pool, 'closeDays', async (db) => {
         await db.query(TRAINING_SQL.lock, [userId]);
         await db.query(TRAINING_SQL.learnerLock, [userId]);
         await db.query(TRAINING_TIME_SQL.settingsLockShared, [cohortId]);
+        /** @type {number | null} */
+        let nowMs = null;
+        /** @param {boolean} commit @param {any} result */
+        const done = (commit, result) => ({ commit, value: { result, nowMs } });
         /** @param {any} reason */
-        const nothing = (reason) => ({ commit: false, value: /** @type {any} */ ({ status: 'nothing', reason }) });
+        const nothing = (reason) => done(false, { status: 'nothing', reason });
         const state = (await db.query(TRAINING_TIME_SQL.closeState, [userId, cohortId])).rows?.[0];
         if (!state) return nothing('no_cohort');
+        nowMs = Number(state.now_ms);
         if (!state.stub) return nothing('no_account');
         const settings = parseSettings((await db.query(TRAINING_TIME_SQL.closeSettings, [cohortId])).rows ?? []);
-        if (!settings) return { commit: false, value: /** @type {any} */ ({ ...INVALID_SETTING }) };
-        const range = closeRange({ nowMs: Number(state.now_ms), startsOn: state.starts_on, endsOn: state.ends_on, addedOn: state.added_on, lastClosed: state.last_closed, settings });
+        if (!settings) return done(false, { ...INVALID_SETTING });
+        const range = closeRange({ nowMs, startsOn: state.starts_on, endsOn: state.ends_on, addedOn: state.added_on, lastClosed: state.last_closed, settings });
         if ('reason' in range) return nothing(range.reason);
         const carriedMs = new Map(((await db.query(TRAINING_TIME_SQL.unitTotals, [userId, cohortId])).rows ?? []).map((r) => [String(r.unit_key), Number(r.counted_ms)]));
         const window = closeWindow({ ...range, settings });
@@ -790,13 +817,13 @@ export async function closeDays({ userId: rawUserId, cohortId: rawCohortId, comp
         ])).rows ?? [];
         // Under the learner's lock no other close runs, and under the account lock the stub stays:
         // anything but every day written is a fault, and nothing is kept.
-        if (written.length !== days.length) return { commit: false, value: /** @type {any} */ ({ error: 'The days could not be written.', error_type: 'unknown' }) };
+        if (written.length !== days.length) return done(false, { error: 'The days could not be written.', error_type: 'unknown' });
         const idOf = new Map(written.map((r) => [String(r.day), String(r.id)]));
         const units = days.flatMap((d) => d.units.filter((u) => u.countedMs > 0 || u.overCapMs > 0).map((u) => ({ id: idOf.get(d.day), ...u })));
         if (units.length) {
             await db.query(TRAINING_TIME_SQL.insertUnitDays, [units.map((u) => u.id), units.map((u) => u.unit), units.map((u) => u.countedMs), units.map((u) => u.overCapMs)]);
         }
-        return { commit: true, value: { status: 'closed', days: days.length, fromDay: range.fromDay, toDay: range.toDay } };
+        return done(true, { status: 'closed', days: days.length, fromDay: range.fromDay, toDay: range.toDay });
     });
 }
 
@@ -949,8 +976,9 @@ export async function recordSignal({ userId: rawUserId, cohortId: rawCohortId, s
 
 /**
  * A learner's study time in a cohort (GET .../time), only for a live learner membership: the final
- * days are closed first (closeDays), then the live values are read in one read-only snapshot.
- * beatMs only while the cohort is in session (the page's beat; no other rule value).
+ * days are closed first (closeDays), then the live values are read in one read-only snapshot, as of
+ * the close's clock (asOf). beatMs only while the cohort is in session (the page's beat; no other
+ * rule value).
  * @param {{ userId: unknown, cohortId: unknown, pool?: TrainingPool | null }} params
  * @returns {Promise<{ status: 'read', time: StudyTime } | { status: 'not_found' | 'not_a_learner' | 'deleted_account' | 'no_account' } | CoreError>}
  *   not_found: no such cohort, or no live membership in it (the two are not told apart)
@@ -965,10 +993,14 @@ export async function readStudyTime({ userId: rawUserId, cohortId: rawCohortId, 
         const role = (await pool.query(TRAINING_SQL.liveMember, [userId, cohortId])).rows?.[0]?.role;
         if (!role) return { status: 'not_found' };
         if (role !== 'learner') return { status: 'not_a_learner' };
-        const closed = await closeDays({ userId, cohortId, computedBy: API_CLOSER, pool });
+        // The read counts up to the close's clock (taken under the learner's lock): a signal still in
+        // flight then has a later clock, so no number counted now can change later.
+        const closing = await closeAndClock({ userId, cohortId, by: API_CLOSER, pool });
+        if ('error_type' in closing) return closing;
+        const closed = closing.result;
         if ('error_type' in closed) return closed;
         if (closed.status === 'nothing' && closed.reason === 'no_account') return await noStub(pool, userId);
-        const read = await readLive(pool, 'readStudyTime', userId, cohortId, null);
+        const read = await readLive(pool, 'readStudyTime', userId, cohortId, closing.nowMs);
         if ('error_type' in read) return read;
         if ('gone' in read) return read.gone === 'no_account' ? await noStub(pool, userId) : { status: 'not_found' };
         const time = liveTime(read);

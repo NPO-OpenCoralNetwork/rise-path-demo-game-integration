@@ -28,7 +28,8 @@
  * migration not applied, a missing grant, a lock wait over TRAINING_LOCK_TIMEOUT, no account row, a
  * database clock behind a closed day); 500 training_failed. A deletion committed while the request
  * waited answers 401 account_deleted in the sign-in's shape ({ error, error_type }). No account row,
- * a clock behind, a 500, a failed close or state are logged by kind, at most once a minute each.
+ * a clock behind, a 500, a failed close or state are logged by kind, at most once a minute each
+ * (the core's [db] lines for a database failure are its own, one per failure).
  */
 import express from 'express';
 import { ACCOUNT_DELETED_REFUSAL } from '../middleware/auth.js';

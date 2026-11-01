@@ -474,7 +474,7 @@ docker compose --env-file stack.env exec -T api node scripts/training-time.mjs -
 - `--close`: 期の受講者ごとに、確定できる日（その日の終わりから、規則の途切れの長さが過ぎた日）を閉じます。0 分の日も行を作り、閉じた日は変えません。`--learner <account uuid>` で 1 人だけにもできます。受講者の画面が合図を送ったときと、受講者が自分の受講時間を読んだときも、API がその人の確定した日を閉じます。`--close` は、画面を開かなくなった受講者の日も閉じます。
 - `--stats`: 行の数（削除したアカウントの分も）と、最後に閉じた日です。
 - 設定のない日は、受講時間を数えません（合図の API は 409 `time_not_configured` で断り、読む API は `status: not_configured` を返します）。デプロイ、期と割り当ての操作は、設定がなくても動きます。
-- 受講時間の API が `api` のログに残す行（同じ種類は 1 分に 1 行まで。受講者の ID は先頭の 8 文字だけ）:
+- 受講時間の API が `api` のログに残す行（`[Training]` の行は、同じ種類で 1 分に 1 行まで。受講者の ID は先頭の 8 文字だけ。DB の失敗は、ほかの API と同じく `[db]` の行にも、そのたびに出ます）:
   - `[Training] the database clock is behind a closed day …`: DB の時計が、閉じた日の合図を読む範囲まで戻っています。合図を記録せず 503 で答えます。VM の時刻合わせ（`timedatectl` の `System clock synchronized`）を確かめます。
   - `[Training] no account row for …`: ログインの記録（`auth.users`）がない受講者です。503 で答えます。DB と `api` のログを確かめます。
   - `[Training] study time failed (…)`・`[Training] closing days after a signal failed (…)`・`[Training] study time state failed (…)`: 括弧の中が理由です。`invalid_setting` なら、保存した規則か単元表の版を今のコードで読めません（`--show` で版を確かめます）。日を閉じる処理が失敗しても、合図は残ります。

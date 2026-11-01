@@ -1311,6 +1311,7 @@ describe('tools/core/trainingTime.js: the pure parts of a signal and of the live
             totalMs: 141 * S,
             todayMs: 21 * S,
             unitMs: want.carriedAfterMs,
+            unitNowMs: want.carriedAfterMs,
         });
         assert.deepEqual(want.days.map((d) => d.countedMs), [20 * S, 21 * S]);
         assert.deepEqual(carried, new Map([[U1, 100 * S]]), 'the closed units are not changed');
@@ -1338,7 +1339,7 @@ describe('tools/core/trainingTime.js: the pure parts of a signal and of the live
     it('liveTime: not_configured without a setting today (one from a later day): no units, no days, nothing counted', () => {
         const settings = parseSettings([settingRow('1', '2026-11-10')]);
         assert.deepEqual(liveTime({ ...LIVE, settings, closedDays: [], unitTotals: new Map(), signals: [] }), {
-            today: '2026-11-04', status: 'not_configured', setting: null, cohort: cohortRange('2026-11-01', '2026-11-30'), units: [], days: [], totalMs: 0, todayMs: 0, unitMs: new Map(),
+            today: '2026-11-04', status: 'not_configured', setting: null, cohort: cohortRange('2026-11-01', '2026-11-30'), units: [], days: [], totalMs: 0, todayMs: 0, unitMs: new Map(), unitNowMs: new Map(),
         });
     });
 
@@ -1466,6 +1467,53 @@ describe('tools/core/trainingTime.js: the live values up to the settled instant 
         assert.equal(set.status, 'set');
         const after = await numbersAt(noon + 32 * S);
         assert.ok(after.every((value, i) => value >= before[i]), `a number went down: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+    });
+
+    it('the GET counts as of its close\'s clock (read under the learner\'s lock): a signal whose clock came later but that commits after the read cannot make the next read go down', async () => {
+        const T0 = at('2026-11-04T03:00:00Z');
+        const { pool } = await seeded({ clock: T0 });
+        chain(pool, { id: chainId(2), unit: U2, from: T0 - 28 * S, n: 9 }); // page 2 (older): unit 2 every 7 s up to T0 + 28 s
+        chain(pool, { id: chainId(1), unit: U1, from: T0, n: 2 }); // page 1 (newer, wins the overlap): its last signal at T0 + 7 s
+        const L = T0 + 7 * S;
+        // The close reads its clock at L + 20 s (page 1 still open); the read's own transaction starts at
+        // L + 25 s, when page 1 would look quiet; page 1's next signal read its clock at L + 22 s, after
+        // the close, and commits after the read.
+        pool.setClock(L + 20 * S);
+        let once = false;
+        pool.before(TRAINING_TIME_SQL.beginRead, () => { if (!once) { once = true; pool.setClock(L + 25 * S); } });
+        const first = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.equal(first.time.asOf, iso(L + 20 * S), 'as of the close\'s clock');
+        pool.addSignal({ userId: A, cohortId: COHORT, unit: U1, chain: chainId(1), born: T0, seq: 2, at: L + 22 * S, focus: true, input: true });
+        pool.setClock(L + 30 * S);
+        const second = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        const numbers = (/** @type {any} */ t) => [t.totalMs, ...t.units.map((/** @type {any} */ u) => u.countedMs), ...t.days.map((/** @type {any} */ d) => d.countedMs)];
+        assert.ok(numbers(second.time).every((value, i) => value >= numbers(first.time)[i]), `a number went down: ${JSON.stringify(numbers(first.time))} → ${JSON.stringify(numbers(second.time))}`);
+    });
+
+    it('the reason judges the unit\'s set time with its time through now: a page that maxPlaces pushed out (it stopped sending, without a stop) holds the numbers back, yet once the unit is over its set time the answer is cap_reached, not counting', async () => {
+        const T0 = at('2026-11-04T03:00:00Z');
+        const rulesIn = { ...RULES_IN, collection: { beatMs: 7 * S, minSpacingMs: 3 * S, maxPlaces: 1 }, counting: { ...RULES_IN.counting, idleMs: 60 * S } };
+        const { pool } = await seeded({ clock: T0, rulesIn });
+        /** @type {Array<[number, Record<string, unknown>]>} */
+        const events = [];
+        for (let k = 0; k <= 14; k += 1) events.push([k * 7, { unitKey: U1, chainId: chainId(1), seq: k }]); // page A0: unit 1 every 7 s
+        events.push([105, { unitKey: U1, chainId: chainId(1), seq: 15, stop: true }]); // A0 hides: 105 s of unit 1
+        for (const [t, seq] of [[100, 0], [107, 1], [114, 2]]) events.push([t, { unitKey: U2, chainId: chainId(2), seq, focus: false, input: false }]); // page P
+        for (let k = 0; k <= 4; k += 1) events.push([108 + 7 * k, { unitKey: U1, chainId: chainId(3), seq: k }]); // page A, newer than P
+        events.sort((x, y) => x[0] - y[0]);
+        /** @type {Map<string, any>} */
+        const answers = new Map();
+        for (const [t, patch] of events) {
+            pool.setClock(T0 + t * S);
+            answers.set(`${patch.chainId}#${patch.seq}`, await send(pool, patch));
+        }
+        assert.deepEqual(answers.get(`${chainId(2)}#2`), { status: 'ignored', reason: 'other_place', nextInMs: null }, 'P is pushed out at 114 s and stops sending');
+        // At 129 s unit 1 has 126 s through now (over its 2 minutes from 123 s); P's last signal (107 s)
+        // still holds the numbers at 105 s until it is gapMs old.
+        const at129 = answers.get(`${chainId(3)}#3`);
+        assert.deepEqual(at129.state, { counting: false, reason: 'cap_reached', todayMs: 105 * S, unit: { unitKey: U1, countedMs: 105 * S, setMs: 120 * S, capReached: false } });
+        const at136 = answers.get(`${chainId(3)}#4`);
+        assert.deepEqual(at136.state, { counting: false, reason: 'cap_reached', todayMs: 120 * S, unit: { unitKey: U1, countedMs: 120 * S, setMs: 120 * S, capReached: true } });
     });
 });
 
