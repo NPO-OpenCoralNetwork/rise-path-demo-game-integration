@@ -153,7 +153,7 @@ describe('scripts/training-time.mjs: loading', () => {
 describe('scripts/training-time.mjs: settings, show, close, stats', () => {
     it('--set: from a day; each refusal has its message (exit 2); --show lists the settings by sha256, never a value', async () => {
         const { pool, catalog, rules } = await loaded();
-        const set = (from, extra = []) => runWith(['--set', SLUG, '--catalog', catalog.sha256, '--rules', rules.sha256, '--from', from, '--by', 'staff-a', '--reason', 'JEED approved', ...extra], { pool });
+        const set = (from, extra = []) => runWith(['--set', SLUG, '--catalog', catalog.sha256, '--rules', rules.sha256, '--from', from, '--by', 'staff-a', '--reason', 'approved for the cohort', ...extra], { pool });
         const ok = await set('2026-11-04');
         assert.equal(ok.code, EXIT.ok);
         assert.equal(ok.out, `Cohort ${SLUG} uses unit list ${catalog.sha256.slice(0, 12)}… and rules ${rules.sha256.slice(0, 12)}… from 2026-11-04 (setting 3).`);
@@ -171,7 +171,7 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         assert.equal(show.code, EXIT.ok);
         const lines = show.out.split('\n');
         assert.equal(lines[0], `${SLUG} (${COHORT}): Web, 2026-11-01 … 2026-11-30, 2 setting(s)`);
-        assert.match(lines[1], new RegExp(`^  from 2026-11-04 \\(in effect today\\): unit list sample-course \\(2 unit\\(s\\)\\) ${catalog.sha256}, rules study-time/v1 ${rules.sha256}; set 2026-11-04T03:00:00\\.000Z by staff-a: JEED approved$`));
+        assert.match(lines[1], new RegExp(`^  from 2026-11-04 \\(in effect today\\): unit list sample-course \\(2 unit\\(s\\)\\) ${catalog.sha256}, rules study-time/v1 ${rules.sha256}; set 2026-11-04T03:00:00\\.000Z by staff-a: approved for the cohort$`));
         assert.match(lines[2], /^ {2}from 2026-11-06: /);
         for (const value of VALUES) assert.ok(!show.out.includes(value), value);
         const empty = await runWith(['--show', 'nope'], { pool });
