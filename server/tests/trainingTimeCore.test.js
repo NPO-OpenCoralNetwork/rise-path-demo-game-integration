@@ -592,8 +592,14 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
         const result = /** @type {any} */ (await send(pool, { seq: 1 }));
         assert.deepEqual(result.state, { counting: true, reason: null, todayMs: 7 * S, unit: { unitKey: U1, countedMs: 7 * S, setMs: 120 * S, capReached: false } });
         assert.equal(pool.queries.filter((q) => q.sql === TRAINING_TIME_SQL.evidence).at(-1)?.params[5], iso(t0 + 7 * S));
+        // At 13 s page 1 is still open (its next signal could still change the time from 7 s on): the
+        // read counts what is settled; once page 1 is no longer open (gapMs after its last signal) the
+        // other page's 4 s are settled too. A number never goes down.
         const later = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
-        assert.deepEqual(later.time.days, [{ day: '2026-11-01', countedMs: 11 * S, final: false }]);
+        assert.deepEqual(later.time.days, [{ day: '2026-11-01', countedMs: 7 * S, final: false }]);
+        pool.setClock(t0 + 7 * S + 23 * S + 1);
+        const settled = /** @type {any} */ (await readStudyTime({ userId: A, cohortId: COHORT, pool }));
+        assert.deepEqual(settled.time.days, [{ day: '2026-11-01', countedMs: 11 * S, final: false }]);
     });
 
     it('the statements: signalState reads the clock once, in whole milliseconds; the inserts take it as a parameter, only while the stub exists, once per chain and day (live rows) and once per seq; the chain and the open places are read from live streams only; the read-only snapshot', () => {
@@ -727,7 +733,8 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), not stored', () =
         pool.setClock(end + 4 * S);
         sent.push({ ...sent[0], seq: 1, at: end + 4 * S });
         const graced = /** @type {any} */ (await send(pool, { seq: 1 }));
-        assert.deepEqual(graced, { status: 'accepted', nextInMs: 7 * S, state: pureState({ signals: sent, today: '2026-11-04', toDay: '2026-11-03', endsOn: '2026-11-03', reason: 'not_in_session' }) });
+        // Stored to close its last pair; the cohort is over, so the page sends no more (nextInMs null).
+        assert.deepEqual(graced, { status: 'accepted', nextInMs: null, state: pureState({ signals: sent, today: '2026-11-04', toDay: '2026-11-03', endsOn: '2026-11-03', reason: 'not_in_session' }) });
         assert.deepEqual(graced.state, { counting: false, reason: 'not_in_session', todayMs: 0, unit: { unitKey: U1, countedMs: 3 * S, setMs: 120 * S, capReached: false } });
         assert.deepEqual(pool.state.streams.map((s) => s.day), ['2026-11-03', '2026-11-04'], 'stored in the stream of its own day, after the last one');
         assert.deepEqual(await unstored(pool, { chainId: chainId(2) }), { status: 'refused', reason: 'not_in_session' });
@@ -1057,7 +1064,7 @@ describe('tools/core/trainingTime.js: the pure parts of a signal and of the live
         assert.equal(readSignalBody({ ...signalBody(), [Symbol('at')]: 1 }), null, 'a symbol key');
     });
 
-    const DUE = Object.freeze({ nowMs: at('2026-11-04T03:00:00Z'), startsOn: '2026-11-01', endsOn: '2026-11-30', addedOn: '2026-10-31', firstSetting: '2026-11-01', lastClosed: null, gapMs: 23 * S });
+    const DUE = Object.freeze({ nowMs: at('2026-11-04T03:00:00Z'), startsOn: '2026-11-01', endsOn: '2026-11-30', addedOn: '2026-10-31', firstSetting: '2026-11-01', lastClosed: null, yesterdayGapMs: 23 * S });
 
     it('closeDue: true while a final day is not closed yet (at 11-04 12:00 JST, 11-01 to 11-03 are final)', () => {
         assert.equal(closeDue(DUE), true);
@@ -1068,12 +1075,18 @@ describe('tools/core/trainingTime.js: the pure parts of a signal and of the live
         assert.equal(closeDue({ ...DUE, lastClosed: '2026-11-03' }), false);
     });
 
-    it('closeDue: yesterday is final only once the clock is past its end + gapMs, strictly, with the gapMs given (today\'s)', () => {
+    it('closeDue: yesterday is final only once the clock is past its end + yesterday\'s gapMs, strictly (closeRange\'s rule); with no setting yesterday, at once', () => {
         const end = jstDayRange('2026-11-03').end;
         const open = { ...DUE, lastClosed: '2026-11-02' };
         assert.equal(closeDue({ ...open, nowMs: end + 23 * S }), false);
         assert.equal(closeDue({ ...open, nowMs: end + 23 * S + 1 }), true);
-        assert.equal(closeDue({ ...open, nowMs: end + 23 * S + 1, gapMs: 29 * S }), false);
+        assert.equal(closeDue({ ...open, nowMs: end + 23 * S + 1, yesterdayGapMs: 29 * S }), false);
+        assert.equal(closeDue({ ...open, nowMs: end + 1, yesterdayGapMs: null }), true);
+        // The same answer as closeRange for the settings it would read.
+        const settings = [/** @type {any} */ ({ id: '1', effectiveFrom: '2026-11-01', rules: RULES })];
+        for (const nowMs of [end + 23 * S, end + 23 * S + 1]) {
+            assert.equal(closeDue({ ...open, nowMs }), !('reason' in closeRange({ nowMs, startsOn: open.startsOn, endsOn: open.endsOn, addedOn: open.addedOn, lastClosed: open.lastClosed, settings })));
+        }
     });
 
     it('closeDue: the first day is the latest of the add day, the first setting\'s day and the cohort\'s first day (a last closed day before it does not move it)', () => {

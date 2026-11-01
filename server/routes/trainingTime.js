@@ -13,19 +13,22 @@
  * POST /cohorts/:cohortId/time/signals, a body of exactly { unitKey, chainId, seq, stop, focus, input }
  *   (no time, no duration: the database clock decides) → 200 { ok, accepted: true, nextInMs, state:
  *   { counting, reason, todayMs, unit: { unitKey, countedMs, setMs, capReached } } | null } (null for
- *   a stop, or when it could not be computed: logged), or 200 { ok, accepted: false, reason, nextInMs }
- *   when the signal is not stored (duplicate, chain_ended, not_open, restart, too_soon, other_place).
- *   nextInMs is beatMs while the page keeps its chain, else null.
+ *   a stop, when it could not be computed (logged), or when a deletion committed after the signal),
+ *   or 200 { ok, accepted: false, reason, nextInMs } when the signal is not stored (duplicate,
+ *   chain_ended, not_open, restart, too_soon, other_place). nextInMs is beatMs while the page keeps
+ *   its chain (in session, not a stop), else null. The numbers never go down from one answer to the
+ *   next (tools/core/trainingTime.js liveTime).
  * beatMs is the only rule value an answer carries (as beatMs or nextInMs).
  *
  * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
- * 400 validation (the signal's body); 401 account_deleted (a deletion committed while the request
- * waited for it); 403 not_a_learner (a live membership with another role); 404 cohort_not_found (no
- * such cohort or no live membership in it, not told apart; a cohort id that is not a UUID, before any
- * statement); 409 time_not_configured, not_in_session, unit_unknown, chain_mismatch (nothing stored);
- * 503 training_unavailable with Retry-After: 60 (the database, a migration not applied, a missing
- * grant, a lock wait over TRAINING_LOCK_TIMEOUT, no account row, a database clock behind a closed
- * day; the last two logged); 500 training_failed.
+ * 400 validation (the signal's body); 403 not_a_learner (a live membership with another role); 404
+ * cohort_not_found (no such cohort or no live membership in it, not told apart; a cohort id that is
+ * not a UUID, before any statement); 409 time_not_configured, not_in_session, unit_unknown,
+ * chain_mismatch (nothing stored); 503 training_unavailable with Retry-After: 60 (the database, a
+ * migration not applied, a missing grant, a lock wait over TRAINING_LOCK_TIMEOUT, no account row, a
+ * database clock behind a closed day); 500 training_failed. A deletion committed while the request
+ * waited answers 401 account_deleted in the sign-in's shape ({ error, error_type }). No account row,
+ * a clock behind, a 500, a failed close or state are logged by kind, at most once a minute each.
  */
 import express from 'express';
 import { ACCOUNT_DELETED_REFUSAL } from '../middleware/auth.js';
@@ -69,23 +72,38 @@ const REFUSED = Object.freeze({
 /** @param {import('express').Request} req */
 const userIdOf = (req) => /** @type {string} */ (/** @type {any} */ (req).userId);
 
+/** One warn line a minute at most for each kind: a fault repeats on every signal of every page. */
+const LOG_EVERY_MS = 60_000;
+
 /**
- * @param {{ logger?: Pick<Console, 'warn'> }} [options]
+ * @param {{ logger?: Pick<Console, 'warn'>, now?: () => number }} [options]
  */
-export function createTrainingTimeRouter({ logger = console } = {}) {
+export function createTrainingTimeRouter({ logger = console, now = () => Date.now() } = {}) {
     const router = express.Router();
+    /** @type {Map<string, number>} */
+    const logged = new Map();
+    /** @param {string} kind @param {string} line */
+    const warn = (kind, line) => {
+        const at = now();
+        if (at - (logged.get(kind) ?? -Infinity) < LOG_EVERY_MS) return;
+        logged.set(kind, at);
+        logger.warn(line);
+    };
 
     /**
      * The refusals both routes share; null when the result is none of them.
      * @param {import('express').Response} res @param {string} userId @param {any} result @param {string} failed
      */
     const refuse = (res, userId, result, failed) => {
-        if ('error_type' in result) return answerCoreError(res, result.error_type, failed);
+        if ('error_type' in result) {
+            if (!UNAVAILABLE.has(result.error_type)) warn(`failed:${result.error_type}`, `[Training] study time failed (${result.error_type})`);
+            return answerCoreError(res, result.error_type, failed);
+        }
         if (result.status === 'not_found') return res.status(404).json(NOT_FOUND);
         if (result.status === 'not_a_learner') return res.status(403).json(NOT_A_LEARNER);
-        if (result.status === 'deleted_account') return res.status(401).json({ ok: false, ...ACCOUNT_DELETED_REFUSAL });
+        if (result.status === 'deleted_account') return res.status(401).json({ ...ACCOUNT_DELETED_REFUSAL });
         if (result.status === 'no_account') {
-            logger.warn(`[Training] no account row for ${userId.slice(0, 8)}… (study time not served)`);
+            warn(`no_account:${userId}`, `[Training] no account row for ${userId.slice(0, 8)}… (study time not served)`);
             return unavailable(res);
         }
         return null;
@@ -111,14 +129,14 @@ export function createTrainingTimeRouter({ logger = console } = {}) {
         const refused = refuse(res, userId, result, failed);
         if (refused || 'error_type' in result) return refused;
         if (result.status === 'accepted') {
-            if (result.closeError) logger.warn(`[Training] closing days after a signal failed (${result.closeError})`);
-            if (result.stateError) logger.warn(`[Training] study time state failed (${result.stateError})`);
+            if (result.closeError) warn(`close:${result.closeError}`, `[Training] closing days after a signal failed (${result.closeError})`);
+            if (result.stateError) warn(`state:${result.stateError}`, `[Training] study time state failed (${result.stateError})`);
             return res.json({ ok: true, accepted: true, nextInMs: result.nextInMs, state: result.state });
         }
         if (result.status === 'ignored') return res.json({ ok: true, accepted: false, reason: result.reason, nextInMs: result.nextInMs });
         if (result.status === 'refused') return res.status(409).json({ ok: false, error: REFUSED[result.reason] ?? 'The signal was refused.', error_type: result.reason });
         // clock_behind: nothing stored until the database clock is past the closed day's window again.
-        logger.warn('[Training] the database clock is behind a closed day (signal not stored)');
+        warn('clock_behind', '[Training] the database clock is behind a closed day (signal not stored)');
         return unavailable(res);
     });
 

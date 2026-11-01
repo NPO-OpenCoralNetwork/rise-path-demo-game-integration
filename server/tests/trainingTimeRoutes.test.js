@@ -74,7 +74,8 @@ const INVALID_BODY = { error: 'The request body is not valid JSON.', error_type:
 const UNAVAILABLE = { ok: false, error: 'Training is unavailable right now. Please try again later.', error_type: 'training_unavailable' };
 const READ_FAILED = { ok: false, error: 'Study time could not be read.', error_type: 'training_failed' };
 const SIGNAL_FAILED = { ok: false, error: 'The signal could not be recorded.', error_type: 'training_failed' };
-const DELETED = { ok: false, ...ACCOUNT_DELETED_REFUSAL };
+// The sign-in's 401 body (server/middleware/auth.js, as server/routes/legal.js): one shape for the page.
+const DELETED = { ...ACCOUNT_DELETED_REFUSAL };
 const RATE_LIMITED = { error: 'Too many requests. Please try again in a minute.', error_type: 'rate_limited' };
 const REFUSED = {
     time_not_configured: 'Study time is not set up for this cohort today.',
@@ -506,8 +507,9 @@ describe('study time on the server.js stack (/api/v2/training/cohorts/:cohortId/
             assert.deepEqual([res.status, res.json], [503, UNAVAILABLE]);
             assert.equal(res.headers.get('retry-after'), '60');
         }
+        // One line for both requests: the same fault of the same account is logged once a minute.
         const training = lines.filter((line) => line.startsWith('[Training]'));
-        assert.equal(training.length, 2, lines.join('\n'));
+        assert.equal(training.length, 1, lines.join('\n'));
         for (const line of training) assert.match(line, new RegExp(`^\\[Training\\] no account row for ${A.slice(0, 8)}…`));
         assert.ok(lines.every((line) => !line.includes(A)), 'the whole id is never logged');
         assert.deepEqual(stored(pool), [0, 0, 0]);

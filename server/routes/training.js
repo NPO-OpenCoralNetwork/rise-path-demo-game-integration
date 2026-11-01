@@ -16,12 +16,12 @@
  *   4. the routes, then 404 not_found for any other path or method (nothing falls through).
  *
  * GET /me → 200 { ok, learnerId, cohorts: [{ cohortId, name, role }] } (live memberships only).
+ * Its refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
+ * 503 training_unavailable (no database, down, a migration not applied, a missing grant; with
+ * Retry-After: 60, as server/routes/legal.js), 500 training_failed (answerCoreError).
  * Study time: GET /cohorts/:cohortId/time and POST /cohorts/:cohortId/time/signals
- * (server/routes/trainingTime.js, used here before the 404).
- * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
- * 503 training_unavailable (no database, down, a migration not applied, a missing grant, a lock wait;
- * with Retry-After: 60, as server/routes/legal.js), 500 training_failed (answerCoreError). 401, 404
- * training_off and 429 come from the middleware, in their own shape.
+ * (server/routes/trainingTime.js, used here before the 404; its header lists its answers).
+ * 401, 404 training_off and 429 come from the middleware, in their own shape.
  * Logic and SQL: tools/core/training.js and tools/core/trainingTime.js. Tables:
  * server/migrations/021_training_cohorts.sql and 022_training_study_time.sql.
  */

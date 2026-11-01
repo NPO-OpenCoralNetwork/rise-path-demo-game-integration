@@ -326,6 +326,7 @@ export function createTrainingTimePool(seed = {}) {
         const member = cohort && state.memberships.find((m) => m.user_id === user && m.cohort_id === cohortId && m.account_deleted_at === null);
         const settings = cohort ? settingsOf(cohortId) : [];
         const current = settings.filter((s) => s.effective_from <= today).at(-1);
+        const yesterdays = settings.filter((s) => s.effective_from <= previousDay(today)).at(-1);
         const live = state.streams.filter((s) => s.user_id === user && s.account_deleted_at === null);
         /** The last signal of a chain over its live streams. @param {any[]} streams */
         const lastOf = (streams) => {
@@ -356,6 +357,7 @@ export function createTrainingTimePool(seed = {}) {
             starts_on: cohort?.starts_on ?? null,
             ends_on: cohort?.ends_on ?? null,
             first_setting: settings[0]?.effective_from ?? null,
+            yesterday_gap_ms: yesterdays ? String(state.rules.find((r) => r.id === yesterdays.rule_set_id).params.counting.gapMs) : null,
             params: current ? structuredClone(state.rules.find((r) => r.id === current.rule_set_id).params) : null,
             unit_known: current ? catalogOf(current).manifest.units.some((/** @type {any} */ u) => u.key === unit) : null,
             chain_cohort_id: ch?.s.cohort_id ?? null,

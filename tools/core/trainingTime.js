@@ -23,12 +23,13 @@
  * (shared/training/studyTime.js) decides with. An accepted signal is stored with that clock, only
  * while the stub exists, in the stream row of its Japan-time day (a chain across 00:00 gets one row
  * per day: closing reads a day's evidence from the streams of the days around it); a clock that
- * went back into a closed day's evidence window stores nothing. Then, when a day may have become
- * final, closeDays in its own transaction (if it fails, the signal stays stored), and the live
- * values in one read-only snapshot.
+ * went back into a closed day's evidence window stores nothing. Then, when a day became final,
+ * closeDays in its own transaction (if it fails, the signal stays stored), and, unless it is a stop,
+ * the live values in one read-only snapshot.
  *
  * Live values (liveTime: GET .../time, and a signal's answer): the closed days' current rows, and
- * the days not closed yet counted from the evidence with the function a close uses, never stored.
+ * the days not closed yet counted from the evidence with the function a close uses, never stored,
+ * up to the instant no other open page's next signal can change (settledUntil): no number goes down.
  *
  * Closing (closeDays): a learner's days, from the first one not closed yet up to the last final one
  * (the database clock passed its end + gapMs) and at most the cohort's last day, counted from the
@@ -48,7 +49,7 @@ import crypto from 'node:crypto';
 import { getPool } from '../../server/db.js';
 import { canonicalJson } from '../../shared/lesson/canonical.js';
 import { TRAINING_KEY, manifestCanonical, parseCourseManifest, setMsOf } from '../../shared/training/courseManifest.js';
-import { admitSignal, cohortRange, countDays, evidenceWindow, jstDayOf, jstDayRange, nextDay, studyReason } from '../../shared/training/studyTime.js';
+import { admitSignal, cohortRange, countDays, countSpan, evidenceWindow, jstDayOf, jstDayRange, nextDay, studyReason } from '../../shared/training/studyTime.js';
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { canonicalUserId } from './accountDeletions.js';
 import { classifyDbError } from './dbErrors.js';
@@ -120,10 +121,12 @@ SELECT to_char(d.today, 'YYYY-MM-DD') AS today, ins.id, ins.effective_from FROM 
     // the cohort id, $3 the chain id, $4 the unit key. The clock is read here, once, in whole
     // milliseconds (the inserts take it as a parameter). One row, with or without a cohort: the stub;
     // the live membership (any role) and its day; the cohort's dates and first setting day; today's
-    // setting (its rules; whether its unit list has the unit); the chain's last signal over every live
-    // stream of the account (a chain of another cohort or unit is refused); the last signal of each
-    // chain of the cohort seen today or yesterday (an open chain's is at most gapMs, 6 hours, old);
-    // the last closed day and the end of its evidence window (its end + the gapMs it was counted with).
+    // setting (its rules; whether its unit list has the unit) and yesterday's gapMs (when a close may
+    // find yesterday final); the chain's last signal over every live stream of the account (a chain
+    // of another cohort or unit is refused); the last signal of each chain of the cohort seen today
+    // or yesterday (an open chain's last signal is at most gapMs old, and timeRules.js caps gapMs at
+    // 6 hours); the last closed day and the end of its evidence window (its end + the gapMs it was
+    // counted with).
     signalState: `WITH t AS (SELECT date_trunc('milliseconds', clock_timestamp()) AS at),
 d AS (SELECT at, (at AT TIME ZONE 'Asia/Tokyo')::date AS today FROM t)
 SELECT ${ms('d.at')} AS now_ms,
@@ -131,6 +134,8 @@ SELECT ${ms('d.at')} AS now_ms,
        c.id AS cohort_id, mb.role, mb.added_on,
        to_char(c.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(c.ends_on, 'YYYY-MM-DD') AS ends_on,
        (SELECT to_char(min(f.effective_from), 'YYYY-MM-DD') FROM training_cohort_time_settings f WHERE f.cohort_id = c.id) AS first_setting,
+       (SELECT (y.params #>> '{counting,gapMs}')::bigint FROM training_cohort_time_settings s JOIN training_time_rule_sets y ON y.id = s.rule_set_id
+         WHERE s.cohort_id = c.id AND s.effective_from <= d.today - 1 ORDER BY s.effective_from DESC, s.id DESC LIMIT 1) AS yesterday_gap_ms,
        st.params, st.unit_known,
        ch.cohort_id AS chain_cohort_id, ch.unit_key AS chain_unit_key, ch.born AS chain_born, ch.seq AS chain_seq, ch.at AS chain_at, ch.flags AS chain_flags,
        (SELECT coalesce(json_agg(json_build_object('chain_id', p.chain_id, 'born', p.born, 'at', p.at, 'flags', p.flags) ORDER BY p.chain_id), '[]'::json)
@@ -433,17 +438,18 @@ export function readSignalBody(body) {
 }
 
 /**
- * Whether a close after a signal at nowMs may find a final day (transaction 2): the first day not
- * closed yet is at or before the last final one (closeRange's days, with today's gapMs; on the day
- * a setting with another gapMs starts, the call comes at most the difference early, when closeDays
- * finds nothing, or late). closeDays decides again under its locks.
- * @param {{ nowMs: number, startsOn: string | null, endsOn: string | null, addedOn: string | null, firstSetting: string | null, lastClosed: string | null, gapMs: number }} input
+ * Whether a close after a signal at nowMs finds a final day (transaction 2): closeRange's rule
+ * without reading every setting. The first day not closed yet is at or before the last final one:
+ * yesterday once the clock passed its end + yesterday's gapMs (or when no setting covers yesterday),
+ * else the day before. closeDays decides again under its locks.
+ * @param {{ nowMs: number, startsOn: string | null, endsOn: string | null, addedOn: string | null, firstSetting: string | null, lastClosed: string | null, yesterdayGapMs: number | null }} input
+ *   yesterdayGapMs: the gapMs of yesterday's setting, null when none
  */
-export function closeDue({ nowMs, startsOn, endsOn, addedOn, firstSetting, lastClosed, gapMs }) {
+export function closeDue({ nowMs, startsOn, endsOn, addedOn, firstSetting, lastClosed, yesterdayGapMs }) {
     if (!addedOn || !firstSetting || !startsOn || !endsOn || !cohortRange(startsOn, endsOn)) return false;
     const { fromDay } = openFrom({ addedOn, firstSetting, startsOn, lastClosed });
     const yesterday = previousDay(jstDayOf(nowMs));
-    const final = nowMs > jstDayRange(yesterday).end + gapMs ? yesterday : previousDay(yesterday);
+    const final = yesterdayGapMs === null || nowMs > jstDayRange(yesterday).end + yesterdayGapMs ? yesterday : previousDay(yesterday);
     return fromDay <= (final < endsOn ? final : endsOn);
 }
 
@@ -473,13 +479,39 @@ export function liveRange({ nowMs, startsOn, endsOn, addedOn, lastClosed, settin
  */
 
 /**
+ * The instant up to which the stored evidence settles the count at nowMs: no later signal can change
+ * an earlier instant (a chain's next pair starts at its last signal; a new chain's pairs and a new
+ * input start at nowMs or later). The earliest last signal of the chains still open (not stopped, at
+ * most the gapMs of its day or the next day old), else nowMs.
+ * @param {{ nowMs: number, signals: Signal[], settings: Setting[] }} input signals: the evidence up to nowMs
+ */
+export function settledUntil({ nowMs, signals, settings }) {
+    /** @type {Map<string, Signal>} */
+    const last = new Map();
+    for (const s of signals) {
+        const seen = last.get(s.chain);
+        if (!seen || s.seq > seen.seq) last.set(s.chain, s);
+    }
+    const gapOf = (/** @type {string} */ day) => settingOf(settings, day)?.rules.counting.gapMs ?? 0;
+    let until = nowMs;
+    for (const l of last.values()) {
+        if (l.stop || l.at >= until) continue;
+        const day = jstDayOf(l.at);
+        if (nowMs - l.at <= Math.max(gapOf(day), gapOf(nextDay(day)))) until = l.at;
+    }
+    return until;
+}
+
+/**
  * A learner's study time in a cohort at nowMs: each closed day's current value, and the days not
- * closed yet counted from `signals` with each unit's time carried from the closed days, exactly as
- * the close will count them (never stored). status: 'not_configured' (no setting today, so nothing
- * was ever counted), 'not_in_session' (outside the cohort's dates, or a date missing) or 'ready'.
- * units: today's unit list in its order, each with its time over every day (closed and live).
- * days: the newest LIVE_DAYS days from today (at most the cohort's last day), not before the first
- * day that counts; final: closed. totalMs: every day, units no longer listed too.
+ * closed yet counted from `signals` with each unit's time carried from the closed days, as the close
+ * will count them, up to settledUntil (never stored). So no number goes down from one answer to the
+ * next (a recount aside): what another open page's next signal can still change is not counted yet.
+ * status: 'not_configured' (no setting today, so nothing was ever counted), 'not_in_session'
+ * (outside the cohort's dates, or a date missing) or 'ready'. units: today's unit list in its order,
+ * each with its time over every day (closed and live). days: the newest LIVE_DAYS days from today
+ * (at most the cohort's last day), not before the first day that counts; final: closed. totalMs:
+ * every day, units no longer listed too.
  * @param {LiveInput} input closedDays: currentDays; unitTotals: each unit's time on the closed days
  */
 export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, settings, closedDays, unitTotals, signals }) {
@@ -492,9 +524,16 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
         if (!found) throw new RangeError(`liveTime: no setting for ${day}`);
         return found;
     };
-    const counted = range?.live
-        ? countDays({ ...range.live, signals, rulesOf: (day) => of(day).rules, setMsOf: (day) => of(day).setMs, carriedMs: unitTotals, cohort })
-        : { days: [], carriedAfterMs: new Map(unitTotals) };
+    const until = settledUntil({ nowMs, signals, settings });
+    /** @type {{ days: Array<{ day: string, countedMs: number }>, carriedAfterMs: Map<string, number> }} */
+    const counted = { days: [], carriedAfterMs: new Map(unitTotals) };
+    for (let day = range?.live?.fromDay ?? ''; range?.live && day <= range.live.toDay; day = nextDay(day)) {
+        const { start, end } = jstDayRange(day);
+        const daySetting = of(day);
+        const span = countSpan({ a: start, b: Math.min(end, Math.max(start, until)), signals, rules: daySetting.rules, setMs: daySetting.setMs, carriedMs: counted.carriedAfterMs, cohort });
+        counted.days.push({ day, countedMs: span.countedMs });
+        counted.carriedAfterMs = span.carriedAfterMs;
+    }
     /** @type {Map<string, LiveDay>} */
     const byDay = new Map(closedDays.map((d) => [d.day, { day: d.day, countedMs: d.countedMs, final: true }]));
     for (const d of counted.days) if (!byDay.has(d.day)) byDay.set(d.day, { day: d.day, countedMs: d.countedMs, final: false });
@@ -533,17 +572,22 @@ export function liveTime({ nowMs, startsOn, endsOn, addedOn, lastClosed, setting
 /**
  * The state in a signal's answer (an accepted signal that is not a stop): today's counted time, the
  * unit's, and why it is not counting (studyReason, null while it counts). null without today's setting.
- * @param {{ nowMs: number, signal: SignalBody, prevAt: number | null, time: ReturnType<typeof liveTime>, signals: Signal[] }} input
- *   prevAt: the chain's previous stored signal (null for its first); signals: the live evidence up to nowMs
+ * @param {{ nowMs: number, signal: SignalBody, prevAt: number | null, time: ReturnType<typeof liveTime>, signals: Signal[], settings?: Setting[] }} input
+ *   prevAt: the chain's previous stored signal (null for its first); signals: the live evidence up to
+ *   nowMs; settings: the cohort's (a pair across 00:00 is judged with each day's; default: today's)
  * @returns {SignalState | null}
  */
-export function stateAfterSignal({ nowMs, signal, prevAt, time, signals }) {
+export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, settings }) {
     const setMs = time.setting?.setMs.get(signal.unitKey);
     if (!time.setting || setMs === undefined) return null;
     const countedMs = time.unitMs.get(signal.unitKey) ?? 0;
+    const today = time.setting.rules.counting;
     const reason = studyReason({
         now: nowMs, chain: { id: signal.chainId, unit: signal.unitKey, prevAt }, signal, signals,
-        counting: time.setting.rules.counting, setMs, unitMs: countedMs, cohort: time.cohort,
+        counting: today,
+        countingOf: (day) => (settings ? settingOf(settings, day)?.rules.counting ?? null : today),
+        maxPlaces: time.setting.rules.collection.maxPlaces,
+        setMs, unitMs: countedMs, cohort: time.cohort,
     });
     return { counting: reason === null, reason, todayMs: time.todayMs, unit: { unitKey: signal.unitKey, countedMs, setMs, capReached: countedMs >= setMs } };
 }
@@ -808,9 +852,10 @@ function readLive(pool, operation, userId, cohortId, asOfMs) {
  * a failed state keeps the signal: closeError or stateError names it (the caller logs it); after a
  * failed state, state is null. The unit is checked in today's stored unit list as stored, so a
  * stored unit list that no longer parses with this code keeps signals (the evidence) while the
- * close and the state fail with invalid_setting; rules that no longer parse refuse the signal.
- * nextInMs: beatMs while the page keeps the chain (accepted, duplicate, too_soon); null otherwise:
- * the page ends it (a stop) or reacts to the reason (a new chain, or it stops).
+ * close and the state fail with invalid_setting; today's rules that no longer parse refuse the
+ * signal. nextInMs: beatMs while the page keeps the chain (accepted, duplicate, too_soon, while the
+ * cohort is in session and the chain goes on); null otherwise: the page ends it (a stop, the
+ * cohort's end) or reacts to the reason (a new chain, or it stops).
  * @param {{ userId: unknown, cohortId: unknown, signal: unknown, pool?: TrainingPool | null }} params
  * @returns {Promise<{ status: 'accepted', nextInMs: number | null, state: SignalState | null, closeError?: string, stateError?: string }
  *   | { status: 'ignored', reason: string, nextInMs: number | null }
@@ -849,10 +894,15 @@ export async function recordSignal({ userId: rawUserId, cohortId: rawCohortId, s
         const places = (Array.isArray(row.places) ? row.places : []).map((/** @type {any} */ p) => ({
             chainId: String(p.chain_id), bornAt: Number(p.born), lastAt: Number(p.at), lastStop: (Number(p.flags) & SIGNAL_FLAGS.stop) !== 0,
         }));
-        const verdict = admitSignal({ now: nowMs, cohortId, signal, configured: true, session: cohortRange(row.starts_on, row.ends_on), unitKnown: row.unit_known === true, chain, places, rules });
+        const session = cohortRange(row.starts_on, row.ends_on);
+        const verdict = admitSignal({ now: nowMs, cohortId, signal, configured: true, session, unitKnown: row.unit_known === true, chain, places, rules });
+        // The page keeps the chain while the cohort is in session and the chain goes on (not a stop,
+        // and not after one); after the cohort's last day a known chain's signal only closes its pair.
+        const keeps = !signal.stop && !chain?.lastStop && session !== null && nowMs < session.to;
+        const nextInMs = keeps ? rules.collection.beatMs : null;
         if (verdict.verdict !== 'accept') {
             if (verdict.verdict === 'refuse') return nothing({ status: 'refused', reason: verdict.reason });
-            return nothing({ status: 'ignored', reason: verdict.reason, nextInMs: KEEP_CHAIN.has(verdict.reason) ? rules.collection.beatMs : null });
+            return nothing({ status: 'ignored', reason: verdict.reason, nextInMs: KEEP_CHAIN.has(verdict.reason) ? nextInMs : null });
         }
         // A clock that went back into a closed day's evidence window would change that day's evidence.
         if (row.closed_until_ms !== null && row.closed_until_ms !== undefined && nowMs <= Number(row.closed_until_ms)) return nothing({ status: 'clock_behind' });
@@ -862,12 +912,13 @@ export async function recordSignal({ userId: rawUserId, cohortId: rawCohortId, s
         // Under the learner's lock no other signal of the account is written (admitSignal saw the
         // chain's last seq), and under the account lock the stub stays: anything else is a fault.
         if (inserted.length !== 1) return nothing({ error: 'The signal could not be written.', error_type: 'unknown' });
-        const due = closeDue({ nowMs, startsOn: row.starts_on, endsOn: row.ends_on, addedOn: row.added_on, firstSetting: row.first_setting, lastClosed: row.last_closed, gapMs: rules.counting.gapMs });
-        return { commit: true, value: { status: 'accepted', nowMs, beatMs: rules.collection.beatMs, prevAt: chain ? chain.lastAt : null, due } };
+        const yesterdayGapMs = row.yesterday_gap_ms === null || row.yesterday_gap_ms === undefined ? null : Number(row.yesterday_gap_ms);
+        const due = closeDue({ nowMs, startsOn: row.starts_on, endsOn: row.ends_on, addedOn: row.added_on, firstSetting: row.first_setting, lastClosed: row.last_closed, yesterdayGapMs });
+        return { commit: true, value: { status: 'accepted', nowMs, nextInMs, prevAt: chain ? chain.lastAt : null, due } };
     });
     if ('error_type' in stored || stored.status !== 'accepted') return stored;
     /** @type {{ status: 'accepted', nextInMs: number | null, state: SignalState | null, closeError?: string, stateError?: string }} */
-    const answer = { status: 'accepted', nextInMs: signal.stop ? null : stored.beatMs, state: null };
+    const answer = { status: 'accepted', nextInMs: stored.nextInMs, state: null };
     if (stored.due) {
         const closed = await closeDays({ userId, cohortId, computedBy: API_CLOSER, pool });
         if ('error_type' in closed) answer.closeError = closed.error_type;
@@ -878,7 +929,7 @@ export async function recordSignal({ userId: rawUserId, cohortId: rawCohortId, s
     // A deletion that committed after the signal: no state.
     if ('gone' in read) return answer;
     try {
-        answer.state = stateAfterSignal({ nowMs: stored.nowMs, signal, prevAt: stored.prevAt, time: liveTime(read), signals: read.signals });
+        answer.state = stateAfterSignal({ nowMs: stored.nowMs, signal, prevAt: stored.prevAt, time: liveTime(read), signals: read.signals, settings: read.settings });
     } catch (err) {
         return { ...answer, stateError: classifyDbError(/** @type {any} */ (err), 'studyTimeState').error_type };
     }

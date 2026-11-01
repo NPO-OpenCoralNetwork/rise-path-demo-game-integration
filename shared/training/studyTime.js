@@ -273,8 +273,8 @@ export function countWhole({ signals, rules, setMs, cohort = NO_COHORT }) {
 /**
  * Whether the server stores a signal, decided under the learner's lock with the database clock.
  *   refuse (409, nothing stored): no rules or units for today ('time_not_configured'); outside
- *     the cohort's dates, or a date missing ('not_in_session'; a signal of a chain already open is
- *     still stored up to gapMs after the last day so its last pair can count, a new chain is not);
+ *     the cohort's dates, or a date missing ('not_in_session'; a signal of a chain the server knows
+ *     is still stored up to gapMs after the last day so its last pair can count, a new chain is not);
  *     a unit not in today's units
  *     ('unit_unknown'); a chain id already used for another cohort or unit ('chain_mismatch').
  *   ignore (200, accepted: false, nothing stored; the page reacts to the reason):
@@ -326,15 +326,19 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
 
 /**
  * Why a page's time is not counting, judged right after its signal at `now` was stored (the answer
- * to that signal; the counting above is unchanged and decides the numbers). It judges the last
- * counted millisecond of the page's last pair, x = prevAt + min(now - prevAt, creditCapMs) - 1, as
- * countSpan counts it, with each other open page's time since its last signal (not stored yet, but
- * it will be) as a pending signal at `now` without input. First match:
+ * to that signal; the counting above is unchanged and decides the numbers). It judges x, the last
+ * counted millisecond of the page's last pair as the days count it (each day with its own rules:
+ * the pair is credited from prevAt for min(now - prevAt, creditCapMs) when the day's gapMs allows
+ * it), as countSpan counts x with the rules of x's day. Each other open page's time since its last
+ * signal is not stored yet but will be: it is a pending signal at `now` with that page's last flags
+ * and no input, except for a page pushed out by maxPlaces newer open pages (its next signal is not
+ * stored). A page that replaced its chain without a stop still looks open until gapMs passes, so
+ * the page sends a stop for a chain it ends. First match:
  *   'not_in_session' now is outside the cohort's dates (a known chain's signal after the last day):
  *                    nothing counts from now on (the part of its last pair before the end still does);
  *   'cap_reached'    the unit's counted time reached its set time: nothing more of it counts;
  *   'starting'       the chain's first signal: no pair yet;
- *   'gap'            the last pair is a break (longer than gapMs);
+ *   'gap'            the last pair is a break: no day credits it (longer than its gapMs);
  *   null             counting: the unit gets x (from this page, or another page of the same unit);
  *   'focus'          requireFocus, and the page had no focus;
  *   'starting'       no input of this page covers x, and this signal brings one (it counts from now);
@@ -346,35 +350,57 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
  *   signal: { focus: boolean, input: boolean },
  *   signals: Signal[],
  *   counting: CountingRules,
+ *   countingOf?: (day: string) => CountingRules | null,
+ *   maxPlaces?: number,
  *   setMs: number,
  *   unitMs: number,
  *   cohort: Range | null,
  * }} input chain: this page's chain, prevAt its previous stored signal (null for seq 0); signals: the
- *   learner's stored evidence in the cohort up to now (this signal included); setMs: the unit's set
- *   time today; unitMs: its counted time through now (closed days and the live ones)
+ *   learner's stored evidence in the cohort up to now (this signal included); counting: today's
+ *   rules, and countingOf a day's (null: none that day; default: today's for every day); maxPlaces:
+ *   the collection's (default: no page is pushed out); setMs: the unit's set time today; unitMs: its
+ *   counted time through now (closed days and the live ones)
  * @returns {StudyReason | null}
  */
-export function studyReason({ now, chain, signal, signals, counting, setMs, unitMs, cohort }) {
+export function studyReason({ now, chain, signal, signals, counting, countingOf = () => counting, maxPlaces = Infinity, setMs, unitMs, cohort }) {
   if (!cohort || now < cohort.from || now >= cohort.to) return 'not_in_session';
   if (unitMs >= setMs) return 'cap_reached';
   if (chain.prevAt === null) return 'starting';
-  const delta = now - chain.prevAt;
-  if (delta > counting.gapMs) return 'gap';
-  const x = chain.prevAt + Math.min(delta, counting.creditCapMs) - 1;
+  const prevAt = chain.prevAt;
+  const delta = now - prevAt;
+  // x: the last millisecond of the pair a day credits, the latest such day (a pair lasts at most 6 hours).
+  let x = -1;
+  /** @type {CountingRules | null} */
+  let rules = null;
+  for (let day = jstDayOf(prevAt); jstDayRange(day).start < now; day = nextDay(day)) {
+    const c = countingOf(day);
+    const { start, end } = jstDayRange(day);
+    const credited = c && delta <= c.gapMs ? Math.min(prevAt + Math.min(delta, c.creditCapMs), end) : start;
+    if (credited > Math.max(prevAt, start)) {
+      x = credited - 1;
+      rules = c;
+    }
+  }
+  if (!rules) return 'gap';
   /** @type {Map<string, Signal>} */
   const last = new Map();
   for (const s of signals) {
     const seen = last.get(s.chain);
     if (!seen || s.seq > seen.seq) last.set(s.chain, s);
   }
-  const pending = [...last.values()]
-    .filter((l) => l.chain !== chain.id && !l.stop && l.at < now && now - l.at <= counting.gapMs)
+  const gapMs = rules.gapMs;
+  const open = [...last.values()].filter((l) => !l.stop && now - l.at <= gapMs);
+  /** How many open chains are newer than `p` (admitSignal's other_place rule for p's next signal). @param {Signal} p */
+  const newer = (p) => open.filter((q) => q.chain !== p.chain && (q.born > p.born || (q.born === p.born && q.chain < p.chain))).length;
+  const pending = open
+    .filter((l) => l.chain !== chain.id && l.at < now && newer(l) < maxPlaces)
     .map((l) => ({ ...l, seq: l.seq + 1, at: now, stop: false, input: false }));
-  const at = countSpan({ a: x, b: x + 1, signals: [...signals, ...pending], rules: { counting }, setMs: new Map(), carriedMs: new Map(), cohort });
+  const at = countSpan({ a: x, b: x + 1, signals: [...signals, ...pending], rules: { counting: rules }, setMs: new Map(), carriedMs: new Map(), cohort });
   const mine = at.units.find((u) => u.unit === chain.unit);
   if (mine && mine.countedMs + mine.overCapMs === 1) return null;
-  if (counting.requireFocus && !signal.focus) return 'focus';
-  const present = signals.some((s) => s.chain === chain.id && s.input && s.at <= x && x < s.at + counting.idleMs);
+  if (rules.requireFocus && !signal.focus) return 'focus';
+  const idleMs = rules.idleMs;
+  const present = signals.some((s) => s.chain === chain.id && s.input && s.at <= x && x < s.at + idleMs);
   if (!present) return signal.input ? 'starting' : 'idle';
   return 'other_tab';
 }
