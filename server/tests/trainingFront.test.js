@@ -10,7 +10,8 @@
 //   components/features/training/trainingModel.ts turns them into what the page shows.
 // - TrainingView.tsx, rendered with a small hook runtime: guests send nothing, every state sits in
 //   one status region, a retry gives focus that was lost to the title, an answer for another
-//   learner and an aborted request never show.
+//   learner and an aborted request never show; a trainee's class links to its study time, and the
+//   nested routes (the study time pages: server/tests/trainingStudyTimeFront.test.js).
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -159,8 +160,9 @@ describe('.github/workflows/ci.yml', () => {
     assert.ok(job.includes(name));
     const step = job.slice(job.indexOf(name));
     const run = step.slice(0, step.indexOf('\n\n') === -1 ? undefined : step.indexOf('\n\n'));
-    assert.match(run, new RegExp(`grep -rlF -e '${MARKER}' -e '/training/me' "\\$RUNNER_TEMP/dist"`));
+    assert.match(run, new RegExp(`grep -rlF -e '${MARKER}' -e '/training/me' -e '/training/cohorts/' "\\$RUNNER_TEMP/dist"`));
     assert.match(read('services/trainingApi.ts'), /const PATH = '\/training\/me';/, 'the API path the grep looks for');
+    assert.match(read('services/trainingApi.ts'), /const COHORTS_PATH = '\/training\/cohorts\/';/, 'the study time paths\' prefix the grep looks for');
     assert.match(run, /exit 1/);
     assert.ok(job.indexOf('- name: Fail if draft legal text reached the bundle') < job.indexOf(name));
     assert.doesNotMatch(job, /VITE_FEATURE_TRAINING\s*:/, 'the build runs with the flag unset');
@@ -276,6 +278,18 @@ const VIEW_STUBS = {
   header: "export default function PageHeader(props) { if (props.titleRef) props.titleRef.current = globalThis.__title ?? null; return { type: 'h1', props: { children: props.title } }; }",
   empty: "export default function EmptyState(props) { return { type: 'EmptyState', props: { children: [props.title, props.action ?? null] } }; }",
   button: "export const Button = (props) => ({ type: 'button', props });",
+  // Routes renders the element of the child route globalThis.__route names (the index by default).
+  router: `
+    export const Routes = (props) => {
+      const want = globalThis.__route ?? null;
+      const match = [].concat(props.children ?? []).find((c) => c && (want === null ? c.props.index === true : c.props.path === want));
+      return match ? match.props.element : null;
+    };
+    export const Route = () => null;
+    export const Link = (props) => ({ type: 'a', props: { href: props.to, className: props.className, 'aria-label': props['aria-label'], children: props.children } });
+    export const Navigate = (props) => ({ type: 'Navigate', props: { to: props.to, replace: props.replace } });
+    export const useParams = () => globalThis.__params ?? {};
+  `,
 };
 
 function createHooks() {
@@ -374,6 +388,7 @@ describe('components/features/training/TrainingView.tsx', () => {
           stub(/ui\/PageHeader$/, 'header');
           stub(/ui\/EmptyState$/, 'empty');
           stub(/ui\/Button$/, 'button');
+          stub(/^react-router-dom$/, 'router');
           b.onLoad({ filter: /.*/, namespace: 'view-stub' }, (args) => ({ contents: VIEW_STUBS[args.path], loader: 'js' }));
         },
       }],
@@ -516,6 +531,33 @@ describe('components/features/training/TrainingView.tsx', () => {
     assert.equal(statusText(await render()), 'B の期|職員');
     hooks.unmount();
     assert.equal(pending[1].signal.aborted, true, 'unmounting aborts the request');
+  });
+
+  it('a trainee\'s class links to its study time (relative to /training); the nested routes, and anything else back to /training', async () => {
+    respond(200, ME([{ cohortId: 'c1', name: 'A', role: 'learner' }, { cohortId: 'c 2', name: 'B', role: 'learner' }, { cohortId: 'c3', name: 'C', role: 'staff' }]));
+    const auth = signedIn();
+    const { hooks, render } = mount(auth);
+    const tree = await render();
+    assert.equal(statusText(tree), 'A|受講者|B|受講者|C|職員');
+    assert.deepEqual(elementsOf(tree).filter((el) => el.type === 'a').map((a) => [a.props.href, textOf(a)]), [['c1', 'A'], ['c%202', 'B']], 'staff get no link');
+    // The route table as the page hands it to Routes (rendered once more, without committing).
+    hooks.begin();
+    const root = View();
+    const routes = [].concat(root.props.children.props.children);
+    assert.deepEqual(routes.map((r) => (r.props.index ? 'index' : r.props.path)), ['index', ':cohortId', ':cohortId/units/:unitKey', '*']);
+    const [, cohort, unit, other] = routes.map((r) => r.props.element);
+    assert.match(cohort.type.name, /^CohortTimeView\d*$/);
+    assert.deepEqual(Object.keys(cohort.props).sort(), ['cohorts', 'learnerId', 'onSignIn']);
+    assert.equal(cohort.props.learnerId, U1);
+    assert.deepEqual(cohort.props.cohorts.map((c) => c.cohortId), ['c1', 'c 2', 'c3']);
+    assert.match(unit.type.name, /^UnitTimeView\d*$/);
+    assert.deepEqual(Object.keys(unit.props).sort(), ['learnerId', 'onSignIn']);
+    assert.equal(unit.props.learnerId, U1);
+    signedIn.logouts = [];
+    unit.props.onSignIn();
+    assert.deepEqual(signedIn.logouts, [{ reason: 'reauth' }]);
+    assert.deepEqual(other.props, { to: '/training', replace: true });
+    hooks.unmount();
   });
 });
 
