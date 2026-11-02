@@ -20,7 +20,7 @@ export default function UnitTimeView({ learnerId, onSignIn }: { learnerId: strin
   const { cohortId = '', unitKey = '' } = useParams();
   const { language } = useLanguage();
   const t = studyCopy[language];
-  const { state, retry } = useStudyTimeRead(cohortId, learnerId);
+  const { state, retry, titleRef } = useStudyTimeRead(cohortId, learnerId);
   const unit = state.kind === 'ready' ? state.time.units.find((u) => u.unitKey === unitKey) : undefined;
 
   let body: React.ReactNode;
@@ -36,7 +36,7 @@ export default function UnitTimeView({ learnerId, onSignIn }: { learnerId: strin
   return (
     <>
       <p><Link to={`/training/${encodeURIComponent(cohortId)}`} className={LINK}>{t.toUnits}</Link></p>
-      <PageHeader title={unit ? unit.title[language] : t.studyTime} />
+      <PageHeader title={unit ? unit.title[language] : t.studyTime} titleRef={titleRef} />
       {body}
     </>
   );

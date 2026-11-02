@@ -12,9 +12,9 @@ const LINK = 'text-small font-medium text-primary-text underline underline-offse
 /**
  * /training/:cohortId (doc/brushup-2026/training-plan.ja.md §4.9): the learner's study time in a
  * class, from GET …/time: today, each unit's time against its set time with a link to study it
- * (while the class is in session), the newest days (final once closed) and the total. The status
- * region holds the state line only (loading, a refusal, outside the dates), so the lists are not
- * read out again on every change.
+ * (while the class is in session), the newest days (final once closed) and the class's total over
+ * every day. The status region holds the state line only (today's time in session; else loading, a
+ * refusal or why nothing is recorded), so the lists are not read out again on every change.
  */
 export default function CohortTimeView({ learnerId, cohorts, onSignIn }: {
   learnerId: string | null;
@@ -25,13 +25,13 @@ export default function CohortTimeView({ learnerId, cohorts, onSignIn }: {
   const { cohortId = '' } = useParams();
   const { language } = useLanguage();
   const t = studyCopy[language];
-  const { state, retry } = useStudyTimeRead(cohortId, learnerId);
+  const { state, retry, titleRef } = useStudyTimeRead(cohortId, learnerId);
   const name = cohorts?.find((c) => c.cohortId === cohortId.toLowerCase())?.name;
 
   return (
     <>
       <p><Link to="/training" className={LINK}>{t.toClasses}</Link></p>
-      <PageHeader title={name ?? t.studyTime} description={name ? t.studyTime : undefined} />
+      <PageHeader title={name ?? t.studyTime} description={name ? t.studyTime : undefined} titleRef={titleRef} />
       <div role="status">
         {state.kind === 'ready' ? <p className="text-body text-fg-2">{statusLine(state.time, language)}</p> : (
           <StudyTimeNotice state={state} language={language} onRetry={retry} onSignIn={onSignIn} />
@@ -93,8 +93,8 @@ function CohortTime({ time, language }: { time: StudyTime; language: 'en' | 'jp'
             ))}
           </ul>
         )}
-        <p className="tabular text-body text-fg-2">{t.total}: {formatDuration(time.totalMs, language)}</p>
       </section>
+      <p className="tabular text-body text-fg-2">{t.total}: {formatDuration(time.totalMs, language)}</p>
     </>
   );
 }

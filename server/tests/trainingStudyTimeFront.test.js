@@ -9,7 +9,9 @@
 //   rules, durations and days; design tokens and no rule value in the section.
 // - The pages (CohortTimeView, UnitTimeView, StudyTimeStatus) and the hook (useStudyTime), rendered
 //   with a small runtime that keeps each component's hooks, against a fake clock (Date.now,
-//   setTimeout, crypto.randomUUID are replaced in the bundle), a fake DOM and a fake fetch.
+//   setTimeout, crypto.randomUUID are replaced in the bundle; it can also jump, as a sleep), a fake
+//   DOM, a fake fetch and a Supabase client whose getSession can be held: stops and the signals
+//   waiting for their token, a seq 0 overtaken by its stop, focus after a button leaves.
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -513,6 +515,50 @@ describe('studyTimeCore.ts', () => {
     }
   });
 
+  it('a retry answered duplicate: the failed signal\'s own flags are the server\'s, and what the retry took on since goes on to the next signal', () => {
+    const d = running();
+    const s1 = one(d.beat(25_100));
+    assert.deepEqual(s1.body, sig('A', 1));
+    d.answer(25_200, s1, fail(0, 'network'));
+    d.step({ type: 'blur' });
+    d.step({ type: 'input' });
+    const again = one(d.beat(50_200));
+    assert.deepEqual(again.body, sig('A', 1, { focus: false, input: true }));
+    d.answer(50_300, again, ok(ignored('duplicate', 25_000)));
+    assert.deepEqual(one(d.beat(75_300)).body, sig('A', 2, { focus: false, input: true }), 'the blur and input since the failed signal');
+    const e = running();
+    e.step({ type: 'input' });
+    const t1 = one(e.beat(25_100));
+    assert.deepEqual(t1.body, sig('A', 1, { input: true }));
+    e.answer(25_200, t1, fail(0, 'network'));
+    const t1again = one(e.beat(50_200));
+    assert.deepEqual(t1again.body, sig('A', 1, { input: true }));
+    e.answer(50_300, t1again, ok(ignored('duplicate', 25_000)));
+    assert.deepEqual(one(e.beat(75_300)).body, sig('A', 2), 'the failed signal\'s own input is the server\'s');
+  });
+
+  it('a stop, or a timer far too late, while a failed signal waits to go again: the stop carries that signal\'s input and blur (the server never had them)', () => {
+    for (const late of [false, true]) {
+      const d = running();
+      d.step({ type: 'blur' });
+      d.step({ type: 'input' });
+      const s1 = one(d.beat(25_100));
+      assert.deepEqual(s1.body, sig('A', 1, { focus: false, input: true }));
+      d.answer(25_200, s1, fail(500, 'training_failed'));
+      const sends = late ? d.beat(50_200 + core.LATE_BEATS * 25_000 + 1, 'B', true) : d.end(true, true);
+      assert.deepEqual(sends[0], { body: sig('A', 2, { stop: true, focus: false, input: true }), keepalive: !late }, late ? 'a late timer' : 'an end');
+      if (late) assert.deepEqual(sends[1].body, sig('B', 0));
+    }
+  });
+
+  it('a timer far too late for a restart still waiting (nothing of its chain sent): its first signal goes, with the input carried to it, and the restart count holds', () => {
+    const d = drive();
+    d.answer(10, one(d.open(0, 'A')), ok(ignored('restart')), 'B');
+    assert.equal(d.core.chain.restarts, 1);
+    assert.deepEqual(d.beat(30_010 + 10 * 30_000, 'C').map((s) => s.body), [sig('B', 0, { input: true })]);
+    assert.equal(d.core.chain.restarts, 1);
+  });
+
   it('refusals stop the page: 401, 403 not_a_learner, 404, 400 and a 409 other than chain_mismatch; only the 409s a later day can lift let the learner start again', () => {
     const cases = [
       [fail(401, 'account_deleted'), 'deleted', false], [fail(401, 'session_changed'), 'signin', false], [fail(401), 'signin', false],
@@ -679,7 +725,7 @@ const PAGE_STUBS = {
   'react/jsx-runtime': "export const jsx = (type, props, key) => ({ type, props, key: key ?? null }); export const jsxs = jsx; export const Fragment = 'Fragment';",
   'lucide-react': "export const CloudOff = 'CloudOff'; export const LogIn = 'LogIn'; export const GraduationCap = 'GraduationCap';",
   language: "export const useLanguage = () => ({ language: globalThis.__language ?? 'jp' });",
-  header: "export default function PageHeader(props) { return { type: 'header', props: { children: [{ type: 'h1', props: { children: props.title } }, props.description ? { type: 'p', props: { children: props.description } } : null] } }; }",
+  header: "export default function PageHeader(props) { if (props.titleRef) props.titleRef.current = globalThis.__title ?? null; return { type: 'header', props: { children: [{ type: 'h1', props: { children: props.title } }, props.description ? { type: 'p', props: { children: props.description } } : null] } }; }",
   empty: "export default function EmptyState(props) { return { type: 'EmptyState', props: { children: [props.title, props.action ?? null] } }; }",
   button: "export const Button = (props) => ({ type: 'button', props });",
   router: `
@@ -809,6 +855,10 @@ function createClock() {
     },
     uuid: () => `00000000-0000-4000-8000-${String((uuids += 1)).padStart(12, '0')}`,
     pending: () => [...timers.values()].map((t) => t.at).sort((a, b) => a - b),
+    /** Moves the clock without firing anything (a sleep): the timers due fire late on the next advance. */
+    jump(ms) {
+      now += ms;
+    },
     /** Moves the clock, firing the timers due on the way (each after the work of the one before). */
     async advance(ms) {
       const end = now + ms;
@@ -1001,11 +1051,32 @@ describe('the study time pages and the hook', () => {
     assert.deepEqual(h.last.numbers, numbers, 'the numbers wait for the server');
     await clock.advance(1);
     await h.render();
-    assert.deepEqual(posted(net.posts()[1]), { unitKey: 'u1', chainId: uuid(1), seq: 1, stop: false, focus: true, input: false, keepalive: false, auth: 'Bearer tok-1' });
+    const p1 = net.posts()[1];
+    assert.deepEqual(posted(p1), { unitKey: 'u1', chainId: uuid(1), seq: 1, stop: false, focus: true, input: false, keepalive: false, auth: 'Bearer tok-1' });
+    p1.reply(200, ACCEPT(30_000, STATE(true, null, 3_990_000, UNIT('u1', 1_590_000, 3_600_000))));
+    await h.render();
+    assert.deepEqual(h.last.view, { kind: 'counting' });
+    assert.deepEqual(h.last.numbers, { todayMs: 3_990_000, unit: UNIT('u1', 1_590_000, 3_600_000) }, 'a second answer\'s numbers under the same view');
     h.unmount();
   });
 
-  it('inputs since the last signal: keydown, pointerdown, wheel, touchstart, focusin; a pointermove or a scroll of main#main-content at most once a second; focus: a blur since the last signal, or the page not focused now', async () => {
+  it('mounted while hidden (a link opened in a background tab): nothing goes and no timer runs, not even on a pageshow, until the page is visible', async () => {
+    net.auto = POST_OK();
+    dom.doc.visibilityState = 'hidden';
+    const h = mountHook(PROPS());
+    await h.render();
+    dom.pageshow(true);
+    await h.render();
+    assert.equal(net.calls.length, 0);
+    assert.deepEqual(clock.pending(), []);
+    assert.deepEqual(h.last.view, { kind: 'idle' });
+    dom.show();
+    await h.render();
+    assert.deepEqual(net.posts().map((c) => [c.body.seq, c.body.stop, c.body.input]), [[0, false, true]]);
+    h.unmount();
+  });
+
+  it('inputs since the last signal: keydown, pointerdown, wheel, touchstart, focusin, pointermove, a scroll of main#main-content; focus: a blur since the last signal, or the page not focused now', async () => {
     net.auto = POST_OK();
     const h = mountHook(PROPS());
     await h.render();
@@ -1023,11 +1094,9 @@ describe('the study time pages and the hook', () => {
     dom.fire('pointermove');
     assert.equal((await beat()).input, true, 'a pointermove');
     await clock.advance(400);
-    dom.fire('pointermove');
     dom.fire('scroll', dom.main);
-    assert.equal((await beat()).input, false, 'within a second of the last one: not counted');
-    dom.fire('scroll', dom.main);
-    assert.equal((await beat()).input, true, 'a scroll of the main element');
+    assert.equal((await beat()).input, true, 'a scroll of the main element, right after the last signal\'s pointermove');
+    assert.equal((await beat()).input, false);
     dom.fire('scroll', dom.win);
     assert.equal((await beat()).input, false, 'a scroll elsewhere is not the page\'s');
     dom.fire('blur');
@@ -1084,19 +1153,29 @@ describe('the study time pages and the hook', () => {
     h.unmount();
   });
 
-  it('a stop never overtakes a signal waiting for its token: it goes right after it, with that token; another account\'s session by then: nothing goes', async () => {
+  it('a stop while its chain\'s first signal waits for its token: neither goes (the server knows nothing of the chain; nothing goes before any token); another account\'s session by then: nothing goes', async () => {
     const held = session.hold();
     const h = mountHook(PROPS());
     await h.render();
     assert.equal(net.posts().length, 0, 'seq 0 waits for getSession');
     dom.hide();
-    assert.equal(net.posts().length, 0, 'the stop waits for it');
     held.release({ token: 'tok-2' });
     await h.render();
-    assert.deepEqual(net.posts().map(posted), [
-      { unitKey: 'u1', chainId: uuid(1), seq: 0, stop: false, focus: true, input: true, keepalive: false, auth: 'Bearer tok-2' },
-      { unitKey: 'u1', chainId: uuid(1), seq: 1, stop: true, focus: true, input: false, keepalive: true, auth: 'Bearer tok-2' },
-    ]);
+    assert.equal(net.calls.length, 0, 'neither seq 0 nor its stop');
+    assert.deepEqual(h.last.view, { kind: 'paused' });
+    net.auto = POST_OK();
+    dom.show();
+    await h.render();
+    assert.deepEqual(net.posts().map(posted), [{ unitKey: 'u1', chainId: uuid(2), seq: 0, stop: false, focus: true, input: true, keepalive: false, auth: 'Bearer tok-1' }]);
+    // With a token from an earlier chain: a chain none of whose signals went out still gets no stop.
+    dom.hide();
+    const held3 = session.hold();
+    dom.show();
+    await h.render();
+    dom.hide();
+    held3.release();
+    await h.render();
+    assert.deepEqual(net.posts().map((c) => [c.body.chainId, c.body.seq, c.body.stop]), [[uuid(2), 0, false], [uuid(2), 1, true]]);
     h.unmount();
 
     net = createNet();
@@ -1117,6 +1196,153 @@ describe('the study time pages and the hook', () => {
     g.unmount();
   });
 
+  it('React\'s development double effect (setup, cleanup, setup) while the token is awaited: only the second chain\'s seq 0 goes', async () => {
+    net.auto = POST_OK();
+    const held = session.hold();
+    const first = mountHook(PROPS());
+    await first.render();
+    first.unmount();
+    const second = mountHook(PROPS());
+    await second.render();
+    held.release();
+    await second.render();
+    assert.deepEqual(net.posts().map((c) => [c.body.chainId, c.body.seq, c.body.stop]), [[uuid(2), 0, false]]);
+    second.unmount();
+  });
+
+  it('a stop while a later signal waits for its token: the stop goes at once with the last token and takes that signal\'s input and blur; that signal never goes, whatever its lookup then finds', async () => {
+    for (const over of [{ token: 'tok-2' }, { user: null }, { user: U2, token: 'tok-u2' }]) {
+      net = createNet();
+      net.auto = POST_OK();
+      dom = createDom();
+      const h = mountHook(PROPS());
+      await h.render();
+      const chainId = net.posts()[0].body.chainId;
+      dom.fire('keydown');
+      dom.fire('blur');
+      const held = session.hold();
+      await clock.advance(clock.pending()[0] - clock.now());
+      await h.render();
+      assert.equal(net.posts().length, 1, 'seq 1 waits for getSession');
+      dom.hide();
+      assert.deepEqual(posted(net.posts()[1]), { unitKey: 'u1', chainId, seq: 2, stop: true, focus: false, input: true, keepalive: true, auth: 'Bearer tok-1' });
+      held.release(over);
+      await h.render();
+      assert.equal(net.posts().length, 2, `${JSON.stringify(over)}: seq 1 never goes`);
+      assert.deepEqual(h.last.view, { kind: 'paused' });
+      h.unmount();
+      assert.equal(net.posts().length, 2, 'no second stop');
+    }
+  });
+
+  it('a stop sent while its chain\'s seq 0 is on its way may reach the server first (not_open): when that seq 0 is stored with the chain going on, the stop goes again, also after the page left; not after another answer, nor for a later seq', async () => {
+    const h = mountHook(PROPS());
+    await h.render();
+    const [p0] = net.posts();
+    dom.hide();
+    const stop = net.posts()[1];
+    assert.deepEqual(posted(stop), { unitKey: 'u1', chainId: p0.body.chainId, seq: 1, stop: true, focus: true, input: false, keepalive: true, auth: 'Bearer tok-1' });
+    stop.reply(200, IGNORE('not_open'));
+    p0.reply(200, ACCEPT(30_000, STATE(true, null, 1, UNIT('u1', 1, 2))));
+    await h.render();
+    assert.deepEqual(net.posts().slice(2).map(posted), [posted(stop)], 'the same stop again');
+    assert.deepEqual(h.last.view, { kind: 'paused' });
+    h.unmount();
+
+    for (const [label, reply, again] of [
+      ['stored, the chain going on', (c) => c.reply(200, ACCEPT(30_000)), true],
+      ['stored, the chain over', (c) => c.reply(200, ACCEPT(null)), false],
+      ['not stored', (c) => c.reply(200, IGNORE('other_place')), false],
+      ['failed', (c) => c.fail(), false],
+    ]) {
+      net = createNet();
+      dom = createDom();
+      const g = mountHook(PROPS());
+      await g.render();
+      const [q0] = net.posts();
+      g.unmount();
+      const left = net.posts()[1];
+      assert.deepEqual([left.body.chainId, left.body.seq, left.body.stop, left.keepalive], [q0.body.chainId, 1, true, true]);
+      reply(q0);
+      await settle();
+      assert.deepEqual(net.posts().slice(2).map(posted), again ? [posted(left)] : [], label);
+    }
+
+    net = createNet();
+    net.auto = (call) => (call.body.seq === 0 ? [200, ACCEPT(30_000)] : undefined);
+    dom = createDom();
+    const k = mountHook(PROPS());
+    await k.render();
+    await clock.advance(clock.pending()[0] - clock.now());
+    await k.render();
+    const k1 = net.posts()[1];
+    assert.equal(k1.body.seq, 1);
+    dom.hide();
+    k1.reply(200, ACCEPT(30_000));
+    await k.render();
+    assert.deepEqual(net.posts().map((c) => [c.body.seq, c.body.stop]), [[0, false], [1, false], [2, true]], 'a later seq: the server knew the chain');
+    k.unmount();
+  });
+
+  it('a stop after a failed signal carries its input and blur; after a blur, or with the window not focused, a stop says not focused', async () => {
+    net.auto = POST_OK();
+    const h = mountHook(PROPS());
+    await h.render();
+    net.auto = null;
+    dom.fire('blur');
+    dom.fire('keydown');
+    await clock.advance(clock.pending()[0] - clock.now());
+    await h.render();
+    const s1 = net.posts().at(-1);
+    assert.deepEqual([s1.body.seq, s1.body.focus, s1.body.input], [1, false, true]);
+    s1.fail();
+    await h.render();
+    assert.deepEqual(h.last.view, { kind: 'retrying', cause: 'network' });
+    h.unmount();
+    assert.deepEqual(posted(net.posts().at(-1)), { unitKey: 'u1', chainId: s1.body.chainId, seq: 2, stop: true, focus: false, input: true, keepalive: true, auth: 'Bearer tok-1' }, 'leaving while focused');
+
+    for (const [label, act] of [['a blur, then leaving', (d, g) => { d.fire('blur'); g.unmount(); }], ['not focused, then hidden', (d) => { d.focused = false; d.hide(); }]]) {
+      net = createNet();
+      net.auto = POST_OK();
+      dom = createDom();
+      const g = mountHook(PROPS());
+      await g.render();
+      act(dom, g);
+      assert.deepEqual([net.posts().at(-1).body.stop, net.posts().at(-1).body.focus], [true, false], label);
+      g.unmount();
+    }
+  });
+
+  it('a timer that fires far too late (a sleep): a stop for the chain, then a new chain without input', async () => {
+    net.auto = POST_OK();
+    const h = mountHook(PROPS());
+    await h.render();
+    dom.fire('keydown');
+    clock.jump(10 * 30_000);
+    await clock.advance(0);
+    await h.render();
+    const [first, stop, next] = net.posts();
+    assert.deepEqual([stop.body.chainId, stop.body.seq, stop.body.stop, stop.body.input, stop.keepalive], [first.body.chainId, 1, true, true, false]);
+    assert.notEqual(next.body.chainId, first.body.chainId);
+    assert.deepEqual([next.body.seq, next.body.stop, next.body.input], [0, false, false]);
+    h.unmount();
+
+    // A chain whose only signal never went out (no session then): no stop for it, only the new chain.
+    net = createNet();
+    net.auto = POST_OK();
+    dom = createDom();
+    session.user = null;
+    const g = mountHook(PROPS());
+    await g.render();
+    assert.equal(net.calls.length, 0);
+    session.user = U1;
+    clock.jump(10 * 30_000);
+    await clock.advance(0);
+    await g.render();
+    assert.deepEqual(net.posts().map((c) => [c.body.seq, c.body.stop, c.body.input]), [[0, false, false]]);
+    g.unmount();
+  });
+
   it('no session right now: the same signal again after the beat; the session is another account\'s: the page stops (sign in again) and sends nothing', async () => {
     net.auto = POST_OK();
     session.user = null;
@@ -1130,6 +1356,7 @@ describe('the study time pages and the hook', () => {
     await h.render();
     assert.deepEqual(posted(net.posts()[0]), { unitKey: 'u1', chainId: uuid(1), seq: 0, stop: false, focus: true, input: true, keepalive: false, auth: 'Bearer tok-1' });
     h.unmount();
+    assert.deepEqual(posted(net.posts().at(-1)), { unitKey: 'u1', chainId: uuid(1), seq: 1, stop: true, focus: true, input: false, keepalive: true, auth: 'Bearer tok-1' }, 'the stop after the lookup found a session again');
 
     net = createNet();
     session.user = U2;
@@ -1138,7 +1365,16 @@ describe('the study time pages and the hook', () => {
     assert.equal(net.calls.length, 0);
     assert.deepEqual(g.last.view, { kind: 'stopped', cause: 'signin' });
     g.unmount();
-    assert.equal(net.calls.length, 0, 'no stop: nothing of this learner went out');
+    assert.equal(net.calls.length, 0, 'the page stopped: no stop either');
+
+    net = createNet();
+    session.user = U1;
+    session.client.auth.getSession = () => Promise.reject(new Error('lock lost'));
+    const f = mountHook(PROPS());
+    await f.render();
+    assert.equal(net.calls.length, 0);
+    assert.deepEqual(f.last.view, { kind: 'retrying', cause: 'network' }, 'getSession failing: tried again later');
+    f.unmount();
   });
 
   it('a 503 with Retry-After: the same signal again after it, the view saying why meanwhile', async () => {
@@ -1225,8 +1461,37 @@ describe('the study time pages and the hook', () => {
       '11月2日|1 時間 5 分|まだ確定していません',
       '11月1日|10 分|確定',
     ]);
-    assert.ok(textOf(tree).includes('合計|: |1 時間 15 分'));
+    assert.ok(textOf(tree).includes('この期の合計|: |1 時間 15 分'));
+    const sections = elementsOf(tree).filter((el) => el.type === 'section');
+    assert.equal(sections.length, 2);
+    assert.ok(sections.every((s) => !textOf(s).includes('この期の合計')), 'the total (every day) is outside the newest days\' list');
     p.unmount();
+  });
+
+  it('「もう一度読み込む」 on a class\'s or a unit\'s page: once the new state shows, focus that the button\'s leaving dropped goes to the title; focus elsewhere stays', async () => {
+    for (const [name, params, line] of [['CohortTimeView', { cohortId: C1 }, '今日: 1 時間 5 分'], ['UnitTimeView', { cohortId: C1, unitKey: 'u1' }, '記録を始めています…']]) {
+      for (const moved of [true, false]) {
+        net = createNet();
+        dom = createDom();
+        globalThis.__params = params;
+        net.auto = () => [503, { error_type: 'training_unavailable' }];
+        const focused = [];
+        globalThis.__title = { focus: (options) => focused.push(options) };
+        const p = mountPage(name, { learnerId: U1, cohorts: null, onSignIn: () => {} });
+        const failed = await p.render();
+        assert.deepEqual(focused, [], 'no focus move on arrival');
+        net.auto = null;
+        if (!moved) dom.doc.activeElement = { tag: 'a' };
+        button(failed, 'もう一度読み込む').props.onClick();
+        assert.equal(statusText(await p.render()), '読み込んでいます…');
+        assert.deepEqual(focused, [], 'not while loading');
+        net.calls.at(-1).reply(200, TIME());
+        assert.equal(statusText(await p.render()), line);
+        assert.deepEqual(focused, moved ? [{ preventScroll: true }] : [], `${name}, focus ${moved ? 'on the body' : 'elsewhere'}`);
+        p.unmount();
+      }
+    }
+    delete globalThis.__title;
   });
 
   it('a class\'s page: not set up, or outside the dates (no study links); a guest sends nothing; loading; refusals with sign-in and retry; another learner\'s or class\'s answer never shows; English', async () => {
@@ -1288,6 +1553,7 @@ describe('the study time pages and the hook', () => {
     const en = mountPage('CohortTimeView', { learnerId: U1, cohorts: null, onSignIn: () => {} });
     const tree = await en.render();
     assert.equal(statusText(tree), 'Today: 1 h 5 min');
+    assert.ok(textOf(tree).includes('Total in this class|: |1 h 15 min'));
     assert.deepEqual(elementsOf(tree).filter((el) => el.type === 'li').map(textOf).slice(1), ['CSS basics|30 min| / |30 min|Set time reached|Study', 'Nov 2|1 h 5 min|Not final yet', 'Nov 1|10 min|Final']);
     en.unmount();
   });
@@ -1387,6 +1653,23 @@ describe('the study time pages and the hook', () => {
         assert.equal(status.split('|')[0], line);
       }
       assert.ok(lines.size >= views.length - 4, `${language}: the lines tell the views apart`);
+    }
+  });
+
+  it('「この画面で記録する」 leaves once recording starts here: focus it had that fell to the page body goes to the section\'s heading; focus elsewhere, or a button never focused, moves nothing', () => {
+    for (const [hadFocus, onBody, moved] of [[true, true, true], [true, false, false], [false, true, false]]) {
+      const rt = createRuntime();
+      const focused = [];
+      const render = (view) => rt.render({ type: pages.StudyTimeStatus, props: { view, numbers: null, language: 'jp', onRecordHere: () => {}, onSignIn: () => {} }, key: null });
+      const tree = render({ kind: 'other_place' });
+      const heading = elementsOf(tree).find((el) => el.type === 'h2');
+      assert.equal(heading.props.tabIndex, -1);
+      heading.props.ref.current = { focus: (options) => focused.push(options) };
+      if (hadFocus) button(tree, 'この画面で記録する').props.onFocus();
+      dom.doc.activeElement = onBody ? dom.doc.body : { tag: 'a' };
+      render({ kind: 'starting' });
+      assert.deepEqual(focused, moved ? [{ preventScroll: true }] : [], `focused ${hadFocus}, on the body ${onBody}`);
+      rt.unmount();
     }
   });
 });

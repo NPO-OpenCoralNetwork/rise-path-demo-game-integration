@@ -16,8 +16,8 @@
  *   400: the page stops; a 409's may pass with the day, so the next user start tries again.
  * - The network, 500, another 403 (the terms check) and a malformed answer: the same signal again
  *   after nextInMs; 429 and 503 after their Retry-After (60 s without one), at least nextInMs. A
- *   signal that was not stored keeps its input and blur for the next one (not a duplicate: the
- *   server has it).
+ *   signal that was not stored keeps its input and blur for the next one, or for the stop (a
+ *   duplicate's own are the server's; what its retry took on since stays).
  * - The numbers are the server's only; nothing advances them between answers.
  */
 import type { StudyReason, StudySignalAnswer, StudySignalBody, StudySignalState } from '../../../services/trainingApi';
@@ -61,6 +61,8 @@ export type StudyCore = {
   chain: Chain | null;
   /** Its signal on its way: one at a time (a stop does not wait). */
   inFlight: SentSignal | null;
+  /** While inFlight is a retry: the input and blur it took on since the failed signal (back on a duplicate). */
+  extra: { input: boolean; blur: boolean } | null;
   /** When the chain's next signal goes, or null (waiting for an answer, or no chain). */
   wakeAt: number | null;
   /** A signal that failed: the next one is it again (its seq, its input and blur kept). */
@@ -94,23 +96,26 @@ export type StudyStep = { core: StudyCore; sends: StudySend[] };
 
 /** The core before any signal: the unit, GET …/time's beatMs and numbers. */
 export function createStudyCore(unitKey: string, beatMs: number, numbers: StudyNumbers | null): StudyCore {
-  return { unitKey, beatMs, chain: null, inFlight: null, wakeAt: null, retry: null, input: false, blur: false, view: { kind: 'idle' }, numbers };
+  return { unitKey, beatMs, chain: null, inFlight: null, extra: null, wakeAt: null, retry: null, input: false, blur: false, view: { kind: 'idle' }, numbers };
 }
 
 const body = (core: StudyCore, s: SentSignal): StudySignalBody => ({ unitKey: core.unitKey, chainId: s.chainId, seq: s.seq, stop: s.stop, focus: s.focus, input: s.input });
+
+/** The input and blur since the chain's last stored signal: those noted since, and a failed signal's. */
+const sinceStored = (core: StudyCore) => ({ input: core.input || Boolean(core.retry?.input), blur: core.blur || (core.retry ? !core.retry.focus : false) });
 
 /** The chain's next signal now: the failed one again, or the next seq; the flags since the last one. */
 function sendNext(core: StudyCore, focused: boolean): StudyStep {
   const chain = core.chain as Chain;
   const retry = core.retry;
   const seq = retry ? retry.seq : chain.nextSeq;
-  const input = (seq === 0 && chain.userStart) || core.input || Boolean(retry?.input);
-  const focus = !(core.blur || (retry ? !retry.focus : false)) && focused;
-  const sent: SentSignal = { chainId: chain.id, seq, stop: false, focus, input };
+  const since = sinceStored(core);
+  const sent: SentSignal = { chainId: chain.id, seq, stop: false, focus: !since.blur && focused, input: (seq === 0 && chain.userStart) || since.input };
   const next: StudyCore = {
     ...core,
     chain: { ...chain, nextSeq: Math.max(chain.nextSeq, seq + 1) },
     inFlight: sent,
+    extra: retry ? { input: core.input, blur: core.blur } : null,
     wakeAt: null,
     retry: null,
     input: false,
@@ -120,28 +125,30 @@ function sendNext(core: StudyCore, focused: boolean): StudyStep {
 }
 
 /**
- * A stop for the chain the page keeps, after its last seq; the chain ends here. Nothing to send
- * without a chain, or before its first signal went out (a restart still waiting).
+ * A stop for the chain the page keeps, after its last seq, with the flags since its last stored
+ * signal; the chain ends here. Nothing to send without a chain, or before its first signal went
+ * out (a restart still waiting).
  */
 function stopChain(core: StudyCore, focused: boolean, keepalive: boolean): StudyStep {
   const chain = core.chain;
-  const ended: StudyCore = { ...core, chain: null, inFlight: null, wakeAt: null, retry: null, input: false, blur: false };
+  const ended: StudyCore = { ...core, chain: null, inFlight: null, extra: null, wakeAt: null, retry: null, input: false, blur: false };
   if (!chain || chain.nextSeq === 0) return { core: ended, sends: [] };
-  const sent: SentSignal = { chainId: chain.id, seq: chain.nextSeq, stop: true, focus: !core.blur && focused, input: core.input || Boolean(core.retry?.input) };
+  const since = sinceStored(core);
+  const sent: SentSignal = { chainId: chain.id, seq: chain.nextSeq, stop: true, focus: !since.blur && focused, input: since.input };
   return { core: ended, sends: [{ body: body(core, sent), keepalive }] };
 }
 
 /** A new chain and its first signal (user: the learner started it, so it carries input). */
 function startChain(core: StudyCore, id: string, user: boolean, focused: boolean, restarts = 0): StudyStep {
-  const fresh: StudyCore = { ...core, chain: { id, nextSeq: 0, userStart: user, restarts }, inFlight: null, wakeAt: null, retry: null, view: { kind: 'starting' } };
+  const fresh: StudyCore = { ...core, chain: { id, nextSeq: 0, userStart: user, restarts }, inFlight: null, extra: null, wakeAt: null, retry: null, view: { kind: 'starting' } };
   return sendNext(fresh, focused);
 }
 
 /** A restart the server asked for: a new chain without input after one beat (bounded). */
 function restartLater(core: StudyCore, id: string, now: number): StudyStep {
   const restarts = (core.chain?.restarts ?? 0) + 1;
-  if (restarts > MAX_RESTARTS) return { core: { ...core, chain: null, inFlight: null, wakeAt: null, retry: null, view: { kind: 'stopped', cause: 'invalid' } }, sends: [] };
-  return { core: { ...core, chain: { id, nextSeq: 0, userStart: false, restarts }, inFlight: null, retry: null, wakeAt: now + core.beatMs }, sends: [] };
+  if (restarts > MAX_RESTARTS) return { core: { ...core, chain: null, inFlight: null, extra: null, wakeAt: null, retry: null, view: { kind: 'stopped', cause: 'invalid' } }, sends: [] };
+  return { core: { ...core, chain: { id, nextSeq: 0, userStart: false, restarts }, inFlight: null, extra: null, retry: null, wakeAt: now + core.beatMs }, sends: [] };
 }
 
 /** The view and numbers of a stored signal's state (a state of another unit is not this page's). */
@@ -153,13 +160,13 @@ function shown(core: StudyCore, state: StudySignalState | null): Pick<StudyCore,
   };
 }
 
-const stopped = (core: StudyCore, cause: StopCause): StudyStep => ({ core: { ...core, chain: null, inFlight: null, wakeAt: null, retry: null, view: { kind: 'stopped', cause } }, sends: [] });
+const stopped = (core: StudyCore, cause: StopCause): StudyStep => ({ core: { ...core, chain: null, inFlight: null, extra: null, wakeAt: null, retry: null, view: { kind: 'stopped', cause } }, sends: [] });
 
 function onAnswer(core: StudyCore, ev: Extract<StudyEvent, { type: 'answer' }>): StudyStep {
   const { sent, result, now } = ev;
   // A stop's answer, or one for a signal the page no longer waits for (an ended chain), changes nothing.
   if (sent.stop || !core.chain || !core.inFlight || core.inFlight.chainId !== sent.chainId || core.inFlight.seq !== sent.seq) return { core, sends: [] };
-  const base: StudyCore = { ...core, inFlight: null };
+  const base: StudyCore = { ...core, inFlight: null, extra: null };
   if (result.ok === true) {
     const answer = result.answer;
     if (answer.accepted === true) {
@@ -168,8 +175,10 @@ function onAnswer(core: StudyCore, ev: Extract<StudyEvent, { type: 'answer' }>):
       // Stored, but the chain ends: after the cohort's last day.
       return stopped(after, 'not_in_session');
     }
-    // Not stored: its input and blur stay for the next signal (a duplicate's are: the server has it).
-    const kept: StudyCore = answer.reason === 'duplicate' ? base : { ...base, input: base.input || sent.input, blur: base.blur || !sent.focus };
+    // Not stored: its input and blur stay for the next signal. A duplicate's own are the server's
+    // (stored before its answer was lost); what its retry took on since stays.
+    const extra = answer.reason === 'duplicate' ? core.extra ?? { input: false, blur: false } : { input: sent.input, blur: !sent.focus };
+    const kept: StudyCore = { ...base, input: base.input || extra.input, blur: base.blur || extra.blur };
     switch (answer.reason) {
       case 'other_place':
         return { core: { ...kept, chain: null, wakeAt: null, view: { kind: 'other_place' } }, sends: [] };
