@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { CloudOff, GraduationCap, LogIn } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -7,13 +8,17 @@ import EmptyState from '../../ui/EmptyState';
 import { Button } from '../../ui/Button';
 import { getTrainingMe, type TrainingRole } from '../../../services/trainingApi';
 import { stateForAnswer, stateForFailure, type TrainingPageState } from './trainingModel';
+import CohortTimeView from './CohortTimeView';
+import UnitTimeView from './UnitTimeView';
 
 /**
  * /training (doc/brushup-2026/training-plan.ja.md D1, §4.6): the cohorts the signed-in learner is
- * in, and their role in each (GET /api/v2/training/me). Ships only with VITE_FEATURE_TRAINING=true
- * (components/routes/lazyRoutes.tsx). No AI tutor here (D6). Every state is shown inside one
- * status region, so a change is announced; after 「もう一度読み込む」 (its button leaves with the old
- * state) focus that was lost goes to the page title.
+ * in, and their role in each (GET /api/v2/training/me); a trainee's class links to its study time.
+ * Ships only with VITE_FEATURE_TRAINING=true (components/routes/lazyRoutes.tsx). No AI tutor here
+ * (D6). Every state is shown inside one status region, so a change is announced; after
+ * 「もう一度読み込む」 (its button leaves with the old state) focus that was lost goes to the page title.
+ * Nested routes (App.tsx routes /training/*): :cohortId, the class's study time (CohortTimeView);
+ * :cohortId/units/:unitKey, a unit's page that records it (UnitTimeView, §4.9).
  */
 
 /** On the page root: CI greps the flag-off build for it (.github/workflows/ci.yml). */
@@ -86,6 +91,8 @@ export default function TrainingView() {
     refocus.current = true;
     setAttempt((n) => n + 1);
   };
+  const signIn = () => { void logout({ reason: 'reauth' }); };
+  const cohorts = state.kind === 'ready' ? state.me.cohorts : null;
 
   let body: React.ReactNode;
   switch (state.kind) {
@@ -102,7 +109,7 @@ export default function TrainingView() {
           tone="primary"
           icon={<LogIn size={18} />}
           title={t.signIn}
-          action={<Button size="sm" onClick={() => { void logout({ reason: 'reauth' }); }}>{t.signInAgain}</Button>}
+          action={<Button size="sm" onClick={signIn}>{t.signInAgain}</Button>}
         />
       );
       break;
@@ -129,7 +136,11 @@ export default function TrainingView() {
           <ul className="flex flex-col gap-3">
             {state.me.cohorts.map((cohort) => (
               <li key={cohort.cohortId} className="rounded-card border border-line bg-surface p-5 shadow-1">
-                <h2 className="text-h3 text-fg">{cohort.name}</h2>
+                <h2 className="text-h3 text-fg">
+                  {cohort.role === 'learner'
+                    ? <Link to={encodeURIComponent(cohort.cohortId)} className="underline underline-offset-4">{cohort.name}</Link>
+                    : cohort.name}
+                </h2>
                 {cohort.role ? <p className="mt-1 text-small text-fg-3">{t.roles[cohort.role]}</p> : null}
               </li>
             ))}
@@ -137,10 +148,20 @@ export default function TrainingView() {
         );
   }
 
-  return (
-    <div data-rp-section={TRAINING_UI_MARKER} className="mx-auto flex max-w-2xl flex-col gap-6 py-6 sm:py-8">
+  const home = (
+    <>
       <PageHeader title={t.title} description={t.description} titleRef={titleRef} />
       <div role="status">{body}</div>
+    </>
+  );
+  return (
+    <div data-rp-section={TRAINING_UI_MARKER} className="mx-auto flex max-w-2xl flex-col gap-6 py-6 sm:py-8">
+      <Routes>
+        <Route index element={home} />
+        <Route path=":cohortId" element={<CohortTimeView learnerId={learnerId} cohorts={cohorts} onSignIn={signIn} />} />
+        <Route path=":cohortId/units/:unitKey" element={<UnitTimeView learnerId={learnerId} onSignIn={signIn} />} />
+        <Route path="*" element={<Navigate to="/training" replace />} />
+      </Routes>
     </div>
   );
 }
