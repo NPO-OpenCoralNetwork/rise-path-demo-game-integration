@@ -15,14 +15,31 @@
  *   another tab can switch it to another account (that stops the page, as a 401 would); no session
  *   right now (a token refresh failing on a flaky network) is retried as a network error.
  * - Inputs: keydown, pointerdown, wheel, touchstart, focusin, pointermove and a scroll of
- *   main#main-content (the app scrolls there); only the first since the last signal is a step.
- *   Focus: the window's blur.
+ *   main#main-content (the app scrolls there); only the first since the last signal is a step. The
+ *   page's own focus moves (moveFocus) are not inputs. Focus: the window's blur.
  */
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getSupabaseClient } from '../../../services/supabaseClient';
 import { getStudyTime, postStudySignal, TrainingApiError, type StudySignalBody } from '../../../services/trainingApi';
 import { createStudyCore, studyStep, type AnswerResult, type RecordingView, type SentSignal, type StudyEvent, type StudyNumbers, type StudySend } from './studyTimeCore';
 import { studyTimeForAnswer, studyTimeForFailure, type StudyTimePageState } from './trainingModel';
+
+/** True only while the page moves focus itself (moveFocus): that focusin is not the learner's input. */
+let movingFocus = false;
+
+/**
+ * The study pages' own focus moves: a title or heading, after the button that had focus left.
+ * focus() fires focusin at once, so the unit page's recorder can tell it from the learner's.
+ */
+export function moveFocus(el: HTMLElement | null): void {
+  if (!el) return;
+  movingFocus = true;
+  try {
+    el.focus({ preventScroll: true });
+  } finally {
+    movingFocus = false;
+  }
+}
 
 /**
  * GET …/time for a study time page: loading, then the class's study time or why not; retry reads
@@ -57,7 +74,7 @@ export function useStudyTimeRead(cohortId: string, learnerId: string | null): {
     if (state.kind === 'loading' || !refocus.current) return;
     refocus.current = false;
     const active = typeof document === 'undefined' ? null : document.activeElement;
-    if (!active || active === document.body) titleRef.current?.focus({ preventScroll: true });
+    if (!active || active === document.body) moveFocus(titleRef.current);
   }, [state.kind]);
   const retry = () => {
     refocus.current = true;
@@ -218,7 +235,7 @@ export function useStudyTime({ cohortId, unitKey, learnerId, beatMs, numbers }: 
     const onBlur = () => apply({ type: 'blur' });
     /** pointermove and scroll come in bursts: an input already noted since the last signal adds nothing. */
     const onInput = () => {
-      if (!core.input) apply({ type: 'input' });
+      if (!movingFocus && !core.input) apply({ type: 'input' });
     };
     const main = document.getElementById('main-content');
 

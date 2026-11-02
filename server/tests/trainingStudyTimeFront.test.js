@@ -551,6 +551,59 @@ describe('studyTimeCore.ts', () => {
     }
   });
 
+  it('resends that fail again keep what each took on since the first attempt: a duplicate at last gives all of it to the next seq; a stop while a resend is on its way carries it', () => {
+    for (const again of [fail(503, 'training_unavailable'), fail(0, 'network'), fail(0, 'no_session')]) {
+      const d = running();
+      const s1 = one(d.beat(25_100));
+      assert.deepEqual(s1.body, sig('A', 1));
+      d.answer(25_200, s1, fail(0, 'network'));
+      d.step({ type: 'blur' });
+      d.step({ type: 'input' });
+      const r1 = one(d.beat(50_200));
+      assert.deepEqual(r1.body, sig('A', 1, { focus: false, input: true }));
+      d.answer(50_300, r1, again);
+      const at = d.core.wakeAt;
+      const r2 = one(d.beat(at));
+      assert.deepEqual(r2.body, sig('A', 1, { focus: false, input: true }), JSON.stringify(again));
+      d.answer(at + 100, r2, ok(ignored('duplicate', 25_000)));
+      assert.deepEqual(one(d.beat(at + 25_100)).body, sig('A', 2, { focus: false, input: true }), `${JSON.stringify(again)}: what the first resend took on`);
+    }
+    const e = running();
+    e.answer(25_200, one(e.beat(25_100)), fail(0, 'network'));
+    e.step({ type: 'blur' });
+    e.step({ type: 'input' });
+    assert.deepEqual(one(e.beat(50_200)).body, sig('A', 1, { focus: false, input: true }));
+    assert.deepEqual(one(e.end()).body, sig('A', 2, { stop: true, focus: false, input: true }), 'the resend on its way may be a duplicate');
+  });
+
+  it('flags noted while a signal is on its way stay when it is not stored (too_soon, a reason the page does not know), when it fails (for its retry, and a stop after another failure), and when its retry is a duplicate', () => {
+    for (const reason of ['too_soon', 'brand_new']) {
+      const d = running();
+      const s1 = one(d.beat(25_100));
+      d.step({ type: 'blur' });
+      d.step({ type: 'input' });
+      d.answer(25_200, s1, ok(ignored(reason, 25_000)));
+      assert.deepEqual(one(d.beat(50_200)).body, sig('A', 2, { focus: false, input: true }), reason);
+    }
+    const e = running();
+    const t1 = one(e.beat(25_100));
+    e.step({ type: 'blur' });
+    e.step({ type: 'input' });
+    e.answer(25_200, t1, fail(0, 'network'));
+    const t1again = one(e.beat(50_200));
+    assert.deepEqual(t1again.body, sig('A', 1, { focus: false, input: true }));
+    e.answer(50_300, t1again, fail(500, 'training_failed'));
+    assert.deepEqual(one(e.end()).body, sig('A', 2, { stop: true, focus: false, input: true }));
+    const f = running();
+    f.answer(25_200, one(f.beat(25_100)), fail(0, 'network'));
+    const retry = one(f.beat(50_200));
+    assert.deepEqual(retry.body, sig('A', 1));
+    f.step({ type: 'blur' });
+    f.step({ type: 'input' });
+    f.answer(50_300, retry, ok(ignored('duplicate', 25_000)));
+    assert.deepEqual(one(f.beat(75_300)).body, sig('A', 2, { focus: false, input: true }), 'noted while the retry was on its way');
+  });
+
   it('a timer far too late for a restart still waiting (nothing of its chain sent): its first signal goes, with the input carried to it, and the restart count holds', () => {
     const d = drive();
     d.answer(10, one(d.open(0, 'A')), ok(ignored('restart')), 'B');
@@ -1188,7 +1241,7 @@ describe('the study time pages and the hook', () => {
     session.token = 'tok-u2';
     held2.release();
     await g.render();
-    assert.equal(net.calls.length, 0, 'nothing for another account');
+    assert.equal(net.calls.length, 0, 'the cancelled seq 0 never goes, whatever its lookup found');
     dom.show();
     await g.render();
     assert.equal(net.calls.length, 0);
@@ -1311,6 +1364,36 @@ describe('the study time pages and the hook', () => {
       assert.deepEqual([net.posts().at(-1).body.stop, net.posts().at(-1).body.focus], [true, false], label);
       g.unmount();
     }
+  });
+
+  it('an input and a blur while a signal is on its way: a too_soon answer keeps them for the next signal; a failure keeps them for the stop', async () => {
+    net.auto = POST_OK();
+    const h = mountHook(PROPS());
+    await h.render();
+    net.auto = null;
+    const next = async () => {
+      await clock.advance(clock.pending()[0] - clock.now());
+      await h.render();
+      return net.posts().at(-1);
+    };
+    const s1 = await next();
+    assert.equal(s1.body.seq, 1);
+    dom.fire('keydown');
+    dom.fire('blur');
+    s1.reply(200, IGNORE('too_soon', 30_000));
+    await h.render();
+    const s2 = await next();
+    assert.deepEqual([s2.body.seq, s2.body.focus, s2.body.input], [2, false, true]);
+    s2.reply(200, ACCEPT(30_000));
+    await h.render();
+    const s3 = await next();
+    assert.deepEqual([s3.body.seq, s3.body.focus, s3.body.input], [3, true, false]);
+    dom.fire('pointermove');
+    dom.fire('blur');
+    s3.fail();
+    await h.render();
+    h.unmount();
+    assert.deepEqual(posted(net.posts().at(-1)), { unitKey: 'u1', chainId: s1.body.chainId, seq: 4, stop: true, focus: false, input: true, keepalive: true, auth: 'Bearer tok-1' });
   });
 
   it('a timer that fires far too late (a sleep): a stop for the chain, then a new chain without input', async () => {
@@ -1654,10 +1737,14 @@ describe('the study time pages and the hook', () => {
       }
       assert.ok(lines.size >= views.length - 4, `${language}: the lines tell the views apart`);
     }
+    // other_tab holds under both overlap rules (another unit's screen may count, or neither), and says what to do.
+    const otherTab = { kind: 'not_counting', reason: 'other_tab' };
+    assert.equal(pages.recordingText(otherTab, 'jp'), '別の単元の画面と時間が重なっているため、この画面の時間は数えていません。別の単元の画面を閉じるか隠すと、また数えます。');
+    assert.equal(pages.recordingText(otherTab, 'en'), 'Another unit\'s screen is open at the same time, so this time is not counted here. Close or hide that screen to count it again.');
   });
 
-  it('「この画面で記録する」 leaves once recording starts here: focus it had that fell to the page body goes to the section\'s heading; focus elsewhere, or a button never focused, moves nothing', () => {
-    for (const [hadFocus, onBody, moved] of [[true, true, true], [true, false, false], [false, true, false]]) {
+  it('「この画面で記録する」 leaves once recording starts here: if it had focus as it left (read as React detaches its ref) and focus fell to the page body, focus goes to the section\'s heading; focus elsewhere, or a button without focus as it left (even one focused earlier), moves nothing', () => {
+    for (const [focusedEarlier, focusedAsItLeft, onBody, moved] of [[true, true, true, true], [true, true, false, false], [false, false, true, false], [true, false, true, false]]) {
       const rt = createRuntime();
       const focused = [];
       const render = (view) => rt.render({ type: pages.StudyTimeStatus, props: { view, numbers: null, language: 'jp', onRecordHere: () => {}, onSignIn: () => {} }, key: null });
@@ -1665,11 +1752,65 @@ describe('the study time pages and the hook', () => {
       const heading = elementsOf(tree).find((el) => el.type === 'h2');
       assert.equal(heading.props.tabIndex, -1);
       heading.props.ref.current = { focus: (options) => focused.push(options) };
-      if (hadFocus) button(tree, 'この画面で記録する').props.onFocus();
+      const here = button(tree, 'この画面で記録する');
+      const el = { tag: 'button' };
+      here.props.ref(el);
+      if (focusedEarlier) dom.doc.activeElement = el;
+      if (!focusedAsItLeft) dom.doc.activeElement = dom.doc.body;
+      here.props.ref(null);
       dom.doc.activeElement = onBody ? dom.doc.body : { tag: 'a' };
       render({ kind: 'starting' });
-      assert.deepEqual(focused, moved ? [{ preventScroll: true }] : [], `focused ${hadFocus}, on the body ${onBody}`);
+      const label = `focused earlier ${focusedEarlier}, as it left ${focusedAsItLeft}, on the body ${onBody}`;
+      assert.deepEqual(focused, moved ? [{ preventScroll: true }] : [], label);
       rt.unmount();
     }
+    dom.doc.activeElement = dom.doc.body;
+  });
+
+  it('the page\'s own focus moves (the heading after 「この画面で記録する」, the title after 「もう一度読み込む」 on a unit\'s page) are not the learner\'s input; the learner\'s own focusin is', async () => {
+    const focusIn = () => dom.win.dispatchEvent(new Event('focusin'));
+    globalThis.__params = { cohortId: C1, unitKey: 'u1' };
+    net.auto = GET(TIME());
+    const p = mountPage('UnitTimeView', { learnerId: U1, onSignIn: () => {} });
+    let tree = await p.render();
+    net.posts()[0].reply(200, IGNORE('other_place'));
+    tree = await p.render();
+    const headingFocus = [];
+    elementsOf(tree).find((el) => el.type === 'h2').props.ref.current = { focus: (options) => { headingFocus.push(options); focusIn(); } };
+    const here = button(tree, 'この画面で記録する');
+    const el = { tag: 'button' };
+    here.props.ref(el);
+    dom.doc.activeElement = el;
+    net.auto = (call) => (call.method === 'POST' ? [200, ACCEPT(30_000)] : undefined);
+    here.props.onClick();
+    here.props.ref(null);
+    dom.doc.activeElement = dom.doc.body;
+    await p.render();
+    assert.deepEqual(headingFocus, [{ preventScroll: true }]);
+    await clock.advance(clock.pending()[0] - clock.now());
+    await p.render();
+    assert.deepEqual(net.posts().slice(1).map((c) => [c.body.seq, c.body.input]), [[0, true], [1, false]], 'the heading\'s focusin is not an input');
+    focusIn();
+    await clock.advance(clock.pending()[0] - clock.now());
+    await p.render();
+    assert.deepEqual([net.posts().at(-1).body.seq, net.posts().at(-1).body.input], [2, true], 'the learner\'s focusin is');
+    p.unmount();
+
+    net = createNet();
+    dom = createDom();
+    net.auto = () => [503, { error_type: 'training_unavailable' }];
+    const titleFocus = [];
+    globalThis.__title = { focus: (options) => { titleFocus.push(options); focusIn(); } };
+    const q = mountPage('UnitTimeView', { learnerId: U1, onSignIn: () => {} });
+    const failed = await q.render();
+    net.auto = (call) => (call.method === 'GET' ? [200, TIME()] : [200, ACCEPT(30_000)]);
+    button(failed, 'もう一度読み込む').props.onClick();
+    await q.render();
+    assert.deepEqual(titleFocus, [{ preventScroll: true }]);
+    await clock.advance(clock.pending()[0] - clock.now());
+    await q.render();
+    assert.deepEqual(net.posts().map((c) => [c.body.seq, c.body.input]), [[0, true], [1, false]], 'the title\'s focusin is not an input');
+    q.unmount();
+    delete globalThis.__title;
   });
 });

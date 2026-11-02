@@ -17,7 +17,7 @@
  * - The network, 500, another 403 (the terms check) and a malformed answer: the same signal again
  *   after nextInMs; 429 and 503 after their Retry-After (60 s without one), at least nextInMs. A
  *   signal that was not stored keeps its input and blur for the next one, or for the stop (a
- *   duplicate's own are the server's; what its retry took on since stays).
+ *   duplicate's own are the server's; what its resends took on since its first attempt stays).
  * - The numbers are the server's only; nothing advances them between answers.
  */
 import type { StudyReason, StudySignalAnswer, StudySignalBody, StudySignalState } from '../../../services/trainingApi';
@@ -61,7 +61,10 @@ export type StudyCore = {
   chain: Chain | null;
   /** Its signal on its way: one at a time (a stop does not wait). */
   inFlight: SentSignal | null;
-  /** While inFlight is a retry: the input and blur it took on since the failed signal (back on a duplicate). */
+  /**
+   * What a seq's resends took on since its first attempt (which the server may have): kept while it
+   * is tried again, back for the next seq on a duplicate, and on a stop meanwhile.
+   */
   extra: { input: boolean; blur: boolean } | null;
   /** When the chain's next signal goes, or null (waiting for an answer, or no chain). */
   wakeAt: number | null;
@@ -101,8 +104,14 @@ export function createStudyCore(unitKey: string, beatMs: number, numbers: StudyN
 
 const body = (core: StudyCore, s: SentSignal): StudySignalBody => ({ unitKey: core.unitKey, chainId: s.chainId, seq: s.seq, stop: s.stop, focus: s.focus, input: s.input });
 
-/** The input and blur since the chain's last stored signal: those noted since, and a failed signal's. */
-const sinceStored = (core: StudyCore) => ({ input: core.input || Boolean(core.retry?.input), blur: core.blur || (core.retry ? !core.retry.focus : false) });
+/**
+ * The input and blur since the chain's last stored signal: those noted since, a failed signal's,
+ * and what its resends took on (the resend on its way may be a duplicate).
+ */
+const sinceStored = (core: StudyCore) => ({
+  input: core.input || Boolean(core.retry?.input) || Boolean(core.extra?.input),
+  blur: core.blur || (core.retry ? !core.retry.focus : false) || Boolean(core.extra?.blur),
+});
 
 /** The chain's next signal now: the failed one again, or the next seq; the flags since the last one. */
 function sendNext(core: StudyCore, focused: boolean): StudyStep {
@@ -115,7 +124,7 @@ function sendNext(core: StudyCore, focused: boolean): StudyStep {
     ...core,
     chain: { ...chain, nextSeq: Math.max(chain.nextSeq, seq + 1) },
     inFlight: sent,
-    extra: retry ? { input: core.input, blur: core.blur } : null,
+    extra: retry ? { input: core.input || Boolean(core.extra?.input), blur: core.blur || Boolean(core.extra?.blur) } : null,
     wakeAt: null,
     retry: null,
     input: false,
@@ -193,7 +202,7 @@ function onAnswer(core: StudyCore, ev: Extract<StudyEvent, { type: 'answer' }>):
         return restartLater(kept, ev.id, now);
     }
   }
-  const retryAt = (wait: number) => ({ ...base, retry: sent, wakeAt: now + Math.max(wait, base.beatMs) });
+  const retryAt = (wait: number) => ({ ...base, retry: sent, extra: core.extra, wakeAt: now + Math.max(wait, base.beatMs) });
   switch (result.status) {
     case 401:
       return stopped(base, result.errorType === 'account_deleted' ? 'deleted' : 'signin');

@@ -2,14 +2,16 @@ import React, { useEffect, useRef } from 'react';
 import { Button } from '../../ui/Button';
 import type { RecordingView, StudyNumbers } from './studyTimeCore';
 import { formatDuration, studyCopy } from './studyTimeText';
+import { moveFocus } from './useStudyTime';
 
 /**
  * The unit page's study time (doc/brushup-2026/training-plan.ja.md §4.9, D13): today's time and the
  * unit's time against its set time, as the server's last answer gave them (nothing advances them in
  * between), and whether the time is counted now, and why not. Only that line is in the status
  * region, so it is announced when it changes, not at every signal. Other-place: 「この画面で記録する」
- * (it leaves when recording starts here: focus it had that fell to the page body goes to the
- * section's heading); a refused sign-in: 「ログインし直す」.
+ * (when it leaves with focus, as recording starts here, focus that fell to the page body goes to the
+ * section's heading: whether it had focus is read as React detaches its ref, before the node goes);
+ * a refused sign-in: 「ログインし直す」.
  */
 export function recordingText(view: RecordingView, language: 'en' | 'jp'): string {
   const t = studyCopy[language];
@@ -34,13 +36,18 @@ export default function StudyTimeStatus({ view, numbers, language, onRecordHere,
 }) {
   const t = studyCopy[language];
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const here = useRef<HTMLButtonElement | null>(null);
   const hereHadFocus = useRef(false);
+  const hereRef = useRef((el: HTMLButtonElement | null) => {
+    if (el) here.current = el;
+    else hereHadFocus.current = typeof document !== 'undefined' && here.current !== null && document.activeElement === here.current;
+  }).current;
   const offered = view.kind === 'other_place';
   useEffect(() => {
     if (offered || !hereHadFocus.current) return;
     hereHadFocus.current = false;
     const active = typeof document === 'undefined' ? null : document.activeElement;
-    if (!active || active === document.body) headingRef.current?.focus({ preventScroll: true });
+    if (!active || active === document.body) moveFocus(headingRef.current);
   }, [offered]);
   return (
     <section aria-labelledby="study-time-heading" className="rounded-card border border-line bg-surface p-5 shadow-1">
@@ -62,7 +69,7 @@ export default function StudyTimeStatus({ view, numbers, language, onRecordHere,
       ) : null}
       <div role="status" className="mt-3 flex flex-col items-start gap-2">
         <p className="text-body text-fg-2">{recordingText(view, language)}</p>
-        {offered ? <Button size="sm" onClick={onRecordHere} onFocus={() => { hereHadFocus.current = true; }}>{t.recordHere}</Button> : null}
+        {offered ? <Button ref={hereRef} size="sm" onClick={onRecordHere}>{t.recordHere}</Button> : null}
         {view.kind === 'stopped' && view.cause === 'signin' ? <Button size="sm" onClick={onSignIn}>{t.signInAgain}</Button> : null}
       </div>
     </section>
