@@ -83,14 +83,14 @@ describe('the VM runbooks follow server/migrations', () => {
         assert.match(guide, /\[`deploy\/risepath-vm\/README\.md`\]\(\.\.\/\.\.\/deploy\/risepath-vm\/README\.md\) の「職業訓練（骨組み）」/, 'the guide links the block');
     });
 
-    it('the job-training block covers 022 (study time): before the services, no role re-run, every staff command over stdin as the script\'s usage shows it, the PostgreSQL proof', () => {
+    it('the job-training block covers 022 (study time) and 023 (its recounts): before the services, no role re-run, the lock 023 takes, every staff command as the script\'s usage shows it, exit 4, the PostgreSQL proof', () => {
         const readme = read('deploy/risepath-vm/README.md');
         const start = readme.indexOf('## 職業訓練（骨組み）');
         const section = readme.slice(start, readme.indexOf('\n## ', start + 1));
         assert.match(section, /migration 022（受講時間）も同じです。022 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります/);
         assert.match(section, /022 も新しい表（7 つ）を作るだけで、`auth\.users` はロックせず、`sql\/mcp_remote_role\.sql` も流し直さなくてかまいません/);
         const usage = read('scripts/training-time.mjs');
-        for (const mode of ['--load-catalog', '--load-rules', '--set', '--show', '--close', '--stats']) {
+        for (const mode of ['--load-catalog', '--load-rules', '--set', '--show', '--close', '--stats', '--verify']) {
             assert.match(section, new RegExp(`exec -T api node scripts/training-time\\.mjs ${mode} `), mode);
             assert.ok(usage.includes(`node scripts/training-time.mjs ${mode} `), `${mode}: the script's own usage`);
         }
@@ -101,6 +101,8 @@ describe('the VM runbooks follow server/migrations', () => {
         assert.doesNotMatch(section, /< \/opt\/risepath-private\//);
         assert.match(section, /`sudo install -d -m 700 \/opt\/risepath-private`/);
         assert.match(section, /`scripts\/db\/verify-training\.mjs` が 022 と/);
+        assert.match(section, /migration 023（受講時間の数え直しの記録）も、`api`・`mcp`・`mcp-public` の起動の前に当てます。[^\n]*`account_busy`/, '023: before the services, and who waits for its lock');
+        assert.match(section, /4 = `--verify` が違いを見つけた/);
         const guide = read('doc/guides/risepath_vm_deployment.md').split('\n').find((line) => line.startsWith('- **022（職業訓練の受講時間）**'));
         assert.ok(guide, 'the 022 bullet in doc/guides/risepath_vm_deployment.md');
         for (const want of ['起動する前に', '`deletion_unavailable`', '`sql/mcp_remote_role.sql` は流し直さなくてよい', '`scripts/training-time.mjs`', 'の「職業訓練（骨組み）」']) assert.ok(guide.includes(want), want);

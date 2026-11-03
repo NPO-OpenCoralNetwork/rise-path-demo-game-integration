@@ -119,12 +119,12 @@ nano /opt/risepath/deploy/risepath-vm/stack.env   # 上の表のとおりに埋�
 # CI の Server stack deploy の「Preflight」の行とくらべ、stack.env の SUPABASE_URL が https://<project>.supabase.co であることを見ます。
 cd /opt/risepath/deploy/risepath-vm/scripts
 ./bootstrap-vm.sh
-# 2 回目: build → db 起動 → migration 000–022 → api → up → healthy を待つ → smoke → systemd 登録
+# 2 回目: build → db 起動 → migration 000–023 → api → up → healthy を待つ → smoke → systemd 登録
 ```
 
 最後に `api` コンテナ内の smoke が通れば、スタックは動いています。VM 起動時にスタックを上げる systemd ユニットは、このデプロイが通ってから登録されます。`deploy-stack.sh` が途中で止まったら、表示された原因（テンプレの値なら変数名）を直し、`./bootstrap-vm.sh` をもう一度実行します（systemd ユニットは bootstrap だけが登録します）。
 
-新しい VM の DB は空から始まります。この初回デプロイで、migration 000–022 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
+新しい VM の DB は空から始まります。この初回デプロイで、migration 000–023 がすべて適用されます。db イメージは pgvector 入りなので、000 が `vector` 拡張を作り、`material_chunks.embedding` は `vector(768)`（HNSW インデックス付き）になります。RAG のベクトル検索が使えます（ただし埋め込みには Gemini が要るので、`GEMINI_ALLOWED` を設定しない既定では、教材はキーワード検索で探します）。これは新しい空の `pgdata` ボリュームのときだけです。pgvector の無いイメージで作ったボリュームは、イメージを替えても `FLOAT8[]` のままで、RAG はキーワード検索で動きます（[`server/migrations/README.md`](../../server/migrations/README.md)）。
 
 学習者がアップロードした教材のファイルは、`uploads` ボリューム（API のコンテナの `/app/uploads`）に置かれ、再デプロイしても残ります。以前の版は、コンテナの中の `public/uploads` に置いていたので、デプロイのたびに消えていました。アカウントの削除と保存期間の処理が、このボリュームのファイルも消します。
 
@@ -435,6 +435,7 @@ DELETE FROM review_cards c USING lesson_progress_lesson_resets r
 - migration 021 を当てる前に、この版の `api`・`mcp`・`mcp-public` を起動しません。021 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります（削除の処理が 021 の表に印を付けるため）。`deploy-stack.sh` は migrate のあとに作り直すので、そのまま使えます。
 - 021 は新しい表を 2 つ作るだけです。`auth.users` はロックせず、ログインした呼び出しもアカウントの削除も待ちません。`sql/mcp_remote_role.sql` は流し直さなくてかまいません（どちらの表も、リモート MCP のロールに渡しません）。
 - migration 022（受講時間）も同じです。022 がないまま `api` を起動すると、アカウントの削除がすべて `deletion_unavailable` で止まります（削除の処理が受講時間の記録にも印を付けるため）。022 も新しい表（7 つ）を作るだけで、`auth.users` はロックせず、`sql/mcp_remote_role.sql` も流し直さなくてかまいません。
+- migration 023（受講時間の数え直しの記録）も、`api`・`mcp`・`mcp-public` の起動の前に当てます。新しい表を 1 つ作り、受講時間の日の表（`training_time_days`）に列と制約を足します。足し終わるまでその表をロックするので、受講時間の合図・読み出し・日を閉じる処理・アカウントの削除の印は 023 を待ち、10 秒を超えると `account_busy` で終わります（もう一度試します）。表が小さいうちはすぐ終わりますが、人の少ない時間に当てます。`sql/mcp_remote_role.sql` は流し直さなくてかまいません。
 - 公開版では `TRAINING_ENABLED` を設定しません。表は空のままで、`/api/v2/training` は 404 を返し、職員のスクリプトも動きません。
 
 **設定（`stack.env`。秘密の値ではありません。`api` だけが読みます）**
@@ -466,6 +467,7 @@ docker compose --env-file stack.env exec -T api node scripts/training-time.mjs -
 docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --show 2026-11-web
 docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --close 2026-11-web
 docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --stats 2026-11-web
+docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --verify 2026-11-web
 ```
 
 - `--load-catalog`・`--load-rules`: 変えない版として読み込みます。同じ内容をもう一度読み込んでも、前の版のままです。形がちがうときは、どの項目かだけを出して断ります。
@@ -473,15 +475,16 @@ docker compose --env-file stack.env exec -T api node scripts/training-time.mjs -
 - `--show`: 期の設定（版は sha256 で）。`--learner <account uuid>` を付けると、その人の確定した日と、単元ごとの時間です。
 - `--close`: 期の受講者ごとに、確定できる日（その日の終わりから、規則の途切れの長さが過ぎた日）を閉じます。0 分の日も行を作り、閉じた日は変えません。`--learner <account uuid>` で 1 人だけにもできます。受講者の画面が合図を送ったときと、受講者が自分の受講時間を読んだときも、API がその人の確定した日を閉じます。`--close` は、画面を開かなくなった受講者の日も閉じます。
 - `--stats`: 行の数（削除したアカウントの分も）と、最後に閉じた日です。
+- `--verify`: 期の受講者ごとに、確定した日の今の値を、その日を数えた版でもう一度数えて比べます（何も書きません）。比べるのは、その版をこのコードで数えられるか、版がその日の期の設定（数え直した日は、その数え直しの記録）のとおりか、読んだ合図の数とハッシュ、数えた時間と単元ごとの時間です。`--learner <account uuid>` で 1 人だけにもできます。違いがあれば、受講者と日ごとに 1 行ずつ出して、終了コード 4 で終わります。出力には受講者の時間が入るので、学校の外に出しません。違いが出たら、何も変えずに [SECURITY.md](../../SECURITY.md) の窓口へ非公開で知らせます（Issue やプルリクエストには書きません）。受講者ごとに 1 つのスナップショットで読み、ロックは取らないので、合図や日を閉じる処理を止めません。
 - 設定のない日は、受講時間を数えません（合図の API は 409 `time_not_configured` で断り、読む API は `status: not_configured` を返します）。デプロイ、期と割り当ての操作は、設定がなくても動きます。
 - 受講時間の API が `api` のログに残す行（`[Training]` の行は、同じ種類で 1 分に 1 行まで。受講者の ID は先頭の 8 文字だけ。DB の失敗は、ほかの API と同じく `[db]` の行にも、そのたびに出ます）:
   - `[Training] the database clock is behind a closed day …`: DB の時計が、閉じた日の合図を読む範囲まで戻っています。合図を記録せず 503 で答えます。VM の時刻合わせ（`timedatectl` の `System clock synchronized`）を確かめます。
   - `[Training] no account row for …`: ログインの記録（`auth.users`）がない受講者です。503 で答えます。DB と `api` のログを確かめます。
   - `[Training] study time failed (…)`・`[Training] closing days after a signal failed (…)`・`[Training] study time state failed (…)`: 括弧の中が理由です。`invalid_setting` なら、保存した規則か単元表の版を今のコードで読めません（`--show` で版を確かめます）。日を閉じる処理が失敗しても、合図は残ります。
 
-終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい（ファイルを流していないときも。5 秒待っても何も届かなければ止まります）、2 = 断った（`TRAINING_ENABLED` が `true` でない、ファイルの形がちがう、期や版がない、日付が範囲の外、今日すでに設定が効いている、今日効いている設定とちがうコースの単元表、保存した版をこのコードで読めない）、3 = いまは使えない（DB。ロックが 10 秒空かないときも。あとでもう一度実行します）。
+終了コード: 0 = できた（または、もうそうなっている）、1 = 使い方のまちがい（ファイルを流していないときも。5 秒待っても何も届かなければ止まります）、2 = 断った（`TRAINING_ENABLED` が `true` でない、ファイルの形がちがう、期や版がない、日付が範囲の外、今日すでに設定が効いている、今日効いている設定とちがうコースの単元表、保存した版をこのコードで読めない）、3 = いまは使えない（DB。ロックが 10 秒空かないときも。あとでもう一度実行します）、4 = `--verify` が違いを見つけた（上のとおり非公開で知らせます）。
 
-- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と、設定の決まり・日を閉じる処理・合図の書き込み（削除・日を閉じる処理・設定の追加との重なり、0 時をまたぐ続き、DB の時計での書き込み、閉じた日まで戻った時計）・受講時間を読む API（閉じる処理の前と読み出しの最中に始めたほかの閉じる処理が、GET のコミットまで待つこと）・合図の書き込みが読む列・状態の読み出しが失敗しても合図が残ること・削除との重なりを、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021 と 022 の行）。VM の DB には決して向けないでください。
+- **DB の確かめ（使い捨ての DB だけ）**: `scripts/db/verify-account-deletion.mjs` の R6 と R12 が、021 と、割り当て・削除の印・削除との重なりを、`scripts/db/verify-training.mjs` が 022 と 023 と、設定の決まり・日を閉じる処理・合図の書き込み（削除・日を閉じる処理・設定の追加との重なり、0 時をまたぐ続き、DB の時計での書き込み、閉じた日まで戻った時計）・受講時間を読む API（閉じる処理の前と読み出しの最中に始めたほかの閉じる処理が、GET のコミットまで待つこと）・合図の書き込みが読む列・状態の読み出しが失敗しても合図が残ること・削除との重なり・数え直しの記録の制約・確かめ（受講者ごとに 1 つのスナップショットで読むこと）を、本物の PostgreSQL 16 で確かめます（[`server/migrations/README.md`](../../server/migrations/README.md) の 021・022・023 の行）。VM の DB には決して向けないでください。
 
 ## CI での予行（Phase 7）
 
@@ -490,7 +493,7 @@ GitHub Actions の `End-to-end checks`（`.github/workflows/e2e.yml`）は、プ
 - `ci/stack.ci.env` は、CI だけのダミーの値です。VM では使いません。`scripts/ci/stack.sh` が 1 回の実行のあいだだけ `stack.env` にコピーし、終わると消します。1 行目に `# risepath-ci-env:` の印があり、印のない `stack.env`（自分で作ったもの）があると、書き換えずに止まります。`billing.env`・`tunnel.env`・`mcp-public.env` があるときも止まります。
 - Compose のプロジェクト名は `risepath-ci` なので、`risepath` のスタックには触れません。
 - `deploy-stack.sh` は、環境変数 `RISEPATH_DEPLOY_SKIP_PULL=1` のときだけ git pull を飛ばします。**VM では設定しません。** `stack.env` に書いても効きません。
-- CI が確かめること: 空の DB への migration 000–022、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
+- CI が確かめること: 空の DB への migration 000–023、`deploy-stack.sh` の順番・ヘルスチェック・スモーク、`sql/mcp_remote_role.sql`（2 回。`Database checks`）、ブラウザでの学習の流れ。確かめないこと（`mcp-public`、2 回目のデプロイ、起動のユニット、origin gate、git pull と、HEAD が動いたときのやり直しも）は、計画の 11.3 の 1 です。
 - 作り直した VM の最初のデプロイの前に、main の 3 つのチェック（`Database checks`・`Server stack deploy`・`Learner end-to-end`）が緑であることを確かめます。
 - 手元で同じことを流すときは `npm run ci:stack`（`Server stack deploy`）と `npm run e2e:local`（`Learner end-to-end`）です（Docker が要ります。計画の 11.1 の「手元で流す」）。動いているあいだは 5432・3006・3100 を、すべてのネットワークに開くので、信頼できるネットワークでだけ流します。
 

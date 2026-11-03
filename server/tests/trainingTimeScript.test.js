@@ -3,7 +3,8 @@
 // - nothing happens unless TRAINING_ENABLED is exactly "true" (stdin is not even read);
 // - usage errors send nothing; the files come over stdin (refused when nothing is piped);
 // - a rules file's values never reach the output: errors name fields, results print sha256 only;
-// - each refusal has its message and exit code 2; a busy lock exits 3 and the other learners close.
+// - each refusal has its message and exit code 2; a busy lock exits 3 and the other learners close;
+// - --verify prints ok or each difference (exit 4), never a rule value, and writes nothing.
 // The values are artificial, not the school's (training-plan D9).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -64,7 +65,7 @@ async function loaded() {
 describe('scripts/training-time.mjs: the switch and the arguments', () => {
     it('refuses everything unless TRAINING_ENABLED is exactly "true" (exit 2), before any statement or reading stdin', async () => {
         for (const env of [{}, { TRAINING_ENABLED: '' }, { TRAINING_ENABLED: 'TRUE' }, { TRAINING_ENABLED: '1' }]) {
-            for (const argv of [['--load-rules', '--by', 'a', '--note', 'b'], ['--close', SLUG], ['--stats', SLUG]]) {
+            for (const argv of [['--load-rules', '--by', 'a', '--note', 'b'], ['--close', SLUG], ['--stats', SLUG], ['--verify', SLUG]]) {
                 const { code, out, pool, reads } = await runWith(argv, { env, stdin: JSON.stringify(RULES_IN) });
                 assert.equal(code, EXIT.refused, JSON.stringify(env));
                 assert.match(out, /TRAINING_ENABLED is not "true"/);
@@ -81,6 +82,7 @@ describe('scripts/training-time.mjs: the switch and the arguments', () => {
             ['--set', SLUG, '--catalog', sha, '--rules', sha, '--from', '2026-11-05', '--by', 'a'], ['--show', 'Bad Slug'], ['--close', SLUG, '--learner', 'nope'],
             ['--show', SLUG, '--learner', A, '--learner', B], ['--set', SLUG, '--catalog', 'ABC', '--rules', sha, '--from', '2026-11-05', '--by', 'a', '--reason', 'r'],
             ['--set', SLUG, '--catalog', sha, '--rules', sha, '--from', '2026-02-30', '--by', 'a', '--reason', 'r'],
+            ['--verify'], ['--verify', SLUG, '--by', 'a'], ['--verify', SLUG, '--learner', 'nope'], ['--verify', SLUG, '--stats', SLUG],
         ]) {
             const { code, pool, reads } = await runWith(argv, { stdin: '{}' });
             assert.equal(code, EXIT.usage, argv.join(' '));
@@ -237,5 +239,47 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         assert.equal(broken.code, EXIT.refused);
         assert.match(broken.out, /a stored rules or unit list version does not parse with this code/);
         assert.equal((await runWith(['--stats', SLUG], { pool: null })).code, EXIT.unavailable);
+    });
+
+    it('--verify: every learner\'s closed days, ok (exit 0) or each difference (exit 4, never a rule value); one learner; a cohort or learner that is not there is refused', async () => {
+        const { pool, catalog, rules } = await loaded();
+        pool.addSetting({ cohortId: COHORT, catalogId: catalog.id, ruleSetId: rules.id, effectiveFrom: '2026-11-01' });
+        const from = Date.parse('2026-11-02T01:00:00Z');
+        for (let seq = 0; seq < 12; seq += 1) pool.addSignal({ userId: A, cohortId: COHORT, unit: 'sample-u1', chain: 'cccccccc-0000-4000-8000-000000000001', born: from, seq, at: from + seq * 7 * S, input: true });
+        await runWith(['--close', SLUG], { pool });
+        const ok = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([ok.code, ok.out.split('\n')], [EXIT.ok, [
+            `${A}: ok (3 day(s))`,
+            `${B}: ok (3 day(s))`,
+            `Checked ${SLUG}: 2 learner(s), 6 day(s); all match.`,
+        ]]);
+        assert.ok(pool.state.days.every((d) => d.kind === 'close'), 'nothing written');
+        const row = pool.state.days.find((d) => d.user_id === A && d.day === '2026-11-02');
+        row.counted_ms += 1000;
+        pool.addSignal({ userId: A, cohortId: COHORT, unit: 'sample-u1', chain: 'cccccccc-0000-4000-8000-000000000002', born: from, seq: 0, at: Date.parse('2026-11-03T02:00:00Z'), input: true });
+        const differs = await runWith(['--verify', SLUG, '--learner', A.toUpperCase()], { pool });
+        assert.equal(differs.code, EXIT.differs);
+        assert.deepEqual(differs.out.split('\n'), [
+            `${A}: 2 difference(s) in 3 day(s)`,
+            '  2026-11-02: the values differ: stored 0:01:18 (over the set time 0:00:00), counted 0:01:17 (over the set time 0:00:00)',
+            '  2026-11-03: the evidence differs from when it was counted (signals 0 then, 1 now, or their content)',
+            `Checked ${SLUG}: 1 learner(s), 3 day(s); 2 difference(s) in 1 learner(s). Report them privately (SECURITY.md) and change nothing until they are understood.`,
+        ]);
+        for (const value of VALUES) assert.ok(!differs.out.includes(value), value);
+        // The day's totals as stored, its time on another unit: the split differs. (Each check ends in a
+        // ROLLBACK, which puts back a copy of the state: read the rows again.)
+        const again = pool.state.days.find((d) => d.user_id === A && d.day === '2026-11-02');
+        again.counted_ms -= 1000;
+        pool.state.unitDays.find((u) => u.day_id === again.id).unit_key = 'sample-u2';
+        const split = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.deepEqual([split.code, split.out.split('\n').slice(0, 2)], [EXIT.differs, [`${A}: 2 difference(s) in 3 day(s)`, "  2026-11-02: the time per unit differs (the day's totals match)"]]);
+        const nobody = await runWith(['--verify', SLUG, '--learner', 'aaaaaaaa-2222-4000-8000-0000000000e0'], { pool });
+        assert.deepEqual([nobody.code, nobody.out], [EXIT.refused, `Refused: aaaaaaaa-2222-4000-8000-0000000000e0 is not a learner of ${SLUG}.`]);
+        const none = await runWith(['--verify', 'nope'], { pool });
+        assert.deepEqual([none.code, none.out], [EXIT.refused, 'Refused: there is no cohort nope.']);
+        pool.state.rules[0].params.counting.gapMs = 1;
+        const broken = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([broken.code, broken.out], [EXIT.refused, 'Refused: a stored rules or unit list version does not parse with this code. Nothing was changed; ask the developers.']);
+        assert.equal((await runWith(['--verify', SLUG], { pool: null })).code, EXIT.unavailable);
     });
 });

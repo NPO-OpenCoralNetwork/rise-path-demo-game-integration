@@ -38,7 +38,8 @@
  * Closing (closeDays): a learner's days, from the first one not closed yet up to the last final one
  * (the database clock passed its end + gapMs) and at most the cohort's last day, counted from the
  * stored signals and appended as day rows (zero days too) with the versions they were counted with
- * and the sha256 of the evidence each read. A day is closed once; a recount appends (PR 4/4). Under
+ * and the sha256 of the evidence each read. A day is closed once; a staff recount appends rows that
+ * name it (D12, migration 023), and tools/core/trainingTimeCheck.js checks every current row. Under
  * the account's shared lock (a deletion waits for the close, then marks its rows; a deletion that
  * ran first left no stub, so nothing is written), the learner's training lock
  * (TRAINING_SQL.learnerLock: a signal reads the clock only under it, so none earlier than the
@@ -99,6 +100,8 @@ export const TRAINING_TIME_SQL = Object.freeze({
     settingsLock: "SELECT pg_advisory_xact_lock(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     settingsLockShared: "SELECT pg_advisory_xact_lock_shared(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     jstToday: "SELECT to_char((clock_timestamp() AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS today",
+    // A staff read in one snapshot that takes no lock (transaction's snapshot option).
+    beginSnapshot: 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
     settingCourses: `SELECT to_char(s.effective_from, 'YYYY-MM-DD') AS effective_from, k.course_key
   FROM training_cohort_time_settings s JOIN training_catalog_versions k ON k.id = s.catalog_version_id
  WHERE s.cohort_id = $1::uuid ORDER BY s.effective_from, s.id`,
@@ -651,13 +654,15 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
  * One transaction on its own connection. `work` decides whether to commit. A lock wait over
  * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'. PostgreSQL ends the COMMIT of a transaction that
  * a failed statement aborted as a rollback, without an error: that is an error here, never the
- * work's result.
+ * work's result. snapshot: one REPEATABLE READ READ ONLY snapshot (a staff read that takes no lock,
+ * tools/core/trainingTimeCheck.js), else READ COMMITTED.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {string} operation
  * @param {(client: Queryable) => Promise<{ commit: boolean, value: T }>} work
+ * @param {{ snapshot?: boolean }} [options]
  * @returns {Promise<T | CoreError>}
  */
-async function transaction(pool, operation, work) {
+export async function transaction(pool, operation, work, { snapshot = false } = {}) {
     if (!pool?.connect) return noDatabase();
     /** @type {any} */
     let client;
@@ -668,7 +673,7 @@ async function transaction(pool, operation, work) {
     }
     let broken = false;
     try {
-        await client.query('BEGIN');
+        await client.query(snapshot ? TRAINING_TIME_SQL.beginSnapshot : 'BEGIN');
         await client.query(TRAINING_SQL.lockTimeout);
         const { commit, value } = await work(client);
         const ended = await client.query(commit ? 'COMMIT' : 'ROLLBACK');

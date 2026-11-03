@@ -2,7 +2,8 @@
 // @ts-check
 /**
  * Staff: study time of job training (doc/brushup-2026/training-plan.ja.md §4.9; tables of
- * server/migrations/022_training_study_time.sql, logic in tools/core/trainingTime.js).
+ * server/migrations/022_training_study_time.sql and 023_training_study_time_recounts.sql, logic in
+ * tools/core/trainingTime.js and trainingTimeCheck.js).
  *
  * Run it in the school deployment's api container (DATABASE_URL_PHASE1 and TRAINING_ENABLED are
  * already there). The unit list and the rules file are private (D2, D9): they live outside the
@@ -14,6 +15,7 @@
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --show 2026-11-web [--learner <account uuid>]
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --close 2026-11-web [--learner <account uuid>]
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --stats 2026-11-web
+ *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --verify 2026-11-web [--learner <account uuid>]
  *
  * --load-catalog  a unit list (risepath.training-course/v1) as a version that never changes, named by
  *                 its sha256; the same content again is the version already there.
@@ -27,10 +29,13 @@
  *                 transaction. The api closes a learner's final days too, when the learner's page
  *                 sends a signal or reads its study time; this closes those of pages that stopped.
  * --stats         the cohort's row counts (marked rows of deleted accounts too) and its last closed day.
+ * --verify        checks every closed day of the cohort's learners (or one): the versions it was
+ *                 counted with, the setting or recount they came from, its evidence and its values.
+ *                 Reads only, in one snapshot per learner, with no lock.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a
- * lock busy for 10 s: try again).
+ * lock busy for 10 s: try again), 4 --verify found a difference (report it privately, SECURITY.md).
  */
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -48,6 +53,7 @@ import {
     loadRules,
     setCohortTime,
 } from '../tools/core/trainingTime.js';
+import { verifyCohort } from '../tools/core/trainingTimeCheck.js';
 import { jstDayOf } from '../shared/training/studyTime.js';
 
 export const USAGE = [
@@ -58,9 +64,10 @@ export const USAGE = [
     '  node scripts/training-time.mjs --show <cohort slug> [--learner <account uuid>]',
     '  node scripts/training-time.mjs --close <cohort slug> [--learner <account uuid>]',
     '  node scripts/training-time.mjs --stats <cohort slug>',
+    '  node scripts/training-time.mjs --verify <cohort slug> [--learner <account uuid>]',
 ].join('\n');
 
-export const EXIT = Object.freeze({ ok: 0, usage: 1, refused: 2, unavailable: 3 });
+export const EXIT = Object.freeze({ ok: 0, usage: 1, refused: 2, unavailable: 3, differs: 4 });
 
 /** The largest file read from stdin (a unit list of 500 units is far below it). */
 export const STDIN_LIMIT = 1024 * 1024;
@@ -82,9 +89,10 @@ export const STAFF_CLOSER = 'staff';
  *   readStdin: the whole of stdin, or null when nothing was piped (a terminal, or no bytes within STDIN_WAIT_MS)
  */
 
-const MODES = /** @type {const} */ (['loadCatalog', 'loadRules', 'set', 'show', 'close', 'stats']);
+const MODES = /** @type {const} */ (['loadCatalog', 'loadRules', 'set', 'show', 'close', 'stats', 'verify']);
+const MODE_LIST = 'choose exactly one of --load-catalog, --load-rules, --set, --show, --close, --stats, --verify';
 const FLAGS = Object.freeze({
-    '--load-catalog': 'loadCatalog', '--load-rules': 'loadRules', '--set': 'set', '--show': 'show', '--close': 'close', '--stats': 'stats',
+    '--load-catalog': 'loadCatalog', '--load-rules': 'loadRules', '--set': 'set', '--show': 'show', '--close': 'close', '--stats': 'stats', '--verify': 'verify',
     '--by': 'by', '--note': 'note', '--reason': 'reason', '--catalog': 'catalog', '--rules': 'rules', '--from': 'from', '--learner': 'learner',
 });
 /** The options each mode takes (and needs). */
@@ -95,6 +103,7 @@ const OPTIONS = Object.freeze({
     show: { needs: [], takes: ['learner'] },
     close: { needs: [], takes: ['learner'] },
     stats: { needs: [], takes: [] },
+    verify: { needs: [], takes: ['learner'] },
 });
 const NO_VALUE = new Set(['loadCatalog', 'loadRules']);
 
@@ -115,7 +124,7 @@ export function parseArgs(argv) {
         }
         const isMode = /** @type {readonly string[]} */ (MODES).includes(name);
         if (isMode && out.mode) {
-            out.error ??= 'choose exactly one of --load-catalog, --load-rules, --set, --show, --close, --stats';
+            out.error ??= MODE_LIST;
             continue;
         }
         if (isMode && NO_VALUE.has(name)) {
@@ -135,7 +144,7 @@ export function parseArgs(argv) {
         else out.values[name] = next;
     }
     if (out.error || out.help) return out;
-    if (!out.mode) return { ...out, error: 'choose exactly one of --load-catalog, --load-rules, --set, --show, --close, --stats' };
+    if (!out.mode) return { ...out, error: MODE_LIST };
     const { needs, takes } = OPTIONS[out.mode];
     const flag = (/** @type {string} */ name) => Object.keys(FLAGS).find((key) => /** @type {Record<string, string>} */ (FLAGS)[key] === name);
     for (const name of Object.keys(out.values)) {
@@ -166,7 +175,7 @@ function failed(result, deps) {
         return EXIT.unavailable;
     }
     if (result.error_type === 'invalid_setting') {
-        deps.log('Refused: a stored rules or unit list version does not parse with this code. Nothing was closed; ask the developers.');
+        deps.log('Refused: a stored rules or unit list version does not parse with this code. Nothing was changed; ask the developers.');
         return EXIT.refused;
     }
     deps.log(`Unavailable: the database could not do it (${result.error_type}). Try again later.`);
@@ -315,6 +324,55 @@ async function closeSome(args, deps) {
     return code;
 }
 
+/** What a difference found by --verify is, in a line (no rule value). @param {import('../tools/core/trainingTimeCheck.js').Difference} d */
+function differenceLine(d) {
+    const detail = /** @type {any} */ (d.detail);
+    switch (d.what) {
+        case 'values':
+            if (detail.stored.countedMs === detail.counted.countedMs && detail.stored.overCapMs === detail.counted.overCapMs) return `  ${d.day}: the time per unit differs (the day's totals match)`;
+            return `  ${d.day}: the values differ: stored ${hms(detail.stored.countedMs)} (over the set time ${hms(detail.stored.overCapMs)}), counted ${hms(detail.counted.countedMs)} (over the set time ${hms(detail.counted.overCapMs)})`;
+        case 'evidence':
+            return `  ${d.day}: the evidence differs from when it was counted (signals ${detail.stored} then, ${detail.found} now, or their content)`;
+        case 'setting':
+            return `  ${d.day}: its versions are not the cohort's setting of that day`;
+        case 'recount':
+            return `  ${d.day}: its versions are not those of its recount ${detail.recount ?? '-'}`;
+        default:
+            return `  ${d.day}: counted with ${detail.algorithm}, which this code cannot count (or its versions do not parse)`;
+    }
+}
+
+/** @param {ReturnType<typeof parseArgs>} args @param {Deps} deps */
+async function verifyOne(args, deps) {
+    const slug = String(args.slug);
+    const result = await verifyCohort({ cohortSlug: slug, learner: args.values.learner, pool: deps.getPool() });
+    if ('error_type' in result) return failed(result, deps);
+    if (result.status !== 'checked') {
+        deps.log(result.status === 'no_cohort' ? `Refused: there is no cohort ${slug}.` : `Refused: ${args.values.learner} is not a learner of ${slug}.`);
+        return EXIT.refused;
+    }
+    let days = 0;
+    let differences = 0;
+    let learners = 0;
+    for (const l of result.learners) {
+        days += l.days;
+        differences += l.differences.length;
+        if (!l.differences.length) {
+            deps.log(`${l.userId}: ok (${l.days} day(s))`);
+            continue;
+        }
+        learners += 1;
+        deps.log(`${l.userId}: ${l.differences.length} difference(s) in ${l.days} day(s)`);
+        for (const d of l.differences) deps.log(differenceLine(d));
+    }
+    if (!differences) {
+        deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); all match.`);
+        return EXIT.ok;
+    }
+    deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); ${differences} difference(s) in ${learners} learner(s). Report them privately (SECURITY.md) and change nothing until they are understood.`);
+    return EXIT.differs;
+}
+
 /** @param {ReturnType<typeof parseArgs>} args @param {Deps} deps */
 async function statsOne(args, deps) {
     const found = await cohortOf(String(args.slug), deps);
@@ -350,6 +408,7 @@ export async function run(argv, deps) {
         case 'set': return setOne(args, deps);
         case 'show': return showOne(args, deps);
         case 'close': return closeSome(args, deps);
+        case 'verify': return verifyOne(args, deps);
         default: return statsOne(args, deps);
     }
 }

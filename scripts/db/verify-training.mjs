@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * Proves migration 022 (job training: study time records) and the code that uses it
- * (tools/core/trainingTime.js: configuration, closing, the signal write and the live values; the
- * membership add of tools/core/training.js; the deletion's two marks) on a real, THROWAWAY
- * PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16). npm test pins the SQL text
- * (server/tests/migration022.test.js, server/tests/trainingTimeCore.test.js) and runs the code on an
+ * Proves migrations 022 and 023 (job training: study time records and their recounts) and the code
+ * that uses them (tools/core/trainingTime.js: configuration, closing, the signal write and the live
+ * values; tools/core/trainingTimeCheck.js: the check of closed days; the membership add of
+ * tools/core/training.js; the deletion's two marks) on a real, THROWAWAY PostgreSQL (16, as the VM's
+ * pgvector/pgvector:0.8.7-pg16). npm test pins the SQL text (server/tests/migration022.test.js,
+ * migration023.test.js, trainingTimeCore.test.js, trainingTimeCheck.test.js) and runs the code on an
  * in-memory fake; CI runs this script on the VM's image (job "Database checks",
- * scripts/ci/db-checks.sh). It is the 確かめ方 of server/migrations/README.md for 022.
+ * scripts/ci/db-checks.sh). It is the 確かめ方 of server/migrations/README.md for 022 and 023.
  *
  *   createdb -h 127.0.0.1 -p 55622 -U postgres verify_tr
  *   node scripts/db/verify-training.mjs --url postgres://postgres@127.0.0.1:55622/verify_tr
@@ -21,8 +22,8 @@
  *   M   every migration twice, each in its own transaction
  *   T1  the tables: a stream's day is its first signal's Japan-time day (at 15:00Z); one live stream
  *       per learner, chain and day, again after the mark (a re-opened id); one close per learner,
- *       cohort and day (the core's insertDays) with a recount beside it, the newest live row the
- *       current value; the flag, sequence and per-day CHECKs
+ *       cohort and day (the core's insertDays) with a recount beside it (its row names its recount,
+ *       023), the newest live row the current value; the flag, sequence and per-day CHECKs
  *   T2  configuration through the core: a unit list and rules load once (the stored jsonb gives the
  *       stored sha256 again), the settings: from today, today again refused, tomorrow, a past day
  *       refused (by the script's check and by the CHECK); the insert alone refuses today and a past
@@ -80,6 +81,16 @@
  *   T16 a signal's state read that fails (a statement on a missing table) rolls back to its
  *       savepoint: the signal is stored, the answer names the error; control: without the savepoint
  *       the COMMIT of the aborted transaction stores nothing, and the write answers an error
+ *   T17 023: a recount row names a recount, a close row none (the CHECK both ways); only a recount of
+ *       its own cohort (the composite foreign key); a recount's record names an override, its days in
+ *       order and the plan's sha256 in lower-case hex, and refuses UPDATE and DELETE (23001). The check
+ *       (verifyCohort) on PostgreSQL: days closed by the core check; recount rows as a recount writes
+ *       them (the override's values, the second day with the first's new unit time carried) check; a
+ *       changed value and a version this code does not have are found. The deletion's marks reach the
+ *       recount rows with the foreign key and the CHECK in place; the record stays
+ *   T18 the check reads each learner in one snapshot: an account deletion committing between its
+ *       read of the rows and of the evidence changes nothing it reports; control: with a plain BEGIN
+ *       (READ COMMITTED) the same deletion makes every day with evidence differ
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
  * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
  */
@@ -101,10 +112,12 @@ import { TRAINING_SQL, addMember } from '../../tools/core/training.js';
 import {
     TRAINING_TIME_SQL, closeDays, evidenceDigest, learnerDays, loadCatalog, loadRules, readStudyTime, recordSignal, setCohortTime, signalOf,
 } from '../../tools/core/trainingTime.js';
+import { CHECK_SQL, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
 const FILE = '022_training_study_time.sql';
+const FILE_023 = '023_training_study_time_recounts.sql';
 const ROLE = 'risepath_mcp_remote';
 const HOLD_MS = 2000;
 const LEAD_MS = 600;
@@ -223,6 +236,13 @@ const close = (pool, user, cohort) => closeDays({ userId: user, cohortId: cohort
 /** @param {pg.Pool} pool @param {string} user @param {string} cohort */
 const dayRows = async (pool, user, cohort) => (await pool.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, kind, counted_ms, over_cap_ms, signals, evidence_sha256, rule_set_id, catalog_version_id, account_deleted_at
     FROM training_time_days WHERE user_id = $1 AND cohort_id = $2 ORDER BY day, id`, [user, cohort])).rows;
+
+/**
+ * A recount's record (023), as a staff recount writes it: its id. Its rows name it.
+ * @param {pg.Pool} pool @param {string} cohort @param {string} from @param {string} to @param {string} ruleSetId
+ */
+const recountRecord = async (pool, cohort, from, to, ruleSetId) => String((await pool.query(`INSERT INTO training_time_recomputes (cohort_id, from_day, to_day, rule_set_id, plan_sha256, recomputed_by, reason)
+    VALUES ($1, $2::date, $3::date, $4, repeat('a', 64), 'verify', 'verify') RETURNING id`, [cohort, from, to, ruleSetId])).rows[0].id);
 
 /** The deletion's own statements up to the stub, as the service sends them, without COMMIT. @param {pg.PoolClient} c @param {string} id */
 async function deletionUpToStub(c, id) {
@@ -355,13 +375,14 @@ async function t1(pool, { catalogId, ruleSetId }) {
     await pool.query('INSERT INTO auth.users (id) VALUES ($1::uuid) ON CONFLICT (id) DO NOTHING', [user]);
     const insertDay = async (counted) => (await pool.query(TRAINING_TIME_SQL.insertDays, [user, cohort, 'verify', ['2026-10-01'], ['study-time/v1'], [ruleSetId], [catalogId], [counted], [0], [0], ['b'.repeat(64)]])).rowCount;
     const closes = [await insertDay(1000), await insertDay(2000)];
-    await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by)
-        VALUES ($1, $2, '2026-10-01', 'recompute', 'study-time/v1', $3, $4, 3000, 0, 0, repeat('c', 64), 'verify')`, [user, cohort, ruleSetId, catalogId]);
+    const recount = await recountRecord(pool, cohort, '2026-10-01', '2026-10-02', ruleSetId);
+    await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+        VALUES ($1, $2, '2026-10-01', 'recompute', 'study-time/v1', $3, $4, 3000, 0, 0, repeat('c', 64), 'verify', $5)`, [user, cohort, ruleSetId, catalogId, recount]);
     const current = (await pool.query(TRAINING_TIME_SQL.currentDays, [user, cohort])).rows.map((r) => `${r.day}:${r.kind}:${r.counted_ms}`);
     check('T1', closes.join() === '1,0' && current.join() === '2026-10-01:recompute:3000', `one close per learner, cohort and day (the core's insert: ${closes.join(', ')}); a recount beside it is the current value: ${current.join()}`);
 
-    const dayCheck = (counted, over) => codeOf(pool, `INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by)
-        VALUES ($1, $2, '2026-10-02', 'recompute', 'study-time/v1', $3, $4, $5, $6, 0, repeat('d', 64), 'verify')`, [user, cohort, ruleSetId, catalogId, counted, over]);
+    const dayCheck = (counted, over) => codeOf(pool, `INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+        VALUES ($1, $2, '2026-10-02', 'recompute', 'study-time/v1', $3, $4, $5, $6, 0, repeat('d', 64), 'verify', $7)`, [user, cohort, ruleSetId, catalogId, counted, over, recount]);
     const dayId = (await pool.query("SELECT id FROM training_time_days WHERE user_id = $1 AND kind = 'close'", [user])).rows[0].id;
     const unitZero = await codeOf(pool, "INSERT INTO training_time_unit_days (day_id, unit_key, counted_ms, over_cap_ms) VALUES ($1, 'unit-a', 0, 0)", [dayId]);
     const limits = [await dayCheck(86_400_000, 1), await dayCheck(86_400_000, 0), unitZero];
@@ -490,8 +511,8 @@ async function t3(pool, { catalogId, ruleSetId }) {
     check('T3', zero.status === 'closed' && zeroRows.length === 2 && zeroRows.every((r) => r.counted_ms === 0 && r.evidence_sha256 === sha256('[]')), `days without signals are closed as zero days: ${zeroRows.length}`);
 
     const again = /** @type {any} */ (await close(pool, user, cohort));
-    await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by)
-        VALUES ($1, $2, $3::date, 'recompute', 'study-time/v1', $4, $5, 1000, 0, 0, repeat('e', 64), 'verify')`, [user, cohort, d2, ruleSetId, catalogId]);
+    await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+        VALUES ($1, $2, $3::date, 'recompute', 'study-time/v1', $4, $5, 1000, 0, 0, repeat('e', 64), 'verify', $6)`, [user, cohort, d2, ruleSetId, catalogId, await recountRecord(pool, cohort, d2, d2, ruleSetId)]);
     const read = /** @type {any} */ (await learnerDays({ userId: user, cohortId: cohort, pool }));
     const d2Now = read.days?.find((/** @type {any} */ d) => d.day === d2);
     check('T3', again.status === 'nothing' && again.reason === 'nothing_final' && d2Now?.kind === 'recompute' && d2Now.countedMs === 1000,
@@ -514,8 +535,8 @@ async function t3(pool, { catalogId, ruleSetId }) {
         ];
         firsts.push(/** @type {any} */ (await close(pool, learner, split)).toDay);
     }
-    const recount = (await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by)
-        VALUES ($1, $2, $3::date, 'recompute', 'study-time/v1', $4, $5, 60000, 0, 0, repeat('a', 64), 'verify') RETURNING id`, [recounted, split, s1, ruleSetId, catalogId])).rows[0].id;
+    const recount = (await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+        VALUES ($1, $2, $3::date, 'recompute', 'study-time/v1', $4, $5, 60000, 0, 0, repeat('a', 64), 'verify', $6) RETURNING id`, [recounted, split, s1, ruleSetId, catalogId, await recountRecord(pool, split, s1, s1, ruleSetId)])).rows[0].id;
     await pool.query("INSERT INTO training_time_unit_days (day_id, unit_key, counted_ms, over_cap_ms) VALUES ($1, 'unit-a', 60000, 0)", [recount]);
     await pool.query('UPDATE training_cohorts SET ends_on = $2::date WHERE id = $1', [split, s2]);
     const seconds = [];
@@ -1061,9 +1082,10 @@ async function t15(pool, { catalogId, ruleSetId }) {
     await pool.query("INSERT INTO training_cohort_time_settings (cohort_id, catalog_version_id, rule_set_id, effective_from, set_at, set_by, reason) VALUES ($1, $2, $3, $4::date, $5::timestamptz, 'verify', 'verify')",
         [cohort, catalogId, rules17, today, iso(jstDayRange(today).start - 86_400_000)]);
     /** A day row (counted 0) of a kind, counted with a rule set; marked an hour after it is written. */
-    const dayRow = (/** @type {string} */ day, /** @type {string} */ ruleSet, kind = 'close', marked = false) => pool.query(`INSERT INTO training_time_days
-        (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, account_deleted_at)
-        VALUES ($1, $2, $3::date, $4, 'study-time/v1', $5, $6, 0, 0, 0, $7, 'verify', ${marked ? "clock_timestamp() + interval '1 hour'" : 'NULL'})`, [user, cohort, day, kind, ruleSet, catalogId, 'f'.repeat(64)]);
+    const dayRow = async (/** @type {string} */ day, /** @type {string} */ ruleSet, kind = 'close', marked = false) => pool.query(`INSERT INTO training_time_days
+        (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, account_deleted_at, recompute_id)
+        VALUES ($1, $2, $3::date, $4, 'study-time/v1', $5, $6, 0, 0, 0, $7, 'verify', ${marked ? "clock_timestamp() + interval '1 hour'" : 'NULL'}, $8)`,
+    [user, cohort, day, kind, ruleSet, catalogId, 'f'.repeat(64), kind === 'recompute' ? await recountRecord(pool, cohort, day, day, ruleSet) : null]);
     await dayRow(d3, ruleSetId);
     await dayRow(d2, rules29);
     await dayRow(yesterday, rules17, 'recompute');
@@ -1097,6 +1119,136 @@ async function t15(pool, { catalogId, ruleSetId }) {
         `the places (${places.length} of 3 chains): ${places.map((p) => `${p.chain_id === across ? 'the chain across 00:00' : p.chain_id === older ? 'yesterday\'s' : 'two days ago\'s'} at ${jstTime(p.at)} JST, flags ${p.flags}`).join('; ')}; the chain's last seq ${state?.chain_seq}`);
 }
 
+/** @param {pg.Pool} pool @param {string} cohort */
+const slugOf = async (pool, cohort) => String((await pool.query('SELECT slug FROM training_cohorts WHERE id = $1', [cohort])).rows[0].slug);
+/** The check's answer, one line per learner: the account id, its days, then each difference as day:what. @param {any} r @returns {string[]} */
+const checkedLines = (r) => (r?.status === 'checked'
+    ? r.learners.map((/** @type {any} */ l) => [l.userId, l.days, ...l.differences.map((/** @type {any} */ d) => `${d.day}:${d.what}`)].join(' '))
+    : [String(r?.status ?? r?.error_type)]);
+/** The differences of a one-learner answer (after the account id and its days). @param {string[]} lines */
+const foundIn = (lines) => lines.join().split(' ').slice(2).join(', ') || 'none';
+
+/** An account deletion (the service's statements up to the stub), committed on its own connection. @param {pg.Pool} pool @param {string} id */
+async function deleteNow(pool, id) {
+    const c = await pool.connect();
+    try {
+        await deletionUpToStub(c, id);
+        await c.query('COMMIT');
+    } catch (error) {
+        await c.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        c.release();
+    }
+}
+
+/** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
+async function t17(pool, { catalogId, ruleSetId }) {
+    // 023's constraints: a recount row names a recount of its own cohort (the composite foreign key),
+    // a close row none (the CHECK); a recount's record never changes and names an override.
+    const [d1, d2] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
+    const user = uid('t17u');
+    const cohort = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1, learners: [user] });
+    const other = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1 });
+    const [mine, theirs] = [await recountRecord(pool, cohort, d1, d1, ruleSetId), await recountRecord(pool, other, d1, d1, ruleSetId)];
+    const dayWith = (/** @type {string} */ kind, /** @type {string | null} */ recount) => codeOf(pool, `INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+        VALUES ($1, $2, $3::date, $4, 'study-time/v1', $5, $6, 0, 0, 0, repeat('f', 64), 'verify', $7)`, [uid('t17x'), cohort, d1, kind, ruleSetId, catalogId, recount]);
+    const named = [await dayWith('close', mine), await dayWith('recompute', null), await dayWith('recompute', theirs), await dayWith('recompute', String(Number(mine) + 1_000_000)),
+        await dayWith('recompute', mine), await dayWith('close', null)];
+    check('T17', named.join() === '23514,23514,23503,23503,ok,ok',
+        `a day row and its recount: a close naming one ${named[0]}, a recount naming none ${named[1]}, another cohort's recount ${named[2]}, no such recount ${named[3]}; a recount of its own cohort ${named[4]}, a close naming none ${named[5]}`);
+    const record = (/** @type {string} */ from, /** @type {string} */ to, /** @type {string | null} */ rules, /** @type {string | null} */ catalog, sha = 'a'.repeat(64)) => codeOf(pool,
+        `INSERT INTO training_time_recomputes (cohort_id, from_day, to_day, rule_set_id, catalog_version_id, plan_sha256, recomputed_by, reason)
+        VALUES ($1, $2::date, $3::date, $4, $5, $6, 'verify', 'verify')`, [cohort, from, to, rules, catalog, sha]);
+    const records = [await record(d1, d2, null, catalogId), await record(d2, d2, ruleSetId, null), await record(d2, d1, ruleSetId, null), await record(d1, d2, null, null),
+        await record(d1, d2, ruleSetId, null, 'A'.repeat(64))];
+    const changes = [await codeOf(pool, "UPDATE training_time_recomputes SET reason = 'x' WHERE id = $1", [mine]), await codeOf(pool, 'DELETE FROM training_time_recomputes WHERE id = $1', [mine])];
+    check('T17', records.join() === 'ok,ok,23514,23514,23514' && changes.join() === '23001,23001',
+        `a recount's record: a unit list only ${records[0]}, rules only ${records[1]}; its days backwards ${records[2]}, no override ${records[3]}, the plan's sha256 in upper case ${records[4]}; UPDATE ${changes[0]}, DELETE ${changes[1]} (rp_rows_immutable)`);
+
+    // The check on PostgreSQL. Two days closed by the core on unit-a (its set time, 2 min, reached on
+    // the first), then a recount of both with other rules (smaller pieces) as a recount writes it: the
+    // override and the replaced rows' unit list, the second day with the first's new unit time carried.
+    const start = (/** @type {string} */ day) => jstDayRange(day).start;
+    const signals = [
+        ...await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d1) + 10 * 3_600_000, n: 20 }),
+        ...await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d2) + 9 * 3_600_000, n: 20 }),
+    ];
+    const closed = /** @type {any} */ (await close(pool, user, cohort));
+    const slug = await slugOf(pool, cohort);
+    const verified = async () => checkedLines(await verifyCohort({ cohortSlug: slug, pool }));
+    const afterClose = await verified();
+    const rules2 = String(/** @type {any} */ (await loadRules({ input: RULES_IN_2, loadedBy: 'verify', note: 'T17', pool })).id);
+    const recount = await recountRecord(pool, cohort, d1, d2, rules2);
+    const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES_2, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days;
+    /** @type {string[]} */
+    const recountRows = [];
+    for (const [i, day] of [d1, d2].entries()) {
+        const w = evidenceWindow(start(day), jstDayRange(day).end, RULES_2.counting);
+        const evidence = signals.filter((s) => s.at >= w.from && s.at <= w.to);
+        const units = want[i].units.filter((u) => u.countedMs > 0 || u.overCapMs > 0);
+        const id = String((await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+            VALUES ($1, $2, $3::date, 'recompute', 'study-time/v1', $4, $5, $6, $7, $8, $9, 'verify', $10) RETURNING id`,
+        [user, cohort, day, rules2, catalogId, want[i].countedMs, units.reduce((n, u) => n + u.overCapMs, 0), evidence.length, evidenceDigest(evidence), recount])).rows[0].id);
+        for (const u of units) await pool.query('INSERT INTO training_time_unit_days (day_id, unit_key, counted_ms, over_cap_ms) VALUES ($1, $2, $3, $4)', [id, u.unit, u.countedMs, u.overCapMs]);
+        recountRows.push(id);
+    }
+    const afterRecount = await verified();
+    await pool.query('UPDATE training_time_days SET counted_ms = counted_ms + 1000 WHERE id = $1', [recountRows[1]]);
+    const tampered = await verified();
+    await pool.query('UPDATE training_time_days SET counted_ms = counted_ms - 1000 WHERE id = $1', [recountRows[1]]);
+    await pool.query("UPDATE training_time_days SET algorithm = 'study-time/v9' WHERE id = $1", [recountRows[0]]);
+    const unknown = await verified();
+    await pool.query("UPDATE training_time_days SET algorithm = 'study-time/v1' WHERE id = $1", [recountRows[0]]);
+    const old = (await dayRows(pool, user, cohort)).filter((r) => r.kind === 'close').map((r) => `${r.counted_ms / S}+${r.over_cap_ms / S}`);
+    const fresh = want.map((d) => `${d.countedMs / S}+${d.units.reduce((n, u) => n + u.overCapMs, 0) / S}`);
+    check('T17', closed.status === 'closed' && afterClose.join() === `${user} 2` && afterRecount.join() === `${user} 2` && old.join() !== fresh.join()
+        && tampered.join() === `${user} 2 ${d2}:values` && unknown.join() === `${user} 2 ${d1}:version`,
+        `the check on PostgreSQL: the closed days (${old.join(', ')} s) ${afterClose.join() === `${user} 2` ? 'match' : afterClose.join()}; recounted with other rules (${fresh.join(', ')} s) ${afterRecount.join() === `${user} 2` ? 'match' : afterRecount.join()}; a changed value: ${foundIn(tampered)}; a version this code does not have: ${foundIn(unknown)}`);
+
+    // The deletion's marks reach the recount rows (the foreign key and the CHECK in place); the record
+    // stays and the rows still name it; the check then has no learner to read.
+    await deleteNow(pool, user);
+    const marks = (await pool.query(`SELECT count(*) FILTER (WHERE account_deleted_at IS NOT NULL) AS marked, count(*) FILTER (WHERE account_deleted_at IS NULL) AS live,
+        count(*) FILTER (WHERE recompute_id = $3) AS named FROM training_time_days WHERE user_id = $1 AND cohort_id = $2`, [user, cohort, recount])).rows[0];
+    const kept = await count(pool, 'SELECT count(*) AS n FROM training_time_recomputes WHERE id = $1', [recount]);
+    const afterDeletion = await verified();
+    check('T17', Number(marks.marked) === 4 && Number(marks.live) === 0 && Number(marks.named) === 2 && kept === 1 && afterDeletion.length === 0,
+        `an account deletion marks the close and recount rows (${marks.marked} marked, ${marks.live} live; ${marks.named} still name the recount); its record stays (${kept}); the check then reads ${afterDeletion.length} learners`);
+}
+
+/** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
+async function t18(pool, { catalogId, ruleSetId }) {
+    // The check reads each learner in one snapshot (REPEATABLE READ READ ONLY, no lock): an account
+    // deletion committing between its read of the rows and its read of the evidence (which takes live
+    // streams only) changes nothing it reports. Control: the same check with a plain BEGIN (READ
+    // COMMITTED) finds no evidence for the learner's days, so every day differs.
+    const [d1, d2] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
+    const start = (/** @type {string} */ day) => jstDayRange(day).start;
+    /** A learner alone in a cohort, with study on both days, closed. @param {string} tag */
+    const closedLearner = async (tag) => {
+        const user = uid(tag);
+        const cohort = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1, learners: [user] });
+        await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d1) + 10 * 3_600_000, n: 12 });
+        await storeChain(pool, { user, cohort, unit: 'unit-b', from: start(d2) + 10 * 3_600_000, n: 12 });
+        const closed = /** @type {any} */ (await close(pool, user, cohort));
+        return { user, slug: await slugOf(pool, cohort), closed: String(closed.status) };
+    };
+    const [x, z] = [await closedLearner('t18x'), await closedLearner('t18z')];
+    /** The check of a learner's cohort with the learner's deletion committed after its read of the rows. @param {{ user: string, slug: string }} l @param {Map<string, string>} send */
+    const deletedDuring = async (l, send) => checkedLines(await verifyCohort({ cohortSlug: l.slug,
+        pool: changedConnections(pool, [{ send, after: CHECK_SQL.learnerRows, run: () => deleteNow(pool, l.user) }]) }));
+    const live = (/** @type {string} */ user) => count(pool, 'SELECT count(*) AS n FROM training_time_days WHERE user_id = $1 AND account_deleted_at IS NULL', [user]);
+    const snapshot = await deletedDuring(x, new Map());
+    const xLive = await live(x.user);
+    check('T18', x.closed === 'closed' && snapshot.join() === `${x.user} 2` && xLive === 0,
+        `an account deletion committed between the check's read of the rows and of the evidence (then ${xLive} live day rows): in its snapshot the check reports ${snapshot.join() === `${x.user} 2` ? 'both days matching' : snapshot.join()}`);
+    const control = await deletedDuring(z, new Map([[TRAINING_TIME_SQL.beginSnapshot, 'BEGIN']]));
+    const zLive = await live(z.user);
+    check('T18', z.closed === 'closed' && control.join() === `${z.user} 2 ${d1}:evidence ${d1}:values ${d2}:evidence ${d2}:values` && zLive === 0,
+        `control, a plain BEGIN: the same deletion (then ${zLive} live day rows) makes every day differ: ${foundIn(control)}`);
+}
+
 export async function main(argv = process.argv.slice(2)) {
     const { url, help } = parseArgs(argv);
     if (help || !url) {
@@ -1121,7 +1273,7 @@ export async function main(argv = process.argv.slice(2)) {
         const files = (await fs.readdir(MIGRATIONS)).filter((name) => /^\d+_.+\.sql$/i.test(name)).sort((a, b) => a.localeCompare(b));
         for (const run of [1, 2]) {
             for (const file of files) await applyMigration(pool, file);
-            check('M', files.includes(FILE), `run ${run}: applied ${files.length} migrations (${files[0]} … ${files.at(-1)}), each in its own transaction`);
+            check('M', files.includes(FILE) && files.includes(FILE_023), `run ${run}: applied ${files.length} migrations (${files[0]} … ${files.at(-1)}), each in its own transaction`);
         }
         const ids = await t2(pool);
         await t1(pool, ids);
@@ -1138,6 +1290,8 @@ export async function main(argv = process.argv.slice(2)) {
         await t14(pool, ids);
         await t15(pool, ids);
         await t16(pool, ids);
+        await t17(pool, ids);
+        await t18(pool, ids);
     } catch (error) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));
     } finally {
