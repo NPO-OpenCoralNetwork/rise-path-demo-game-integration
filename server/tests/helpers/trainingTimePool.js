@@ -10,7 +10,8 @@
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN, and the
  * snapshot BEGIN of a staff read, keep a copy that ROLLBACK restores; the state's savepoint too;
  * each answered with node-pg's command tag; a BEGIN whose text ends in READ ONLY refuses every write
- * until it ends; the check's LOCK TABLE … IN ACCESS SHARE MODE is answered, nothing waits). Rows
+ * until it ends; the check's LOCK TABLE … IN ACCESS SHARE MODE NOWAIT, its shorter lock timeout and
+ * its read of no rows that locks the indexes are answered, nothing waits). Rows
  * ordered by a unit key come in the order of the VM's database collation (en_US.utf8 ignores '-':
  * 'unit1' before 'unit-a'), not JavaScript's. Any other statement throws, so a changed query fails loudly;
  * the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file (npm test
@@ -334,6 +335,11 @@ export function createTrainingTimePool(seed = {}) {
             case CHECK_SQL.lockCohort:
             case CHECK_SQL.lockLearner:
                 return ended('LOCK');
+            case CHECK_SQL.tryLockTimeout:
+                return ended('SET');
+            case CHECK_SQL.indexesCohort:
+            case CHECK_SQL.indexesLearner:
+                return result([]);
             case CHECK_SQL.learnerRows:
                 return result(state.days
                     .filter((d) => d.user_id === p1 && d.cohort_id === p2 && d.account_deleted_at === null)

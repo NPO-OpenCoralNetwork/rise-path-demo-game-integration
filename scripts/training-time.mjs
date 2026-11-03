@@ -32,8 +32,8 @@
  * --verify        checks every closed day of the cohort's learners (or one): the versions it was
  *                 counted with, the setting or recount they came from, its evidence and its values.
  *                 Reads only, in one snapshot per learner, with no advisory lock. Its tables are
- *                 locked for reading first, without waiting: while a migration's DDL holds one, it
- *                 holds nothing and tries again, for about 10 s.
+ *                 locked for reading first, without waiting: while a migration's DDL holds one (or
+ *                 an index of one, for over 20 ms), it holds nothing and tries again, for about 10 s.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a

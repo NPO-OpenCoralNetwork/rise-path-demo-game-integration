@@ -27,7 +27,7 @@ import { STUDY_TIME_ALGORITHM, cohortRange, countDay, evidenceWindow, jstDayRang
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { TRAINING_TIME_SQL, closeDays, evidenceDigest, loadCatalog, loadRules, signalOf } from '../../tools/core/trainingTime.js';
-import { CHECK_SQL, LOCK_RETRY, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
+import { CHECK_SQL, LOCK_RETRY, SNAPSHOT_LOCKS, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
 import { AUTH_SQL, createTrainingTimePool } from './helpers/trainingTimePool.js';
 
 const S = 1000;
@@ -132,14 +132,16 @@ describe('tools/core/trainingTimeCheck.js', () => {
         const inside = (/** @type {number} */ i) => sent.slice(i, sent.findIndex((q, j) => j > i && q.sql === 'ROLLBACK') + 1).map((q) => q.sql);
         assert.equal(inside(begins[0]).length + inside(begins[1]).length + inside(begins[2]).length, sent.length, 'nothing between them');
         // The cohort and its learners; then, for each learner, the setting, the rows, units, versions
-        // and evidence; each snapshot's tables locked (ACCESS SHARE) before its first SELECT, then a rollback.
-        assert.deepEqual(inside(begins[0]), [TRAINING_TIME_SQL.beginSnapshot, TRAINING_SQL.lockTimeout, CHECK_SQL.lockCohort, TRAINING_SQL.cohortBySlug, TRAINING_TIME_SQL.learners, 'ROLLBACK']);
+        // and evidence; each snapshot's tables locked (ACCESS SHARE, NOWAIT) before its first SELECT,
+        // its lock timeout lowered and its indexes locked by a read of no rows, then a rollback.
+        assert.deepEqual(inside(begins[0]), [TRAINING_TIME_SQL.beginSnapshot, TRAINING_SQL.lockTimeout, ...SNAPSHOT_LOCKS.cohort, TRAINING_SQL.cohortBySlug, TRAINING_TIME_SQL.learners, 'ROLLBACK']);
         for (const i of begins.slice(1)) {
             assert.deepEqual(inside(i), [
-                TRAINING_TIME_SQL.beginSnapshot, TRAINING_SQL.lockTimeout, CHECK_SQL.lockLearner, TRAINING_TIME_SQL.closeSettings, CHECK_SQL.learnerRows, CHECK_SQL.unitRows,
+                TRAINING_TIME_SQL.beginSnapshot, TRAINING_SQL.lockTimeout, ...SNAPSHOT_LOCKS.learner, TRAINING_TIME_SQL.closeSettings, CHECK_SQL.learnerRows, CHECK_SQL.unitRows,
                 CHECK_SQL.rulesByIds, CHECK_SQL.catalogsByIds, TRAINING_TIME_SQL.evidence, 'ROLLBACK',
             ]);
         }
+        assert.deepEqual([SNAPSHOT_LOCKS.cohort, SNAPSHOT_LOCKS.learner], [[CHECK_SQL.lockCohort, CHECK_SQL.tryLockTimeout, CHECK_SQL.indexesCohort], [CHECK_SQL.lockLearner, CHECK_SQL.tryLockTimeout, CHECK_SQL.indexesLearner]]);
         assert.ok(!sent.some((q) => [TRAINING_SQL.lock, TRAINING_SQL.learnerLock, TRAINING_TIME_SQL.settingsLockShared, 'BEGIN', 'COMMIT'].includes(q.sql)), 'no advisory lock, no write transaction');
         // In that snapshot (as on PostgreSQL) any write is refused, so code that wrote there would fail.
         const client = await pool.connect();
@@ -160,18 +162,28 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.equal(CHECK_SQL.lockCohort, 'LOCK TABLE training_cohorts, training_memberships IN ACCESS SHARE MODE NOWAIT');
         assert.equal(CHECK_SQL.lockLearner, 'LOCK TABLE training_cohort_time_settings, training_time_rule_sets, training_catalog_versions, training_time_days, '
             + 'training_time_unit_days, training_time_recomputes, training_time_streams, training_time_signals IN ACCESS SHARE MODE NOWAIT');
+        assert.equal(CHECK_SQL.tryLockTimeout, "SET LOCAL lock_timeout = '20ms'");
         // Every table the migrations create that a statement names, however it is written (a list, a
-        // subquery, a schema, the end of the text).
+        // subquery, the end of the text, with or without public. or quotes, on either side; a rename
+        // is caught by T18 on PostgreSQL, which compares the locks a snapshot's reads take).
+        const bare = (/** @type {string} */ name) => name.replace(/"/g, '').toLowerCase().replace(/^public\./, '');
         const migrations = new URL('../migrations/', import.meta.url);
-        const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f))
-            .flatMap((f) => [...fs.readFileSync(new URL(f, migrations), 'utf8').matchAll(/\bCREATE TABLE (?:IF NOT EXISTS )?([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)?)/gi)].map((m) => m[1].toLowerCase())))];
+        const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f)).flatMap((f) => [...fs.readFileSync(new URL(f, migrations), 'utf8')
+            .matchAll(/\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?)/gi)].map((m) => bare(m[1]))))];
         assert.ok(created.includes('auth.users') && created.includes('training_time_recomputes') && created.includes('training_cohorts'), 'the tables are found');
-        const tablesOf = (/** @type {string} */ sql) => created.filter((t) => new RegExp(`(?<![\\w.])${t.replace('.', '\\.')}(?![\\w.])`, 'i').test(sql));
-        const lockedBy = (/** @type {string} */ lock) => lock.replace(/^LOCK TABLE /, '').replace(/ IN ACCESS SHARE MODE NOWAIT$/, '').split(', ');
+        const spelled = (/** @type {string} */ t) => (t.includes('.') ? t.split('.').map((p) => `"?${p}"?`).join('\\.') : `(?:"?public"?\\.)?"?${t}"?`);
+        const tablesOf = (/** @type {string} */ sql) => created.filter((t) => new RegExp(`(?<![\\w."])${spelled(t)}(?![\\w."])`, 'i').test(sql));
+        assert.deepEqual(['FROM public.training_cohorts c', 'FROM "training_cohorts"', 'JOIN "public"."training_cohorts" c', 'FROM training_cohorts', 'JOIN auth.users u', 'x.training_cohorts_id'].map(tablesOf),
+            [['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['auth.users'], []], 'each spelling of a table');
+        const lockedBy = (/** @type {string} */ lock) => lock.replace(/^LOCK TABLE /, '').replace(/ IN ACCESS SHARE MODE NOWAIT$/, '').split(', ').map(bare);
         const reads = (/** @type {string[]} */ sqls) => [...new Set(sqls.flatMap(tablesOf))].sort();
         assert.deepEqual(reads([TRAINING_SQL.cohortBySlug, TRAINING_TIME_SQL.learners]), [...lockedBy(CHECK_SQL.lockCohort)].sort());
         assert.deepEqual(reads([TRAINING_TIME_SQL.closeSettings, CHECK_SQL.learnerRows, CHECK_SQL.unitRows, CHECK_SQL.rulesByIds, CHECK_SQL.catalogsByIds, CHECK_SQL.recountsByIds, TRAINING_TIME_SQL.evidence]),
             [...lockedBy(CHECK_SQL.lockLearner)].sort());
+        // The read of no rows that locks the indexes names the same tables as the LOCK.
+        for (const [lock, indexes] of [[CHECK_SQL.lockCohort, CHECK_SQL.indexesCohort], [CHECK_SQL.lockLearner, CHECK_SQL.indexesLearner]]) {
+            assert.equal(indexes, `SELECT 1 FROM ${lockedBy(lock).join(', ')} LIMIT 0`);
+        }
         assert.match(CHECK_SQL.learnerRows, /\n {2}FROM training_time_days\n WHERE user_id = \$1::uuid AND cohort_id = \$2::uuid AND account_deleted_at IS NULL\n ORDER BY day, id$/);
         assert.match(CHECK_SQL.learnerRows, /^SELECT id, to_char\(day, 'YYYY-MM-DD'\) AS day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals,\n {7}evidence_sha256, recompute_id, computed_at, computed_by\n/);
         assert.match(CHECK_SQL.unitRows, / FROM training_time_unit_days WHERE day_id = ANY\(\$1::bigint\[\]\) ORDER BY day_id, unit_key$/);
@@ -180,7 +192,7 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.match(CHECK_SQL.recountsByIds, /to_char\(from_day, 'YYYY-MM-DD'\) AS from_day, to_char\(to_day, 'YYYY-MM-DD'\) AS to_day, rule_set_id, catalog_version_id\n {2}FROM training_time_recomputes WHERE id = ANY\(\$1::bigint\[\]\) ORDER BY id$/);
     });
 
-    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked rolls back, holding nothing, and tries again 0.1 s later; after LOCK_RETRY.tries tries, account_busy; another lock wait (after the LOCK) is account_busy at once', async () => {
+    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked, or a lock wait over 20 ms after it, rolls the try back, holding nothing, and the next comes 0.1 s later; after LOCK_RETRY.tries tries, account_busy', async () => {
         assert.deepEqual([LOCK_RETRY.tries * LOCK_RETRY.everyMs, TRAINING_SQL.lockTimeout], [10_000, "SET LOCAL lock_timeout = '10s'"], 'about the lock timeout of the other operations');
         const busy = () => Object.assign(new Error('could not obtain lock on relation'), { code: '55P03' });
         /** @type {number[]} */
@@ -204,12 +216,19 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep })).error_type, 'account_busy');
         assert.equal(pool.queries.slice(tries0).filter((q) => q.sql === CHECK_SQL.lockLearner).length, LOCK_RETRY.tries);
         assert.equal(slept.length, LOCK_RETRY.tries - 1);
-        // A lock wait after the LOCK (an index held by a REINDEX): no other try.
+        // A lock wait over the try's 20 ms after the LOCK (an index a REINDEX holds, met by the read of
+        // no rows, or later in a read): the try starts over as well; for good, account_busy.
         const { pool: other } = await seeded();
+        other.failOn(CHECK_SQL.indexesLearner, busy(), 1);
+        other.failOn(CHECK_SQL.learnerRows, busy(), 1);
+        slept.length = 0;
+        const again = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep, learner: A }));
+        assert.deepEqual([again.learners.map((/** @type {any} */ l) => [l.userId, l.days, l.differences]), slept], [[[A, 3, []]], [100, 100]]);
         other.failOn(CHECK_SQL.learnerRows, busy());
         slept.length = 0;
+        const sent1 = other.queries.length;
         assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep })).error_type, 'account_busy');
-        assert.deepEqual([other.queries.filter((q) => q.sql === CHECK_SQL.lockLearner).length, slept], [1, []]);
+        assert.deepEqual([other.queries.slice(sent1).filter((q) => q.sql === CHECK_SQL.learnerRows).length, slept.length], [LOCK_RETRY.tries, LOCK_RETRY.tries - 1]);
     });
 
     it('differences: a changed value (that day only), evidence added to a closed window, a close row with another setting\'s versions, a version this code does not have', async () => {
