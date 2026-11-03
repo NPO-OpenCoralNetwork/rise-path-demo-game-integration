@@ -17,7 +17,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { PassThrough } from 'node:stream';
-import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, USAGE, hms, parseArgs, readStdinFrom, run, signed } from '../../scripts/training-time.mjs';
+import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, USAGE, hms, parseArgs, readStdinFrom, run, signed, unitLines } from '../../scripts/training-time.mjs';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { TRAINING_TIME_SQL, loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
 import { CHECK_SQL, LOCK_RETRY } from '../../tools/core/trainingTimeCheck.js';
@@ -192,6 +192,17 @@ describe('scripts/training-time.mjs: the switch and the arguments', () => {
         // 18.667 s), 0:59 → 1:00 is 1 s (0.2 s), 0:59 → 0:59 nothing (0.8 s).
         assert.deepEqual([signed(77_000, 58_333), signed(59_900, 60_100), signed(59_100, 59_900), signed(0, 0), signed(1_000, 3_601_999)],
             ['-0:00:19', '+0:00:01', '±0:00:00', '±0:00:00', '+1:00:00']);
+        // A changed day's unit lines show a change when a unit's counted time or its time over the set
+        // time prints differently (either column, any unit), not when each prints the same.
+        assert.deepEqual([
+            unitLines([['u1', 60_000, 30_000]], [['u1', 60_000, 0]]).shown,
+            unitLines([['u1', 60_000, 0]], [['u1', 30_000, 0]]).shown,
+            unitLines([['u1', 1_000, 0], ['u2', 60_400, 0]], [['u1', 2_000, 0], ['u2', 60_000, 400]]).shown,
+            unitLines([['u1', 60_400, 0]], [['u1', 60_000, 400]]).shown,
+            unitLines([], [['u1', 900, 0]]).shown,
+        ], [true, true, true, false, false]);
+        assert.deepEqual(unitLines([['u2', 1_000, 0]], [['u1', 2_000, 0]]).lines,
+            ['    unit u1: 0:00:00 → 0:00:02 counted, 0:00:00 → 0:00:00 over the set time', '    unit u2: 0:00:01 → 0:00:00 counted, 0:00:00 → 0:00:00 over the set time']);
     });
 
     it('--recompute: exactly one of --dry-run or --expect, --rules or --catalog or both; --to, --expect, --dry-run and --learner only where they go; then the core\'s checks of the input; each exit 1 before any statement, stdin not read', async () => {
@@ -732,7 +743,7 @@ describe('scripts/training-time.mjs: recounts (--recompute) and their record (--
         assert.deepEqual([nobody.code, nobody.out], [EXIT.ok, 'aaaaaaaa-2323-4000-8000-0000000000e0 in web-2026-11: 0 closed day(s)']);
     });
 
-    it('--recompute --dry-run: a unit counted on one side only; a unit list alone that moves set time between two units (the totals stay, the split changes); a change every printed value hides is named', async () => {
+    it('--recompute --dry-run: a unit counted on one side only (before, or after); a unit list alone that moves set time between two units (the totals stay, the split changes), on the recounted day and on a later one; values that change although each prints as before are named, with or without a change of versions', async () => {
         const study = (/** @type {any} */ pool, /** @type {string} */ userId, /** @type {string} */ unit, /** @type {number} */ chain, /** @type {number} */ born, /** @type {number[]} */ pairs) => {
             const id = `cccccccc-0000-4000-8000-${String(chain).padStart(12, '0')}`;
             let at = born;
@@ -786,7 +797,8 @@ describe('scripts/training-time.mjs: recounts (--recompute) and their record (--
         ]]);
         // B on 11-01: ten pairs of 6.93 s and one of 7.5 s (76.8 s); rules whose pair counts up to 7 s
         // give 76.3 s. 11-03 (its own rules) then counts 43.7 s and 33.3 s over instead of 43.2 s and
-        // 33.8 s: each prints as before, so the line says it changes by less than a second.
+        // 33.8 s: on both days each value prints as before, so each line says its values change by less
+        // than a second (11-01 also changes its rules; A's 11-01 changes only its rules, no mark).
         const sub = await loaded();
         const capped = /** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, creditCapMs: 7 * S } }, loadedBy: 'a', note: 'b', pool: sub.pool }));
         sub.pool.addSetting({ cohortId: COHORT, catalogId: sub.catalog.id, ruleSetId: sub.rules.id, effectiveFrom: '2026-11-01' });
@@ -800,14 +812,96 @@ describe('scripts/training-time.mjs: recounts (--recompute) and their record (--
             `${A}: 1 day(s)`,
             `  2026-11-01  0:00:00 → 0:00:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${versions}`,
             `${B}: 2 day(s)`,
-            `  2026-11-01  0:01:16 → 0:01:16 (±0:00:00), over the set time 0:00:00 → 0:00:00${versions}`,
+            `  2026-11-01  0:01:16 → 0:01:16 (±0:00:00), over the set time 0:00:00 → 0:00:00${versions}; its values change by less than a second`,
             '    unit sample-u1: 0:01:16 → 0:01:16 counted, 0:00:00 → 0:00:00 over the set time',
-            '  2026-11-03  0:00:43 → 0:00:43 (±0:00:00), over the set time 0:00:33 → 0:00:33; it changes by less than a second',
+            '  2026-11-03  0:00:43 → 0:00:43 (±0:00:00), over the set time 0:00:33 → 0:00:33; its values change by less than a second',
             '    unit sample-u1: 0:00:43 → 0:00:43 counted, 0:00:33 → 0:00:33 over the set time',
             '2 learner(s), 3 day(s) change: counted 0:02:00 → 0:02:00 (±0:00:00).',
             `Plan sha256 ${planSha(hidden.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(hidden.out)} instead of --dry-run.`,
         ]]);
-        for (const out of [zero.out, swapped.out, hidden.out]) {
+        // The mirror of the first case: rules that count only time with focus in the setting (the day
+        // closed at 0, no unit row), recounted with rules that count it: the unit appears after.
+        const gain = await loaded();
+        const focusOnly = /** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, requireFocus: true } }, loadedBy: 'a', note: 'b', pool: gain.pool }));
+        gain.pool.addSetting({ cohortId: COHORT, catalogId: gain.catalog.id, ruleSetId: focusOnly.id, effectiveFrom: '2026-11-01' });
+        study(gain.pool, A, 'sample-u2', 35, Date.parse('2026-11-01T01:00:00Z'), Array(11).fill(7 * S));
+        assert.equal((await runWith(['--close', SLUG], { pool: gain.pool })).code, EXIT.ok);
+        const gained = await runWith([...recompute({ to: '2026-11-01', rules: gain.rules.sha256 }), '--dry-run'], { pool: gain.pool });
+        const counted = `; rules ${short(focusOnly.sha256)} → ${short(gain.rules.sha256)}`;
+        assert.deepEqual([gained.code, gained.out.split('\n')], [EXIT.ok, [
+            `Recount of ${SLUG}, 2026-11-01 … 2026-11-01: rules ${gain.rules.sha256}, unit list each day's own; by staff-a: ${REASON}`,
+            `${A}: 1 day(s)`,
+            `  2026-11-01  0:00:00 → 0:01:17 (+0:01:17), over the set time 0:00:00 → 0:00:00${counted}`,
+            '    unit sample-u2: 0:00:00 → 0:01:17 counted, 0:00:00 → 0:00:00 over the set time',
+            `${B}: 1 day(s)`,
+            `  2026-11-01  0:00:00 → 0:00:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${counted}`,
+            '2 learner(s), 2 day(s) change: counted 0:00:00 → 0:01:17 (+0:01:17).',
+            `Plan sha256 ${planSha(gained.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(gained.out)} instead of --dry-run.`,
+        ]]);
+        // A later day whose totals stay and whose split between units moves by whole seconds: its unit
+        // lines show it, so no mark. Unit lists of 1 and 2 minutes from 11-01, three units of 4 minutes
+        // from 11-02; A studies unit-x and unit-y 90 s each on 11-01, 240 s each and unit-z 60 s on
+        // 11-02; 11-01 recounted with the 1 and 2 minutes swapped moves 30 s of carry between them.
+        const split = await loaded();
+        const xy2 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 1), unit('unit-y', 2)] }, loadedBy: 'a', note: 'b', pool: split.pool }));
+        const yx2 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 2), unit('unit-y', 1)] }, loadedBy: 'a', note: 'b', pool: split.pool }));
+        const xyz = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 4), unit('unit-y', 4), unit('unit-z', 4)] }, loadedBy: 'a', note: 'b', pool: split.pool }));
+        split.pool.addSetting({ cohortId: COHORT, catalogId: xy2.id, ruleSetId: split.rules.id, effectiveFrom: '2026-11-01' });
+        split.pool.addSetting({ cohortId: COHORT, catalogId: xyz.id, ruleSetId: split.rules.id, effectiveFrom: '2026-11-02' });
+        study(split.pool, A, 'unit-x', 36, Date.parse('2026-11-01T01:00:00Z'), Array(15).fill(6 * S));
+        study(split.pool, A, 'unit-y', 37, Date.parse('2026-11-01T02:00:00Z'), Array(15).fill(6 * S));
+        study(split.pool, A, 'unit-x', 38, Date.parse('2026-11-02T01:00:00Z'), Array(40).fill(6 * S));
+        study(split.pool, A, 'unit-y', 39, Date.parse('2026-11-02T02:00:00Z'), Array(40).fill(6 * S));
+        study(split.pool, A, 'unit-z', 40, Date.parse('2026-11-02T03:00:00Z'), Array(10).fill(6 * S));
+        assert.equal((await runWith(['--close', SLUG], { pool: split.pool })).code, EXIT.ok);
+        const moved = await runWith([...recompute({ to: '2026-11-01', catalog: yx2.sha256 }), '--dry-run'], { pool: split.pool });
+        const swap = `; unit list ${short(xy2.sha256)} → ${short(yx2.sha256)}`;
+        assert.deepEqual([moved.code, moved.out.split('\n')], [EXIT.ok, [
+            `Recount of ${SLUG}, 2026-11-01 … 2026-11-01: rules each day's own, unit list ${yx2.sha256}; by staff-a: ${REASON}`,
+            `${A}: 2 day(s)`,
+            `  2026-11-01  0:02:30 → 0:02:30 (±0:00:00), over the set time 0:00:30 → 0:00:30${swap}`,
+            '    unit unit-x: 0:01:00 → 0:01:30 counted, 0:00:30 → 0:00:00 over the set time',
+            '    unit unit-y: 0:01:30 → 0:01:00 counted, 0:00:00 → 0:00:30 over the set time',
+            '  2026-11-02  0:06:30 → 0:06:30 (±0:00:00), over the set time 0:02:30 → 0:02:30',
+            '    unit unit-x: 0:03:00 → 0:02:30 counted, 0:01:00 → 0:01:30 over the set time',
+            '    unit unit-y: 0:02:30 → 0:03:00 counted, 0:01:30 → 0:01:00 over the set time',
+            '    unit unit-z: 0:01:00 → 0:01:00 counted, 0:00:00 → 0:00:00 over the set time',
+            `${B}: 1 day(s)`,
+            `  2026-11-01  0:00:00 → 0:00:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${swap}`,
+            '2 learner(s), 3 day(s) change: counted 0:09:00 → 0:09:00 (±0:00:00).',
+            `Plan sha256 ${planSha(moved.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(moved.out)} instead of --dry-run.`,
+        ]]);
+        // Units that move by less than a second while the day's totals stay exactly the same: two units
+        // studied 60.4 s each under 1 and 2 minutes (60 s + 0.4 s over, 60.4 s), then 2 and 1 minutes
+        // (60.4 s, 60 s + 0.4 s over); on 11-02 (4 minutes each, 240 s each) the carry moves 0.4 s.
+        const tiny = await loaded();
+        const xy3 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 1), unit('unit-y', 2)] }, loadedBy: 'a', note: 'b', pool: tiny.pool }));
+        const yx3 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 2), unit('unit-y', 1)] }, loadedBy: 'a', note: 'b', pool: tiny.pool }));
+        const xy4 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 4), unit('unit-y', 4)] }, loadedBy: 'a', note: 'b', pool: tiny.pool }));
+        tiny.pool.addSetting({ cohortId: COHORT, catalogId: xy3.id, ruleSetId: tiny.rules.id, effectiveFrom: '2026-11-01' });
+        tiny.pool.addSetting({ cohortId: COHORT, catalogId: xy4.id, ruleSetId: tiny.rules.id, effectiveFrom: '2026-11-02' });
+        study(tiny.pool, A, 'unit-x', 41, Date.parse('2026-11-01T01:00:00Z'), Array(10).fill(6_040));
+        study(tiny.pool, A, 'unit-y', 42, Date.parse('2026-11-01T02:00:00Z'), Array(10).fill(6_040));
+        study(tiny.pool, A, 'unit-x', 43, Date.parse('2026-11-02T01:00:00Z'), Array(40).fill(6 * S));
+        study(tiny.pool, A, 'unit-y', 44, Date.parse('2026-11-02T02:00:00Z'), Array(40).fill(6 * S));
+        assert.equal((await runWith(['--close', SLUG], { pool: tiny.pool })).code, EXIT.ok);
+        const small = await runWith([...recompute({ to: '2026-11-01', catalog: yx3.sha256 }), '--dry-run'], { pool: tiny.pool });
+        const swap3 = `; unit list ${short(xy3.sha256)} → ${short(yx3.sha256)}`;
+        assert.deepEqual([small.code, small.out.split('\n')], [EXIT.ok, [
+            `Recount of ${SLUG}, 2026-11-01 … 2026-11-01: rules each day's own, unit list ${yx3.sha256}; by staff-a: ${REASON}`,
+            `${A}: 2 day(s)`,
+            `  2026-11-01  0:02:00 → 0:02:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${swap3}; its values change by less than a second`,
+            '    unit unit-x: 0:01:00 → 0:01:00 counted, 0:00:00 → 0:00:00 over the set time',
+            '    unit unit-y: 0:01:00 → 0:01:00 counted, 0:00:00 → 0:00:00 over the set time',
+            '  2026-11-02  0:05:59 → 0:05:59 (±0:00:00), over the set time 0:02:00 → 0:02:00',
+            '    unit unit-x: 0:03:00 → 0:02:59 counted, 0:01:00 → 0:01:00 over the set time',
+            '    unit unit-y: 0:02:59 → 0:03:00 counted, 0:01:00 → 0:01:00 over the set time',
+            `${B}: 1 day(s)`,
+            `  2026-11-01  0:00:00 → 0:00:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${swap3}`,
+            '2 learner(s), 3 day(s) change: counted 0:08:00 → 0:08:00 (±0:00:00).',
+            `Plan sha256 ${planSha(small.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(small.out)} instead of --dry-run.`,
+        ]]);
+        for (const out of [zero.out, swapped.out, hidden.out, gained.out, moved.out, small.out]) {
             noRuleValue(out, ['7000', '6930', '7500']);
             assert.doesNotMatch(out, ISO_TIME);
             differencesMatch(out);

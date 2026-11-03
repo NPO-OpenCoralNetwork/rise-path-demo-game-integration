@@ -461,7 +461,7 @@ const shortSha = (sha) => (sha ? `${sha.slice(0, 12)}…` : '-');
  * @param {Units} before @param {Units} after
  * @returns {{ lines: string[], shown: boolean }}
  */
-function unitLines(before, after) {
+export function unitLines(before, after) {
     const keys = [...new Set([...before.map((u) => u[0]), ...after.map((u) => u[0])])].sort();
     const of = (/** @type {Units} */ units, /** @type {string} */ key) => units.find((u) => u[0] === key) ?? [key, 0, 0];
     let shown = false;
@@ -497,9 +497,11 @@ function printPlan(plan, slug, deps) {
                 d.before.catalog === d.after.catalog ? '' : `; unit list ${shortSha(d.before.catalog)} → ${shortSha(d.after.catalog)}`,
             ].join('');
             const units = sameUnits(d.before.units, d.after.units) ? { lines: [], shown: false } : unitLines(d.before.units, d.after.units);
-            // A change every printed value hides (each is whole seconds) is still named.
-            const shown = versions !== '' || units.shown || hms(d.before.countedMs) !== hms(d.after.countedMs) || hms(d.before.overCapMs) !== hms(d.after.overCapMs);
-            deps.log(`  ${d.day}  ${hms(d.before.countedMs)} → ${hms(d.after.countedMs)} (${signed(d.before.countedMs, d.after.countedMs)}), over the set time ${hms(d.before.overCapMs)} → ${hms(d.after.overCapMs)}${versions}${shown ? '' : '; it changes by less than a second'}`);
+            // Values that change although each prints as before (whole seconds) are still named,
+            // whether the versions change too or not.
+            const valuesDiffer = d.before.countedMs !== d.after.countedMs || d.before.overCapMs !== d.after.overCapMs || units.lines.length > 0;
+            const hidden = valuesDiffer && !units.shown && hms(d.before.countedMs) === hms(d.after.countedMs) && hms(d.before.overCapMs) === hms(d.after.overCapMs);
+            deps.log(`  ${d.day}  ${hms(d.before.countedMs)} → ${hms(d.after.countedMs)} (${signed(d.before.countedMs, d.after.countedMs)}), over the set time ${hms(d.before.overCapMs)} → ${hms(d.after.overCapMs)}${versions}${hidden ? '; its values change by less than a second' : ''}`);
             for (const line of units.lines) deps.log(line);
         }
     }

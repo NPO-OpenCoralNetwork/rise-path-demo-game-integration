@@ -1141,7 +1141,7 @@ async function t15(pool, { catalogId, ruleSetId }) {
     // seen yesterday or today (a chain across 00:00 by its newer stream; one of two days ago is not a
     // place).
     const gapOf = async (/** @type {number} */ gapMs) => String((/** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, gapMs } }, loadedBy: 'verify', note: 'T15', pool }))).id);
-    const [rules29, rules17, rules41, rules53, rules47] = [await gapOf(29 * S), await gapOf(17 * S), await gapOf(41 * S), await gapOf(53 * S), await gapOf(47 * S)];
+    const [rules29, rules17, rules41, rules53, rules47, rules59] = [await gapOf(29 * S), await gapOf(17 * S), await gapOf(41 * S), await gapOf(53 * S), await gapOf(47 * S), await gapOf(59 * S)];
     const [d3, d2, yesterday, today] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2), await dayFromToday(pool, -1), await dayFromToday(pool, 0)];
     const user = uid('t15u');
     // Settings: from three days ago gapMs 23 s (RULES), from today 17 s.
@@ -1157,7 +1157,9 @@ async function t15(pool, { catalogId, ruleSetId }) {
     // An earlier closed day recounted with a wider gapMs than any row of the last one: not read.
     await dayRow(d3, rules47, 'recompute');
     await dayRow(d2, rules29);
-    await dayRow(yesterday, rules17, 'recompute');
+    // A later day's recount, wider than any row of the last closed day: not read either (and that day
+    // is not the last closed one: its close is marked).
+    await dayRow(yesterday, rules59, 'recompute');
     await dayRow(yesterday, rules17, 'close', true);
     /** A chain's signals ([seq, at, flags]) through the write's statements. */
     const store = async (/** @type {string} */ chain, /** @type {string} */ unit, /** @type {number} */ born, /** @type {Array<[number, number, number]>} */ signals) => {
@@ -1177,7 +1179,7 @@ async function t15(pool, { catalogId, ruleSetId }) {
     const unknown = (await pool.query(TRAINING_TIME_SQL.signalState, [user, cohort, across, 'unit-zzz'])).rows[0];
     const until = Number(state?.closed_until_ms) - jstDayRange(d2).end;
     check('T15', state?.last_closed === d2 && until === 29 * S,
-        `the clock guard: the last closed day ${state?.last_closed} (${d2} expected) and its window's end ${until / S} s after its end (its own gapMs 29 s; not today's 17 s, nor an earlier day's recount's 47 s)`);
+        `the clock guard: the last closed day ${state?.last_closed} (${d2} expected) and its window's end ${until / S} s after its end (its own gapMs 29 s; not today's 17 s, nor an earlier day's recount's 47 s, nor a later day's 59 s)`);
     // Recount rows of that day, in this order: one counted with a wider gapMs, one with a wider one
     // still that an account deletion marked, and the day's current row, counted with a narrower one.
     await dayRow(d2, rules41, 'recompute');
