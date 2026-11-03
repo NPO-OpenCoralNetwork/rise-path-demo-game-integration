@@ -84,10 +84,13 @@
  *   T17 023: a recount row names a recount, a close row none (the CHECK both ways); only a recount of
  *       its own cohort (the composite foreign key); a recount's record names an override, its days in
  *       order and the plan's sha256 in lower-case hex, and refuses UPDATE and DELETE (23001). The check
- *       (verifyCohort) on PostgreSQL: days closed by the core check; recount rows as a recount writes
- *       them (the override's values, the second day with the first's new unit time carried) check; a
- *       changed value and a version this code does not have are found. The deletion's marks reach the
- *       recount rows with the foreign key and the CHECK in place; the record stays
+ *       (verifyCohort) on PostgreSQL: days closed by the core check (a day with three units, which the
+ *       database's collation may order otherwise than the code: en_US.utf8 ignores '-'; a chain out of
+ *       the last day across 00:00 JST); recount rows as a recount writes them (the override's values
+ *       and evidence window, one more signal after 00:00, the second day with the first's new unit
+ *       time carried) check; a changed value and a version this code does not have are found. The
+ *       deletion's marks reach the recount rows with the foreign key and the CHECK in place; the record
+ *       stays
  *   T18 the check reads each learner in one snapshot: an account deletion committing between its
  *       read of the rows and of the evidence changes nothing it reports; control: with a plain BEGIN
  *       (READ COMMITTED) the same deletion makes every day with evidence differ
@@ -131,7 +134,8 @@ const RULES_IN = Object.freeze({
     counting: { gapMs: 23 * S, creditCapMs: 13 * S, idleMs: 101 * S, requireFocus: false, overlap: 'prefer_focus_latest' },
 });
 const RULES = /** @type {any} */ (parseTimeRules(RULES_IN)).rules;
-const RULES_IN_2 = Object.freeze({ ...RULES_IN, counting: { ...RULES_IN.counting, creditCapMs: 5 * S } });
+// Other rules: smaller pieces, and the evidence read from further back and ahead (gapMs, idleMs).
+const RULES_IN_2 = Object.freeze({ ...RULES_IN, counting: { ...RULES_IN.counting, gapMs: 29 * S, creditCapMs: 5 * S, idleMs: 151 * S } });
 const RULES_2 = /** @type {any} */ (parseTimeRules(RULES_IN_2)).rules;
 const unitsOf = (/** @type {number} */ u1, /** @type {number} */ u2) => ({
     schema: 'risepath.training-course/v1',
@@ -1147,8 +1151,11 @@ async function t17(pool, { catalogId, ruleSetId }) {
     // 023's constraints: a recount row names a recount of its own cohort (the composite foreign key),
     // a close row none (the CHECK); a recount's record never changes and names an override.
     const [d1, d2] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
+    const manifest = unitsOf(2, 30);
+    manifest.units.push({ key: 'unit1', title: { jp: '1', en: '1' }, setMinutes: 30 });
+    const keys = String(/** @type {any} */ (await loadCatalog({ input: manifest, loadedBy: 'verify', note: 'T17', pool })).id);
     const user = uid('t17u');
-    const cohort = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1, learners: [user] });
+    const cohort = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId: keys, ruleSetId, from: d1, learners: [user] });
     const other = await cohortWith(pool, { startsOn: d1, endsOn: d2, catalogId, ruleSetId, from: d1 });
     const [mine, theirs] = [await recountRecord(pool, cohort, d1, d1, ruleSetId), await recountRecord(pool, other, d1, d1, ruleSetId)];
     const dayWith = (/** @type {string} */ kind, /** @type {string | null} */ recount) => codeOf(pool, `INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
@@ -1166,21 +1173,30 @@ async function t17(pool, { catalogId, ruleSetId }) {
     check('T17', records.join() === 'ok,ok,23514,23514,23514' && changes.join() === '23001,23001',
         `a recount's record: a unit list only ${records[0]}, rules only ${records[1]}; its days backwards ${records[2]}, no override ${records[3]}, the plan's sha256 in upper case ${records[4]}; UPDATE ${changes[0]}, DELETE ${changes[1]} (rp_rows_immutable)`);
 
-    // The check on PostgreSQL. Two days closed by the core on unit-a (its set time, 2 min, reached on
-    // the first), then a recount of both with other rules (smaller pieces) as a recount writes it: the
-    // override and the replaced rows' unit list, the second day with the first's new unit time carried.
+    // The check on PostgreSQL. The cohort's unit list has 'unit1' too: on the second day three units,
+    // which the VM's and CI's collation (en_US.utf8 ignores '-') returns in another order than the
+    // code's (unit1 unit-a unit-b). Two days closed by the core: unit-a on both (its set time, 2 min,
+    // reached on the first), unit1, and a chain on unit-b out of the second day across 00:00 JST, its
+    // last signal 26 s after it. Then a recount of both with other rules (smaller pieces, evidence
+    // read further ahead: that last signal is in the second day's window now) as a recount writes it:
+    // the override and the replaced rows' unit list, the second day with the first's new unit time
+    // carried.
     const start = (/** @type {string} */ day) => jstDayRange(day).start;
     const signals = [
         ...await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d1) + 10 * 3_600_000, n: 20 }),
         ...await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d2) + 9 * 3_600_000, n: 20 }),
+        ...await storeChain(pool, { user, cohort, unit: 'unit1', from: start(d2) + 11 * 3_600_000, n: 12 }),
+        ...await storeChain(pool, { user, cohort, unit: 'unit-b', from: jstDayRange(d2).end - 40 * S, n: 12, every: 6 * S }),
     ];
     const closed = /** @type {any} */ (await close(pool, user, cohort));
     const slug = await slugOf(pool, cohort);
     const verified = async () => checkedLines(await verifyCohort({ cohortSlug: slug, pool }));
+    const collated = String((await pool.query(`SELECT string_agg(u.unit_key, ' ' ORDER BY u.unit_key) AS k
+        FROM training_time_unit_days u JOIN training_time_days d ON d.id = u.day_id WHERE d.user_id = $1 AND d.day = $2::date`, [user, d2])).rows[0].k);
     const afterClose = await verified();
     const rules2 = String(/** @type {any} */ (await loadRules({ input: RULES_IN_2, loadedBy: 'verify', note: 'T17', pool })).id);
     const recount = await recountRecord(pool, cohort, d1, d2, rules2);
-    const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES_2, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days;
+    const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES_2, setMsOf: () => setMsOf(manifest), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days;
     /** @type {string[]} */
     const recountRows = [];
     for (const [i, day] of [d1, d2].entries()) {
@@ -1189,7 +1205,7 @@ async function t17(pool, { catalogId, ruleSetId }) {
         const units = want[i].units.filter((u) => u.countedMs > 0 || u.overCapMs > 0);
         const id = String((await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
             VALUES ($1, $2, $3::date, 'recompute', 'study-time/v1', $4, $5, $6, $7, $8, $9, 'verify', $10) RETURNING id`,
-        [user, cohort, day, rules2, catalogId, want[i].countedMs, units.reduce((n, u) => n + u.overCapMs, 0), evidence.length, evidenceDigest(evidence), recount])).rows[0].id);
+        [user, cohort, day, rules2, keys, want[i].countedMs, units.reduce((n, u) => n + u.overCapMs, 0), evidence.length, evidenceDigest(evidence), recount])).rows[0].id);
         for (const u of units) await pool.query('INSERT INTO training_time_unit_days (day_id, unit_key, counted_ms, over_cap_ms) VALUES ($1, $2, $3, $4)', [id, u.unit, u.countedMs, u.overCapMs]);
         recountRows.push(id);
     }
@@ -1200,11 +1216,14 @@ async function t17(pool, { catalogId, ruleSetId }) {
     await pool.query("UPDATE training_time_days SET algorithm = 'study-time/v9' WHERE id = $1", [recountRows[0]]);
     const unknown = await verified();
     await pool.query("UPDATE training_time_days SET algorithm = 'study-time/v1' WHERE id = $1", [recountRows[0]]);
-    const old = (await dayRows(pool, user, cohort)).filter((r) => r.kind === 'close').map((r) => `${r.counted_ms / S}+${r.over_cap_ms / S}`);
+    const rowsNow = await dayRows(pool, user, cohort);
+    const old = rowsNow.filter((r) => r.kind === 'close').map((r) => `${r.counted_ms / S}+${r.over_cap_ms / S}`);
     const fresh = want.map((d) => `${d.countedMs / S}+${d.units.reduce((n, u) => n + u.overCapMs, 0) / S}`);
+    // The second day's evidence: the close's (R1) and the recount's (R2, one more signal after 00:00).
+    const read = rowsNow.filter((r) => r.day === d2).map((r) => r.signals);
     check('T17', closed.status === 'closed' && afterClose.join() === `${user} 2` && afterRecount.join() === `${user} 2` && old.join() !== fresh.join()
-        && tampered.join() === `${user} 2 ${d2}:values` && unknown.join() === `${user} 2 ${d1}:version`,
-        `the check on PostgreSQL: the closed days (${old.join(', ')} s) ${afterClose.join() === `${user} 2` ? 'match' : afterClose.join()}; recounted with other rules (${fresh.join(', ')} s) ${afterRecount.join() === `${user} 2` ? 'match' : afterRecount.join()}; a changed value: ${foundIn(tampered)}; a version this code does not have: ${foundIn(unknown)}`);
+        && want[1].units.length === 3 && read.length === 2 && read[1] === read[0] + 1 && tampered.join() === `${user} 2 ${d2}:values` && unknown.join() === `${user} 2 ${d1}:version`,
+        `the check on PostgreSQL (the second day's units as the database orders them: ${collated}): the closed days (${old.join(', ')} s) ${afterClose.join() === `${user} 2` ? 'match' : afterClose.join()}; recounted with other rules (${fresh.join(', ')} s; the second day's evidence ${read.join(' then ')} signals) ${afterRecount.join() === `${user} 2` ? 'match' : afterRecount.join()}; a changed value: ${foundIn(tampered)}; a version this code does not have: ${foundIn(unknown)}`);
 
     // The deletion's marks reach the recount rows (the foreign key and the CHECK in place); the record
     // stays and the rows still name it; the check then has no learner to read.

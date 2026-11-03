@@ -13,6 +13,7 @@ import { PassThrough } from 'node:stream';
 import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, hms, parseArgs, readStdinFrom, run } from '../../scripts/training-time.mjs';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
+import { CHECK_SQL } from '../../tools/core/trainingTimeCheck.js';
 import { createTrainingTimePool } from './helpers/trainingTimePool.js';
 
 const S = 1000;
@@ -263,7 +264,7 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
             `${A}: 2 difference(s) in 3 day(s)`,
             '  2026-11-02: the values differ: stored 0:01:18 (over the set time 0:00:00), counted 0:01:17 (over the set time 0:00:00)',
             '  2026-11-03: the evidence differs from when it was counted (signals 0 then, 1 now, or their content)',
-            `Checked ${SLUG}: 1 learner(s), 3 day(s); 2 difference(s) in 1 learner(s). Report them privately (SECURITY.md) and change nothing until they are understood.`,
+            `Checked ${SLUG}: 1 learner(s), 3 day(s); 2 difference(s) in 1 learner(s). Keep this output in the school (learners' ids and times); report privately (SECURITY.md) that --verify found differences, without learner data, and change nothing until they are understood.`,
         ]);
         for (const value of VALUES) assert.ok(!differs.out.includes(value), value);
         // The day's totals as stored, its time on another unit: the split differs. (Each check ends in a
@@ -273,6 +274,24 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         pool.state.unitDays.find((u) => u.day_id === again.id).unit_key = 'sample-u2';
         const split = await runWith(['--verify', SLUG, '--learner', A], { pool });
         assert.deepEqual([split.code, split.out.split('\n').slice(0, 2)], [EXIT.differs, [`${A}: 2 difference(s) in 3 day(s)`, "  2026-11-02: the time per unit differs (the day's totals match)"]]);
+        // The unit put back. Then a recount row of 11-01 naming a unit list its recount did not use,
+        // 11-02's close row naming a unit list that is not its day's setting (K2 differs in a unit not
+        // studied: the same values), 11-03 counted with a version this code does not have.
+        const day = (/** @type {string} */ d) => pool.state.days.find((r) => r.user_id === A && r.day === d);
+        pool.state.unitDays.find((u) => u.day_id === day('2026-11-02').id).unit_key = 'sample-u1';
+        const k2 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: COURSE.units.map((/** @type {any} */ u) => (u.key === 'sample-u2' ? { ...u, setMinutes: 31 } : u)) }, loadedBy: 'a', note: 'b', pool }));
+        const close01 = day('2026-11-01');
+        const recount = pool.addRecount({ cohortId: COHORT, fromDay: '2026-11-01', toDay: '2026-11-01', ruleSetId: rules.id,
+            rows: [{ userId: A, day: '2026-11-01', ruleSetId: rules.id, catalogId: k2.id, countedMs: 0, overCapMs: 0, signals: close01.signals, evidenceSha256: close01.evidence_sha256 }] });
+        day('2026-11-02').catalog_version_id = k2.id;
+        day('2026-11-03').algorithm = 'study-time/v9';
+        const kinds = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.deepEqual([kinds.code, kinds.out.split('\n').slice(0, 4)], [EXIT.differs, [
+            `${A}: 3 difference(s) in 3 day(s)`,
+            `  2026-11-01: its versions are not those of its recount ${recount}`,
+            "  2026-11-02: its versions are not the cohort's setting of that day",
+            '  2026-11-03: counted with study-time/v9, which this code cannot count (or its versions do not parse)',
+        ]]);
         const nobody = await runWith(['--verify', SLUG, '--learner', 'aaaaaaaa-2222-4000-8000-0000000000e0'], { pool });
         assert.deepEqual([nobody.code, nobody.out], [EXIT.refused, `Refused: aaaaaaaa-2222-4000-8000-0000000000e0 is not a learner of ${SLUG}.`]);
         const none = await runWith(['--verify', 'nope'], { pool });
@@ -280,6 +299,11 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         pool.state.rules[0].params.counting.gapMs = 1;
         const broken = await runWith(['--verify', SLUG], { pool });
         assert.deepEqual([broken.code, broken.out], [EXIT.refused, 'Refused: a stored rules or unit list version does not parse with this code. Nothing was changed; ask the developers.']);
+        // A table locked for 10 s (it takes no lock itself: only a migration's ALTER and the like can hold it up).
+        pool.state.rules[0].params.counting.gapMs = RULES_IN.counting.gapMs;
+        pool.failOn(CHECK_SQL.learnerRows, Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' }));
+        const busy = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([busy.code, busy.out], [EXIT.unavailable, 'Unavailable: a lock was busy for 10 s (a migration may be running). Try again.']);
         assert.equal((await runWith(['--verify', SLUG], { pool: null })).code, EXIT.unavailable);
     });
 });

@@ -35,7 +35,8 @@
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a
- * lock busy for 10 s: try again), 4 --verify found a difference (report it privately, SECURITY.md).
+ * lock busy for 10 s: try again), 4 --verify found a difference (keep the output in the school; report
+ * privately that there was one, without learner data, SECURITY.md).
  */
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -164,14 +165,18 @@ export const hms = (ms) => {
     return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
-/** A refusal of the core module: a usage error, or the database (3; a busy lock says so). @param {{ error: string, error_type: string }} result @param {Deps} deps */
-function failed(result, deps) {
+/**
+ * A refusal of the core module: a usage error, or the database (3; a busy lock says so, with what may
+ * hold it: a close or an account deletion, or for --verify, which takes no lock, a migration).
+ * @param {{ error: string, error_type: string }} result @param {Deps} deps @param {string} [holder]
+ */
+function failed(result, deps, holder = 'an account deletion or a close may be running') {
     if (result.error_type === 'validation') {
         deps.log(`${result.error}\n${USAGE}`);
         return EXIT.usage;
     }
     if (result.error_type === 'account_busy') {
-        deps.log('Unavailable: a lock was busy for 10 s (an account deletion or a close may be running). Try again.');
+        deps.log(`Unavailable: a lock was busy for 10 s (${holder}). Try again.`);
         return EXIT.unavailable;
     }
     if (result.error_type === 'invalid_setting') {
@@ -346,7 +351,7 @@ function differenceLine(d) {
 async function verifyOne(args, deps) {
     const slug = String(args.slug);
     const result = await verifyCohort({ cohortSlug: slug, learner: args.values.learner, pool: deps.getPool() });
-    if ('error_type' in result) return failed(result, deps);
+    if ('error_type' in result) return failed(result, deps, 'a migration may be running');
     if (result.status !== 'checked') {
         deps.log(result.status === 'no_cohort' ? `Refused: there is no cohort ${slug}.` : `Refused: ${args.values.learner} is not a learner of ${slug}.`);
         return EXIT.refused;
@@ -369,7 +374,7 @@ async function verifyOne(args, deps) {
         deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); all match.`);
         return EXIT.ok;
     }
-    deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); ${differences} difference(s) in ${learners} learner(s). Report them privately (SECURITY.md) and change nothing until they are understood.`);
+    deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); ${differences} difference(s) in ${learners} learner(s). Keep this output in the school (learners' ids and times); report privately (SECURITY.md) that --verify found differences, without learner data, and change nothing until they are understood.`);
     return EXIT.differs;
 }
 

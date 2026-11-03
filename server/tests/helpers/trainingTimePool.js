@@ -9,9 +9,11 @@
  * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN, and the
  * snapshot BEGIN of a staff read, keep a copy that ROLLBACK restores; the state's savepoint too;
- * each answered with node-pg's command tag; a read-only snapshot refuses a write). Any other
- * statement throws, so a changed query fails loudly; the SQL itself runs on PostgreSQL 16 in
- * scripts/db/verify-training.mjs. Not a test file (npm test runs *.test.js).
+ * each answered with node-pg's command tag; a read-only snapshot refuses every write). Rows ordered
+ * by a unit key come in the order of the VM's database collation (en_US.utf8 ignores '-': 'unit1'
+ * before 'unit-a'), not JavaScript's. Any other statement throws, so a changed query fails loudly;
+ * the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file (npm test
+ * runs *.test.js).
  */
 import { TRAINING_SQL } from '../../../tools/core/training.js';
 import { TRAINING_TIME_SQL } from '../../../tools/core/trainingTime.js';
@@ -27,6 +29,11 @@ const result = (rows) => ({ rowCount: rows.length, rows });
 const ended = (command) => ({ command, rowCount: 0, rows: [] });
 /** A PostgreSQL error with its SQLSTATE. @param {string} code @param {string} message */
 const pgError = (code, message) => Object.assign(new Error(message), { code });
+/** A statement that writes (the module's inserts, a WITH … INSERT among them). */
+const WRITES = /\b(INSERT\s+INTO|DELETE\s+FROM)\b|\bUPDATE\s+\S+\s+SET\b/i;
+const EN_US = new Intl.Collator('en-US', { ignorePunctuation: true });
+/** ORDER BY a unit key as en_US.utf8 orders it ('-' ignored first, then code units). @param {string} a @param {string} b */
+const byCollation = (a, b) => EN_US.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
 
 /** What requireAuth sends for a session, exactly (tools/core/accountDeletions.js readAccountState, server/db.js ensureAuthUser). */
 export const AUTH_SQL = Object.freeze({
@@ -97,6 +104,7 @@ export function createTrainingTimePool(seed = {}) {
         for (const hook of hooks.filter((h) => h.sql === sql)) hook.run();
         const failure = failures.find((f) => f.sql === sql);
         if (failure) throw failure.error;
+        if (readOnly && WRITES.test(sql)) throw pgError('25006', 'cannot execute a write in a read-only transaction');
         const [p1, p2] = params;
         switch (sql) {
             case 'BEGIN':
@@ -245,7 +253,7 @@ export function createTrainingTimePool(seed = {}) {
                         sums.set(u.unit_key, { counted: s.counted + u.counted_ms, over: s.over + u.over_cap_ms });
                     }
                 }
-                return result([...sums.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([unit, s]) => ({ unit_key: unit, counted_ms: String(s.counted), over_cap_ms: String(s.over) })));
+                return result([...sums.entries()].sort(([a], [b]) => byCollation(a, b)).map(([unit, s]) => ({ unit_key: unit, counted_ms: String(s.counted), over_cap_ms: String(s.over) })));
             }
             case TRAINING_TIME_SQL.evidence: {
                 const [user, cohort, fromDay, toDay, fromIso, toIso] = params;
@@ -265,7 +273,6 @@ export function createTrainingTimePool(seed = {}) {
                 return result(rows);
             }
             case TRAINING_TIME_SQL.insertDays: {
-                if (readOnly) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
                 const [user, cohort, by, days, algorithms, ruleSetIds, catalogIds, counted, over, signals, digests] = params;
                 if (!state.stubs.includes(String(user))) return result([]);
                 const rows = [];
@@ -328,7 +335,7 @@ export function createTrainingTimePool(seed = {}) {
                 const ids = /** @type {string[]} */ (p1).map(String);
                 return result(state.unitDays
                     .filter((u) => ids.includes(u.day_id))
-                    .sort((x, y) => Number(x.day_id) - Number(y.day_id) || x.unit_key.localeCompare(y.unit_key))
+                    .sort((x, y) => Number(x.day_id) - Number(y.day_id) || byCollation(x.unit_key, y.unit_key))
                     .map((u) => ({ day_id: u.day_id, unit_key: u.unit_key, counted_ms: u.counted_ms, over_cap_ms: u.over_cap_ms })));
             }
             case CHECK_SQL.rulesByIds: {

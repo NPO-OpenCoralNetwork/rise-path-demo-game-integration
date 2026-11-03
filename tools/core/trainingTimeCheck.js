@@ -42,7 +42,7 @@ import { TRAINING_TIME_SQL, evidenceDigest, parseSettings, settingOf, signalOf, 
 /** @typedef {import('../../shared/training/studyTime.js').TimeRules} TimeRules */
 /** @typedef {import('../../shared/training/studyTime.js').Range} Range */
 
-/** A day's units as [unit key, counted ms, over the set time ms], sorted by key. @typedef {Array<[string, number, number]>} Units */
+/** A day's units as [unit key, counted ms, over the set time ms], in code-unit order of the key. @typedef {Array<[string, number, number]>} Units */
 /**
  * A live day row (training_time_days), units only on the current rows.
  * @typedef {{ id: string, day: string, kind: string, algorithm: string, ruleSetId: string, catalogVersionId: string, countedMs: number,
@@ -80,11 +80,18 @@ export const isoTime = (value) => {
     return Number.isFinite(time) ? new Date(time).toISOString() : null;
 };
 
+/**
+ * Code-unit order of the unit keys. Not the database's: its collation may order them otherwise (the
+ * VM's en_US.utf8 ignores '-', so 'unit1' comes before 'unit-a' there).
+ * @param {[string, number, number]} x @param {[string, number, number]} y
+ */
+const byKey = (x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0);
+
 /** @param {import('../../shared/training/studyTime.js').UnitTime[]} units @returns {Units} */
 export const unitsOf = (units) => units
     .filter((u) => u.countedMs > 0 || u.overCapMs > 0)
     .map((u) => /** @type {[string, number, number]} */ ([u.unit, u.countedMs, u.overCapMs]))
-    .sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+    .sort(byKey);
 
 /** @param {Units} a @param {Units} b */
 export const sameUnits = (a, b) => canonicalJson(a) === canonicalJson(b);
@@ -239,6 +246,8 @@ export async function readLearner(db, userId, cohortId, extra = []) {
     for (const u of (await db.query(CHECK_SQL.unitRows, [current.map((r) => r.id)])).rows ?? []) {
         byId.get(String(u.day_id))?.units.push([String(u.unit_key), Number(u.counted_ms), Number(u.over_cap_ms)]);
     }
+    // The rows come in the database collation's order; the counted units are in code-unit order.
+    for (const r of current) r.units.sort(byKey);
     const ruleIds = [...new Set(rows.map((r) => r.ruleSetId))];
     const catalogIds = [...new Set(rows.map((r) => r.catalogVersionId))];
     for (const r of (await db.query(CHECK_SQL.rulesByIds, [ruleIds])).rows ?? []) records.rules.set(String(r.id), rulesVersionOf(r));
