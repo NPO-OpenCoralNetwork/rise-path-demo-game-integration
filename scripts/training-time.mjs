@@ -31,8 +31,9 @@
  * --stats         the cohort's row counts (marked rows of deleted accounts too) and its last closed day.
  * --verify        checks every closed day of the cohort's learners (or one): the versions it was
  *                 counted with, the setting or recount they came from, its evidence and its values.
- *                 Reads only, in one snapshot per learner, with no advisory lock (its tables are
- *                 locked for reading first: a migration's DDL on them makes it wait, up to 10 s).
+ *                 Reads only, in one snapshot per learner, with no advisory lock. Its tables are
+ *                 locked for reading first, without waiting: while a migration's DDL holds one, it
+ *                 holds nothing and tries again, for about 10 s.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a
@@ -87,8 +88,10 @@ export const STAFF_CLOSER = 'staff';
  *   log: (line: string) => void,
  *   readStdin: () => Promise<string | null>,
  *   now?: () => number,
+ *   sleep?: (ms: number) => Promise<void>,
  * }} Deps
  *   readStdin: the whole of stdin, or null when nothing was piped (a terminal, or no bytes within STDIN_WAIT_MS)
+ *   sleep: the wait between --verify's tries for its read locks (verifyCohort's own when left out)
  */
 
 const MODES = /** @type {const} */ (['loadCatalog', 'loadRules', 'set', 'show', 'close', 'stats', 'verify']);
@@ -356,7 +359,7 @@ function differenceLine(d) {
 /** @param {ReturnType<typeof parseArgs>} args @param {Deps} deps */
 async function verifyOne(args, deps) {
     const slug = String(args.slug);
-    const result = await verifyCohort({ cohortSlug: slug, learner: args.values.learner, pool: deps.getPool() });
+    const result = await verifyCohort({ cohortSlug: slug, learner: args.values.learner, pool: deps.getPool(), sleep: deps.sleep });
     if ('error_type' in result) return failed(result, deps, 'a migration may be running');
     if (result.status !== 'checked') {
         deps.log(result.status === 'no_cohort' ? `Refused: there is no cohort ${slug}.` : `Refused: ${args.values.learner} is not a learner of ${slug}.`);

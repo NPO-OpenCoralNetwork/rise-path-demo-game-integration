@@ -27,7 +27,7 @@ import { STUDY_TIME_ALGORITHM, cohortRange, countDay, evidenceWindow, jstDayRang
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { TRAINING_TIME_SQL, closeDays, evidenceDigest, loadCatalog, loadRules, signalOf } from '../../tools/core/trainingTime.js';
-import { CHECK_SQL, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
+import { CHECK_SQL, LOCK_RETRY, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
 import { AUTH_SQL, createTrainingTimePool } from './helpers/trainingTimePool.js';
 
 const S = 1000;
@@ -157,11 +157,17 @@ describe('tools/core/trainingTimeCheck.js', () => {
 
     it('the statements: the snapshot is REPEATABLE READ READ ONLY; each locks every table its reads use, in ACCESS SHARE mode; a learner\'s live rows of this cohort only (a deleted account\'s marked rows and another cohort\'s are not read), in day and id order; units, versions and recounts by id', () => {
         assert.equal(TRAINING_TIME_SQL.beginSnapshot, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-        assert.equal(CHECK_SQL.lockCohort, 'LOCK TABLE training_cohorts, training_memberships IN ACCESS SHARE MODE');
+        assert.equal(CHECK_SQL.lockCohort, 'LOCK TABLE training_cohorts, training_memberships IN ACCESS SHARE MODE NOWAIT');
         assert.equal(CHECK_SQL.lockLearner, 'LOCK TABLE training_cohort_time_settings, training_time_rule_sets, training_catalog_versions, training_time_days, '
-            + 'training_time_unit_days, training_time_recomputes, training_time_streams, training_time_signals IN ACCESS SHARE MODE');
-        const tablesOf = (/** @type {string} */ sql) => [...sql.matchAll(/\b(?:FROM|JOIN)\s+([a-z_]+)\s/g)].map((m) => m[1]);
-        const lockedBy = (/** @type {string} */ lock) => lock.replace(/^LOCK TABLE /, '').replace(/ IN ACCESS SHARE MODE$/, '').split(', ');
+            + 'training_time_unit_days, training_time_recomputes, training_time_streams, training_time_signals IN ACCESS SHARE MODE NOWAIT');
+        // Every table the migrations create that a statement names, however it is written (a list, a
+        // subquery, a schema, the end of the text).
+        const migrations = new URL('../migrations/', import.meta.url);
+        const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f))
+            .flatMap((f) => [...fs.readFileSync(new URL(f, migrations), 'utf8').matchAll(/\bCREATE TABLE (?:IF NOT EXISTS )?([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)?)/gi)].map((m) => m[1].toLowerCase())))];
+        assert.ok(created.includes('auth.users') && created.includes('training_time_recomputes') && created.includes('training_cohorts'), 'the tables are found');
+        const tablesOf = (/** @type {string} */ sql) => created.filter((t) => new RegExp(`(?<![\\w.])${t.replace('.', '\\.')}(?![\\w.])`, 'i').test(sql));
+        const lockedBy = (/** @type {string} */ lock) => lock.replace(/^LOCK TABLE /, '').replace(/ IN ACCESS SHARE MODE NOWAIT$/, '').split(', ');
         const reads = (/** @type {string[]} */ sqls) => [...new Set(sqls.flatMap(tablesOf))].sort();
         assert.deepEqual(reads([TRAINING_SQL.cohortBySlug, TRAINING_TIME_SQL.learners]), [...lockedBy(CHECK_SQL.lockCohort)].sort());
         assert.deepEqual(reads([TRAINING_TIME_SQL.closeSettings, CHECK_SQL.learnerRows, CHECK_SQL.unitRows, CHECK_SQL.rulesByIds, CHECK_SQL.catalogsByIds, CHECK_SQL.recountsByIds, TRAINING_TIME_SQL.evidence]),
@@ -172,6 +178,38 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.match(CHECK_SQL.rulesByIds, / FROM training_time_rule_sets WHERE id = ANY\(\$1::bigint\[\]\) ORDER BY id$/);
         assert.match(CHECK_SQL.catalogsByIds, / FROM training_catalog_versions WHERE id = ANY\(\$1::bigint\[\]\) ORDER BY id$/);
         assert.match(CHECK_SQL.recountsByIds, /to_char\(from_day, 'YYYY-MM-DD'\) AS from_day, to_char\(to_day, 'YYYY-MM-DD'\) AS to_day, rule_set_id, catalog_version_id\n {2}FROM training_time_recomputes WHERE id = ANY\(\$1::bigint\[\]\) ORDER BY id$/);
+    });
+
+    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked rolls back, holding nothing, and tries again 0.1 s later; after LOCK_RETRY.tries tries, account_busy; another lock wait (after the LOCK) is account_busy at once', async () => {
+        assert.deepEqual([LOCK_RETRY.tries * LOCK_RETRY.everyMs, TRAINING_SQL.lockTimeout], [10_000, "SET LOCAL lock_timeout = '10s'"], 'about the lock timeout of the other operations');
+        const busy = () => Object.assign(new Error('could not obtain lock on relation'), { code: '55P03' });
+        /** @type {number[]} */
+        const slept = [];
+        const sleep = async (/** @type {number} */ ms) => { slept.push(ms); };
+        const { pool } = await seeded();
+        // The cohort's LOCK finds a table locked once, the first learner's twice.
+        pool.failOn(CHECK_SQL.lockCohort, busy(), 1);
+        pool.failOn(CHECK_SQL.lockLearner, busy(), 2);
+        const sent0 = pool.queries.length;
+        const checked = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep }));
+        assert.deepEqual(checked.learners.map((/** @type {any} */ l) => [l.userId, l.days, l.differences]), [[A, 3, []], [B, 3, []]]);
+        assert.deepEqual(slept, [100, 100, 100]);
+        const sent = pool.queries.slice(sent0).map((q) => q.sql);
+        assert.deepEqual(sent.slice(0, 4), [TRAINING_TIME_SQL.beginSnapshot, TRAINING_SQL.lockTimeout, CHECK_SQL.lockCohort, 'ROLLBACK'], 'a failed try reads nothing');
+        assert.equal(sent.filter((s) => s === TRAINING_TIME_SQL.beginSnapshot).length, 6, 'the cohort twice, the first learner three times, the second once');
+        // A table that stays locked.
+        slept.length = 0;
+        pool.failOn(CHECK_SQL.lockLearner, busy());
+        const tries0 = pool.queries.length;
+        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep })).error_type, 'account_busy');
+        assert.equal(pool.queries.slice(tries0).filter((q) => q.sql === CHECK_SQL.lockLearner).length, LOCK_RETRY.tries);
+        assert.equal(slept.length, LOCK_RETRY.tries - 1);
+        // A lock wait after the LOCK (an index held by a REINDEX): no other try.
+        const { pool: other } = await seeded();
+        other.failOn(CHECK_SQL.learnerRows, busy());
+        slept.length = 0;
+        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep })).error_type, 'account_busy');
+        assert.deepEqual([other.queries.filter((q) => q.sql === CHECK_SQL.lockLearner).length, slept], [1, []]);
     });
 
     it('differences: a changed value (that day only), evidence added to a closed window, a close row with another setting\'s versions, a version this code does not have', async () => {
@@ -206,6 +244,25 @@ describe('tools/core/trainingTimeCheck.js', () => {
         pool.state.rules.find((r) => r.id === r1.id).algorithm = 'study-time/v9';
         const found = (await check(pool, A)).learners[0].differences;
         assert.deepEqual(found.map((d) => [d.day, d.what, d.detail.cause, d.detail.rulesAlgorithm]), DAYS.map((day) => [day, 'version', 'rules_row', 'study-time/v9']));
+    });
+
+    it('a recount row\'s rules, by cause: an algorithm this code does not have (unknown), a rules row naming another algorithm than its rules (rules_row), rules that do not parse (unparsed); never counted with another version', async () => {
+        const { pool, catalog } = await seeded();
+        // A rules version of study-time/v2 (loadRules refuses it here: the row as newer code would load
+        // it), the override of a recount of 11-01 whose row is otherwise the close row's.
+        const V2 = '900';
+        pool.state.rules.push({ id: V2, algorithm: 'study-time/v2', sha256: 'c'.repeat(64), params: { ...structuredClone(RULES_IN), algorithm: 'study-time/v2' }, loaded_by: 'test', note: 'test' });
+        const close = rowOf(pool, '2026-11-01');
+        pool.addRecount({ cohortId: COHORT, fromDay: '2026-11-01', toDay: '2026-11-01', ruleSetId: V2, rows: [{ userId: A, day: '2026-11-01', ruleSetId: V2, catalogId: catalog.id,
+            countedMs: close.counted_ms, overCapMs: close.over_cap_ms, signals: close.signals, evidenceSha256: close.evidence_sha256,
+            units: pool.state.unitDays.filter((u) => u.day_id === close.id).map((u) => /** @type {[string, number, number]} */ ([u.unit_key, u.counted_ms, u.over_cap_ms])) }] });
+        const causes = async () => (await check(pool, A)).learners[0].differences.map((/** @type {any} */ d) => [d.day, d.what, d.detail.cause, d.detail.rulesAlgorithm]);
+        const v2 = () => pool.state.rules.find((r) => r.id === V2);
+        assert.deepEqual(await causes(), [['2026-11-01', 'version', 'unknown', 'study-time/v2']]);
+        v2().algorithm = 'study-time/v1';
+        assert.deepEqual(await causes(), [['2026-11-01', 'version', 'rules_row', 'study-time/v1']], 'the row says v1, its rules v2');
+        v2().params = { ...structuredClone(RULES_IN), counting: { ...RULES_IN.counting, gapMs: 1 } };
+        assert.deepEqual(await causes(), [['2026-11-01', 'version', 'unparsed', 'study-time/v1']], 'v1 rules that do not parse with this code');
     });
 
     it('a later setting (D12: other rules and unit list from 11-03, then one in the future): each closed day checks against its own day\'s setting; a close row naming another unit list differs', async () => {

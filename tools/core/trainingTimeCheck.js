@@ -19,11 +19,13 @@
  * their count and sha256) and its values (counted, over the set time, each unit) are what its
  * versions give. The cohort and its learners, then each learner, are read in a REPEATABLE READ READ
  * ONLY snapshot of their own, so a signal, a close or an account deletion committing meanwhile is not
- * half seen. Before its snapshot, each locks the tables it reads in ACCESS SHARE mode: a migration's
- * DDL on them is waited for (up to the lock timeout, then account_busy) and seen whole, never through
- * an older snapshot (a table rewrite is not MVCC-safe: such a snapshot sees the table empty). ACCESS
- * SHARE conflicts only with ACCESS EXCLUSIVE, so signals, closes and deletion marks go on, and no
- * advisory lock is taken. It writes nothing.
+ * half seen. Before its snapshot, each locks the tables it reads in ACCESS SHARE mode, NOWAIT
+ * (lockedSnapshot): a migration's DDL on them is never read through an older snapshot (a table
+ * rewrite is not MVCC-safe: such a snapshot sees the table empty); while DDL holds or waits for one of
+ * them, the try rolls back, holding nothing, and the next comes LOCK_RETRY.everyMs later, for about
+ * the lock timeout (then account_busy). It never waits while holding a lock, so it is never in a
+ * deadlock with a migration. ACCESS SHARE conflicts only with ACCESS EXCLUSIVE, so signals, closes
+ * and deletion marks go on, and no advisory lock is taken. It writes nothing.
  *
  * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
  */
@@ -51,7 +53,11 @@ import { TRAINING_TIME_SQL, evidenceDigest, parseSettings, settingOf, signalOf, 
  * @typedef {{ id: string, day: string, kind: string, algorithm: string, ruleSetId: string, catalogVersionId: string, countedMs: number,
  *   overCapMs: number, signals: number, evidenceSha256: string, recomputeId: string | null, computedAt: string | null, computedBy: string, units: Units }} DayRow
  */
-/** A rules version: null rules when it does not parse with this code. @typedef {{ id: string, sha256: string, algorithm: string, rules: TimeRules | null }} RulesVersion */
+/**
+ * A rules version: null rules when it does not parse with this code; declared, the algorithm its
+ * params name (kept when they do not parse; null when they name none).
+ * @typedef {{ id: string, sha256: string, algorithm: string, declared: string | null, rules: TimeRules | null }} RulesVersion
+ */
 /** A unit list version: null setMs when it does not parse. @typedef {{ id: string, sha256: string, courseKey: string, setMs: Map<string, number> | null }} CatalogVersion */
 /** @typedef {{ id: string, cohortId: string, fromDay: string, toDay: string, ruleSetId: string | null, catalogVersionId: string | null }} RecountRecord */
 /**
@@ -64,9 +70,9 @@ import { TRAINING_TIME_SQL, evidenceDigest, parseSettings, settingOf, signalOf, 
 /** The statements, exactly as sent. $1 is the canonical account id, or the ids to read. */
 export const CHECK_SQL = Object.freeze({
     // First in a snapshot, before any SELECT (a LOCK takes no snapshot): the tables its reads use.
-    lockCohort: 'LOCK TABLE training_cohorts, training_memberships IN ACCESS SHARE MODE',
+    lockCohort: 'LOCK TABLE training_cohorts, training_memberships IN ACCESS SHARE MODE NOWAIT',
     lockLearner: 'LOCK TABLE training_cohort_time_settings, training_time_rule_sets, training_catalog_versions, training_time_days, training_time_unit_days, '
-        + 'training_time_recomputes, training_time_streams, training_time_signals IN ACCESS SHARE MODE',
+        + 'training_time_recomputes, training_time_streams, training_time_signals IN ACCESS SHARE MODE NOWAIT',
     // Every live row of a learner in a cohort, in day and id order (the newest of a day is its current value).
     learnerRows: `SELECT id, to_char(day, 'YYYY-MM-DD') AS day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals,
        evidence_sha256, recompute_id, computed_at, computed_by
@@ -106,7 +112,8 @@ export const sameUnits = (a, b) => canonicalJson(a) === canonicalJson(b);
 /** A rules row parsed again (null rules when it does not parse with this code). @param {any} row @returns {RulesVersion} */
 export function rulesVersionOf(row) {
     const parsed = parseTimeRules(row.params);
-    return { id: String(row.id), sha256: String(row.sha256), algorithm: String(row.algorithm), rules: 'errors' in parsed ? null : parsed.rules };
+    const declared = typeof row.params?.algorithm === 'string' ? row.params.algorithm : null;
+    return { id: String(row.id), sha256: String(row.sha256), algorithm: String(row.algorithm), declared, rules: 'errors' in parsed ? null : parsed.rules };
 }
 
 /** A unit list row parsed again (null setMs when it does not parse). @param {any} row @returns {CatalogVersion} */
@@ -199,16 +206,18 @@ export function verifyLearner({ records, settings, cohortId, cohort }) {
 const valuesOf = (v) => ({ countedMs: v.countedMs, overCapMs: v.overCapMs, units: v.units });
 
 /**
- * Why a row is not counted with its versions: 'unparsed' (its rules or unit list version does not
- * parse with this code), 'rules_row' (the rules row names another algorithm than its rules), 'unknown'
- * (this code has no counting version of its rules' algorithm), 'row' (the day row names another
- * algorithm than its rules).
+ * Why a row is not counted with its versions: 'unknown' (its rules name an algorithm this code has no
+ * counting version of), 'rules_row' (the rules row names another algorithm than its rules), 'unparsed'
+ * (its rules or unit list version does not parse with this code), 'row' (the day row names another
+ * algorithm than its rules). The algorithm the rules name comes first: a version this code does not
+ * have is that, not a version that does not parse.
  * @param {RulesVersion | undefined} rules @param {CatalogVersion | undefined} catalog
  */
 function versionCause(rules, catalog) {
+    if (rules?.declared && !countingVersion(rules.declared)) return rules.algorithm === rules.declared ? 'unknown' : 'rules_row';
     if (!rules?.rules || !catalog?.setMs) return 'unparsed';
     if (rules.algorithm !== rules.rules.algorithm) return 'rules_row';
-    return countingVersion(rules.rules.algorithm) ? 'row' : 'unknown';
+    return 'row';
 }
 
 /**
@@ -237,7 +246,7 @@ function provenanceOf({ row, rows, recounts, settings, cohortId }) {
  * Read what a learner's check and recount need, in the caller's transaction: every live row, the
  * unit rows of the current ones, the versions and recounts they name, and the evidence of the closed
  * days (the widest window of the versions used, `extra` included). In a REPEATABLE READ snapshot the
- * caller sends CHECK_SQL.lockLearner before its first SELECT (the module header).
+ * caller has locked the tables first (CHECK_SQL.lockLearner, lockedSnapshot).
  * @param {Queryable} db @param {string} userId @param {string} cohortId @param {RulesVersion[]} [extra]
  * @returns {Promise<LearnerRecords>}
  */
@@ -303,15 +312,16 @@ export async function readLearner(db, userId, cohortId, extra = []) {
 
 /**
  * Staff: check a cohort's closed days (the header), every live learner or one.
- * @param {{ cohortSlug: string, learner?: unknown, pool?: TrainingPool | null }} params
+ * @param {{ cohortSlug: string, learner?: unknown, pool?: TrainingPool | null, sleep?: (ms: number) => Promise<void> }} params
+ *   sleep: the wait between tries for the read locks (lockedSnapshot)
  * @returns {Promise<{ status: 'checked', learners: Array<{ userId: string, days: number, differences: Difference[] }> }
  *   | { status: 'no_cohort' | 'not_a_learner' } | CoreError>} CoreError 'invalid_setting' when a
  *   stored setting does not parse with this code
  */
-export async function verifyCohort({ cohortSlug, learner, pool = getPool() }) {
+export async function verifyCohort({ cohortSlug, learner, pool = getPool(), sleep = pause }) {
     const one = learner === undefined || learner === null ? null : canonicalUserId(learner);
     if (learner !== undefined && learner !== null && !one) return { error: 'An account id (a UUID) is required.', error_type: 'validation' };
-    const head = await transaction(pool, 'verifyCohort', async (db) => ({ commit: false, value: await readCohort(db, cohortSlug) }), { snapshot: true });
+    const head = await lockedSnapshot(pool, CHECK_SQL.lockCohort, (db) => readCohort(db, cohortSlug), sleep);
     if (!head) return { status: 'no_cohort' };
     if ('error_type' in head) return head;
     const { cohort, learners } = head;
@@ -319,15 +329,14 @@ export async function verifyCohort({ cohortSlug, learner, pool = getPool() }) {
     /** @type {Array<{ userId: string, days: number, differences: Difference[] }>} */
     const out = [];
     for (const userId of one ? [one] : learners) {
-        const checked = await transaction(pool, 'verifyCohort', async (db) => {
-            await db.query(CHECK_SQL.lockLearner);
+        const checked = await lockedSnapshot(pool, CHECK_SQL.lockLearner, async (db) => {
             const settings = parseSettings((await db.query(TRAINING_TIME_SQL.closeSettings, [cohort.id])).rows ?? []);
             /** @type {{ days: number, differences: Difference[] } | CoreError} */
             const value = settings
                 ? verifyLearner({ records: await readLearner(db, userId, cohort.id), settings, cohortId: cohort.id, cohort: cohortRange(cohort.startsOn, cohort.endsOn) })
                 : { ...INVALID_SETTING };
-            return { commit: false, value };
-        }, { snapshot: true });
+            return value;
+        }, sleep);
         if ('error_type' in checked) return checked;
         out.push({ userId, ...checked });
     }
@@ -337,15 +346,53 @@ export async function verifyCohort({ cohortSlug, learner, pool = getPool() }) {
 /** A stored version that no longer parses with this code stops the counting (no guess). */
 export const INVALID_SETTING = Object.freeze({ error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' });
 
+/** The tries for a snapshot's read locks: 100, 0.1 s apart, about TRAINING_LOCK_TIMEOUT (10 s). */
+export const LOCK_RETRY = Object.freeze({ tries: 100, everyMs: 100 });
+/** @param {number} ms @returns {Promise<void>} */
+const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+/** A try whose LOCK … NOWAIT found one of its tables locked. */
+const LOCKED = Object.freeze({ locked: true });
+
+/**
+ * A REPEATABLE READ READ ONLY snapshot that first locks its tables (`lock`, a LOCK … IN ACCESS SHARE
+ * MODE NOWAIT; it takes no snapshot), then runs `work` and rolls back. While one of the tables is
+ * held or waited for in a conflicting mode (a migration's DDL), the LOCK fails at once (55P03): the
+ * try rolls back, holding nothing, and the next comes LOCK_RETRY.everyMs later; after
+ * LOCK_RETRY.tries tries, account_busy. So it never waits while holding a lock (no deadlock with a
+ * migration that locks two of these tables), and its snapshot is taken after any DDL on them.
+ * Another lock wait (an index held by a REINDEX) ends with the lock timeout, as account_busy.
+ * @template T
+ * @param {TrainingPool | null | undefined} pool @param {string} lock @param {(db: Queryable) => Promise<T>} work
+ * @param {(ms: number) => Promise<void>} sleep
+ * @returns {Promise<T | CoreError>}
+ */
+export async function lockedSnapshot(pool, lock, work, sleep) {
+    /** @type {(db: Queryable) => Promise<{ commit: boolean, value: T | typeof LOCKED }>} */
+    const attempt = async (db) => {
+        try {
+            await db.query(lock);
+        } catch (err) {
+            if (/** @type {any} */ (err)?.code === '55P03') return { commit: false, value: LOCKED };
+            throw err;
+        }
+        return { commit: false, value: await work(db) };
+    };
+    for (let tries = 1; ; tries += 1) {
+        const value = await transaction(pool, 'verifyCohort', attempt, { snapshot: true });
+        if (value !== LOCKED) return /** @type {T | CoreError} */ (value);
+        if (tries >= LOCK_RETRY.tries) return { error: 'A table stayed locked. Try again.', error_type: 'account_busy' };
+        await sleep(LOCK_RETRY.everyMs);
+    }
+}
+
 /**
  * A cohort and its live learners (in id order, the order every lock is taken in), in the caller's
- * transaction: their two tables locked first (CHECK_SQL.lockCohort; the module header). Errors are
- * thrown, so transaction() turns a lock wait over its timeout into account_busy. null: no cohort.
+ * transaction, whose snapshot has locked their two tables (CHECK_SQL.lockCohort, lockedSnapshot).
+ * Errors are thrown, for transaction() to classify. null: no cohort.
  * @param {Queryable} db @param {string} cohortSlug
  * @returns {Promise<{ cohort: { id: string, startsOn: string | null, endsOn: string | null }, learners: string[] } | null>}
  */
 export async function readCohort(db, cohortSlug) {
-    await db.query(CHECK_SQL.lockCohort);
     const row = (await db.query(TRAINING_SQL.cohortBySlug, [cohortSlug])).rows?.[0];
     if (!row) return null;
     const cohort = { id: String(row.id), startsOn: row.starts_on ?? null, endsOn: row.ends_on ?? null };

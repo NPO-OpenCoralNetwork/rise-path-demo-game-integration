@@ -83,7 +83,7 @@ export function createTrainingTimePool(seed = {}) {
     let savepoint = null;
     /** @type {{ sql: string, params: unknown[], tx: boolean }[]} */
     const queries = [];
-    /** @type {{ sql: string, error: any }[]} */
+    /** @type {{ sql: string, error: any, times: number }[]} */
     const failures = [];
     /** @type {unknown[]} */
     const releases = [];
@@ -107,8 +107,11 @@ export function createTrainingTimePool(seed = {}) {
     const runner = (tx) => async (/** @type {string} */ sql, /** @type {any[]} */ params = []) => {
         queries.push({ sql, params, tx });
         for (const hook of hooks.filter((h) => h.sql === sql)) hook.run();
-        const failure = failures.find((f) => f.sql === sql);
-        if (failure) throw failure.error;
+        const failure = failures.find((f) => f.sql === sql && f.times > 0);
+        if (failure) {
+            failure.times -= 1;
+            throw failure.error;
+        }
         if (readOnly && WRITES.test(sql)) throw pgError('25006', 'cannot execute a write in a read-only transaction');
         const [p1, p2] = params;
         switch (sql) {
@@ -447,8 +450,8 @@ export function createTrainingTimePool(seed = {}) {
         tx: () => queries.filter((q) => q.tx).map((q) => q.sql),
         /** @param {number} ms */
         setClock: (ms) => { state.clock = ms; },
-        /** Make a statement throw (an Error with a SQLSTATE). @param {string} sql @param {any} error */
-        failOn: (sql, error) => failures.push({ sql, error }),
+        /** Make a statement throw (an Error with a SQLSTATE), every time or its next `times`. @param {string} sql @param {any} error @param {number} [times] */
+        failOn: (sql, error, times = Infinity) => failures.push({ sql, error, times }),
         /** Run `run` (move the clock, add a row) just before each matching statement. @param {string} sql @param {() => void} run */
         before: (sql, run) => hooks.push({ sql, run }),
         /**

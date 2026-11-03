@@ -96,9 +96,13 @@
  *       learner in one snapshot: an account deletion committing between its read of the rows and of
  *       the evidence changes nothing it reports; control: with a plain BEGIN (READ COMMITTED) the same
  *       deletion makes every day with evidence differ. A table rewrite (ALTER COLUMN … USING, not
- *       MVCC-safe) held HOLD_MS and committed while the check waits: the check, which locks its tables
- *       (ACCESS SHARE) before its snapshot, reads both days; control: without that LOCK its snapshot,
- *       taken before the wait, reads no day of the rewritten table
+ *       MVCC-safe) held HOLD_MS, then committed, while the check runs: its LOCK … NOWAIT (ACCESS
+ *       SHARE, before its snapshot) fails and is tried again, no backend waiting on a lock meanwhile,
+ *       then it reads both days; control: without that LOCK it waits in its read of the day rows, and
+ *       its snapshot, taken before, reads no day of the rewritten table. A migration altering two of
+ *       the tables a snapshot locks, in the other order (memberships then cohorts; the recounts' table
+ *       then the days'), HOLD_MS apart: its second ALTER goes through and the check reads both days;
+ *       control: with a LOCK that waits, PostgreSQL cancels the migration as a deadlock (40P01)
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
  * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
  */
@@ -1298,23 +1302,28 @@ async function t18(pool, { catalogId, ruleSetId }) {
     check('T18', z.closed === 'closed' && control.join() === `${z.user} 2 ${d1}:evidence ${d1}:values ${d2}:evidence ${d2}:values` && zLive === 0,
         `control, a plain BEGIN: the same deletion (then ${zLive} live day rows) makes every day differ: ${foundIn(control)}`);
 
-    // A migration's table rewrite (not MVCC-safe) held HOLD_MS and committed while the check waits:
-    // the check locks its tables (ACCESS SHARE) before its snapshot, so it waits and reads the
-    // rewritten table whole. Control: without that LOCK, its snapshot (taken by its first SELECT,
-    // before the wait) sees the rewritten table empty.
+    // A migration's table rewrite (not MVCC-safe) held HOLD_MS, then committed, while the check runs:
+    // the check's LOCK … NOWAIT fails while the table is held, so it tries again, holding nothing (no
+    // backend waits on a lock meanwhile), and its snapshot reads the rewritten table whole. Control:
+    // without that LOCK, its snapshot (taken by its first SELECT) waits in its read of the day rows
+    // and sees the rewritten table empty.
     const [y, w] = [await closedLearner('t18y'), await closedLearner('t18w')];
+    /** The statements waiting on a lock, of the other connections. */
+    const waitingOnLocks = async () => (await pool.query(`SELECT query FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'`)).rows.map((r) => String(r.query));
     /** @param {{ slug: string }} l @param {string[]} skip */
     const rewrittenDuring = async (l, skip) => {
         const ddl = await pool.connect();
+        const recorded = recordingPool(pool);
         try {
             await ddl.query('BEGIN');
             await ddl.query('ALTER TABLE training_time_days ALTER COLUMN signals TYPE integer USING signals + 0');
-            const started = Date.now();
-            const checking = verifyCohort({ cohortSlug: l.slug, pool: changedConnections(pool, [{}, { skip }]) });
+            const checking = verifyCohort({ cohortSlug: l.slug, pool: changedConnections(recorded.pool, [{}, { skip }]) });
             await sleep(HOLD_MS);
+            const waiting = await waitingOnLocks();
             await ddl.query('COMMIT');
             const lines = checkedLines(await checking);
-            return { lines, waited: Date.now() - started };
+            return { lines, waiting, tries: recorded.sent.filter((sql) => sql === CHECK_SQL.lockLearner).length };
         } catch (error) {
             await ddl.query('ROLLBACK').catch(() => {});
             throw error;
@@ -1323,11 +1332,75 @@ async function t18(pool, { catalogId, ruleSetId }) {
         }
     };
     const locked = await rewrittenDuring(y, []);
-    check('T18', y.closed === 'closed' && locked.lines.join() === `${y.user} 2` && locked.waited >= BLOCKED_MS,
-        `a table rewrite committed while the check waited ${locked.waited} ms for its lock: ${locked.lines.join() === `${y.user} 2` ? 'both days read and matching' : locked.lines.join()}`);
+    check('T18', y.closed === 'closed' && locked.lines.join() === `${y.user} 2` && locked.waiting.length === 0 && locked.tries >= 2,
+        `a table rewrite held ${HOLD_MS} ms, then committed: the check tried its LOCK ${locked.tries} times, waiting on no lock (waiting: ${locked.waiting.length}), then ${locked.lines.join() === `${y.user} 2` ? 'read both days, matching' : locked.lines.join()}`);
     const unlocked = await rewrittenDuring(w, [CHECK_SQL.lockLearner]);
-    check('T18', w.closed === 'closed' && unlocked.lines.join() === `${w.user} 0`,
-        `control, without the lock: the snapshot taken before the wait reads ${unlocked.lines.join().split(' ')[1] ?? '?'} days of the rewritten table`);
+    check('T18', w.closed === 'closed' && unlocked.lines.join() === `${w.user} 0` && unlocked.waiting.join() === CHECK_SQL.learnerRows,
+        `control, without the lock: the check waited in ${unlocked.waiting.join() === CHECK_SQL.learnerRows ? 'its read of the day rows, after its snapshot' : `${unlocked.waiting.length} statements`}, which reads ${unlocked.lines.join().split(' ')[1] ?? '?'} days of the rewritten table`);
+
+    // A migration that changes two of the tables a snapshot locks, in the other order than its LOCK:
+    // the first ALTER held while the check starts, the second HOLD_MS later. The check never waits
+    // while holding a lock, so the migration's second ALTER goes through (no deadlock), and the check
+    // reads the learner's days once the migration ends. Control: a LOCK that waits (no NOWAIT) holds
+    // the tables before the one it waits for, and PostgreSQL cancels the migration (40P01).
+    const [v, u, t] = [await closedLearner('t18v'), await closedLearner('t18u'), await closedLearner('t18t')];
+    /** @param {{ slug: string }} l @param {string} first @param {string} second @param {Map<string, string>} [send] */
+    const migrationDuring = async (l, first, second, send) => {
+        const ddl = await pool.connect();
+        try {
+            await ddl.query('BEGIN');
+            await ddl.query(`ALTER TABLE ${first} ADD COLUMN t18_probe integer`);
+            const checking = verifyCohort({ cohortSlug: l.slug, pool: send ? changedConnections(pool, [{}, { send }]) : pool });
+            await sleep(HOLD_MS);
+            const migrated = await ddl.query(`ALTER TABLE ${second} ADD COLUMN t18_probe integer`).then(() => 'ok', (error) => String(error.code));
+            await ddl.query('ROLLBACK');
+            return { migrated, lines: checkedLines(await checking) };
+        } catch (error) {
+            await ddl.query('ROLLBACK').catch(() => {});
+            throw error;
+        } finally {
+            ddl.release();
+        }
+    };
+    const cohortShape = await migrationDuring(v, 'training_memberships', 'training_cohorts');
+    const learnerShape = await migrationDuring(u, 'training_time_recomputes', 'training_time_days');
+    check('T18', cohortShape.migrated === 'ok' && cohortShape.lines.join() === `${v.user} 2` && learnerShape.migrated === 'ok' && learnerShape.lines.join() === `${u.user} 2`,
+        `a migration altering the memberships, then the cohorts: its second ALTER ${cohortShape.migrated}, the check ${matchesTwo(cohortShape.lines, v.user)}; the recounts' table, then the days': ${learnerShape.migrated}, ${matchesTwo(learnerShape.lines, u.user)}`);
+    const waitingLock = await migrationDuring(t, 'training_time_recomputes', 'training_time_days', new Map([[CHECK_SQL.lockLearner, CHECK_SQL.lockLearner.replace(/ NOWAIT$/, '')]]));
+    check('T18', waitingLock.migrated === '40P01' && waitingLock.lines.join() === `${t.user} 2`,
+        `control, a LOCK that waits: the migration's second ALTER ${waitingLock.migrated === '40P01' ? 'is cancelled as a deadlock (40P01)' : waitingLock.migrated}, the check then ${matchesTwo(waitingLock.lines, t.user)}`);
+}
+
+/** 'reads both days, matching' for a one-learner answer with two days and no difference. @param {string[]} lines @param {string} user */
+const matchesTwo = (lines, user) => (lines.join() === `${user} 2` ? 'reads both days, matching' : lines.join());
+
+/**
+ * A pool for the core that records the statements its connections send (after changedConnections'
+ * changes, when it wraps this one).
+ * @param {pg.Pool} pool @returns {{ pool: any, sent: string[] }}
+ */
+function recordingPool(pool) {
+    /** @type {string[]} */
+    const sent = [];
+    return {
+        sent,
+        pool: {
+            query: (/** @type {string} */ sql, /** @type {unknown[]} */ params) => {
+                sent.push(sql);
+                return pool.query(sql, params);
+            },
+            connect: async () => {
+                const client = await pool.connect();
+                return {
+                    query: (/** @type {string} */ sql, /** @type {unknown[]} */ params) => {
+                        sent.push(sql);
+                        return client.query(sql, params);
+                    },
+                    release: (/** @type {any} */ error) => client.release(error),
+                };
+            },
+        },
+    };
 }
 
 export async function main(argv = process.argv.slice(2)) {
