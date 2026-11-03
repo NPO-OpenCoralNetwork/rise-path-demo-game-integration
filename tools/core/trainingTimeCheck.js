@@ -365,8 +365,9 @@ export async function verifyCohort({ cohortSlug, learner, pool = getPool(), slee
 export const INVALID_SETTING = Object.freeze({ error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' });
 
 /**
- * The tries for a snapshot's read locks: 100, each started 0.1 s after the last one started (a try
- * that waited 20 ms sleeps 80), so about TRAINING_LOCK_TIMEOUT (10 s) in all.
+ * The tries for a snapshot's read locks: 100, each started 0.1 s after the last one started, or at
+ * once after a try over 0.1 s (a try that waited 20 ms sleeps 80), so about TRAINING_LOCK_TIMEOUT
+ * (10 s) in all while tries take under 0.1 s.
  */
 export const LOCK_RETRY = Object.freeze({ tries: 100, everyMs: 100 });
 /** @param {number} ms @returns {Promise<void>} */
@@ -388,10 +389,10 @@ export const SNAPSHOT_LOCKS = Object.freeze({
  * tables held or waited for in a conflicting mode, a migration's DDL; or, for 20 ms, an index a
  * REINDEX holds, or a TOAST table or its index while a read fetches a value stored out of line) rolls
  * the try back, holding nothing; any other error ends it (transaction() classifies it). The next try
- * starts LOCK_RETRY.everyMs after the last one started, and after LOCK_RETRY.tries tries, about 10 s,
- * account_busy. So a try waits at most 20 ms while it holds a lock, far under PostgreSQL's
- * deadlock_timeout (1 s): a migration that locks two of these tables is not cancelled as a deadlock
- * with it. No table rewrite commits between its snapshot and its reads.
+ * starts LOCK_RETRY.everyMs after the last one started (at once after a longer try), and after
+ * LOCK_RETRY.tries tries, about 10 s, account_busy. So a try waits at most 20 ms while it holds a
+ * lock, far under PostgreSQL's deadlock_timeout (1 s): a migration that locks two of these tables is
+ * not cancelled as a deadlock with it. No table rewrite commits between its snapshot and its reads.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {readonly string[]} locks SNAPSHOT_LOCKS.cohort or .learner
  * @param {(db: Queryable) => Promise<T>} work @param {(ms: number) => Promise<void>} sleep

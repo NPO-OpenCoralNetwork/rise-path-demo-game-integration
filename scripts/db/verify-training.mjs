@@ -100,13 +100,15 @@
  *       SHARE, before its snapshot) fails and is tried again, no backend waiting on a lock meanwhile,
  *       then it reads both days; control: without that LOCK and its 20 ms limit, the try's read of no
  *       rows takes its snapshot, then waits for the rewritten table, and reads no day of it (the gap,
- *       up to 20 ms a try, that the LOCK closes). A migration altering two of the tables a snapshot
- *       locks, in the other order (memberships then cohorts; the recounts' table then the days'), or
- *       rebuilding an index of the days' table and then altering the recounts', HOLD_MS apart: its
- *       second statement goes through and the check reads both days; controls: with a LOCK that
- *       waits, or a try whose read waits for the index, PostgreSQL cancels the migration as a deadlock
- *       (40P01). The tables each snapshot's reads lock (pg_locks) are those its LOCK locks; a try's
- *       opening statements lock every index of them, the LOCK and the 20 ms limit alone none
+ *       up to 20 ms a try, that the LOCK closes). The same for the cohort's snapshot with the
+ *       memberships rewritten (control: it reads no learner). A migration altering two of the tables a
+ *       snapshot locks, in the other order (memberships then cohorts; the recounts' table then the
+ *       days'), or rebuilding an index of the days' table and then altering the recounts' (of the
+ *       memberships, then the cohorts), HOLD_MS apart: its second statement goes through and the
+ *       check reads both days; controls: with a LOCK that waits, or a try whose read waits for the
+ *       index (the learner's; the cohort's), PostgreSQL cancels the migration as a deadlock (40P01).
+ *       The tables each snapshot's reads lock (pg_locks) are those its LOCK locks; a try's opening
+ *       statements lock every index of them, the LOCK and the 20 ms limit alone none
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
  * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
  */
@@ -1311,24 +1313,29 @@ async function t18(pool, { catalogId, ruleSetId }) {
     // backend waits on a lock meanwhile), and its snapshot reads the rewritten table whole. Control:
     // without the LOCK and the 20 ms limit (so the wait lasts the whole hold), the try's read of no
     // rows takes its snapshot, then waits for the rewritten table, and sees it empty: the gap, up to
-    // 20 ms a try, that the LOCK closes.
-    const [y, w] = [await closedLearner('t18y'), await closedLearner('t18w')];
+    // 20 ms a try, that the LOCK closes. The days' table for a learner's snapshot; the memberships for
+    // the cohort's, whose control reads no learner (so it would report a cohort it did not check).
+    const [y, w, ya, wa] = [await closedLearner('t18y'), await closedLearner('t18w'), await closedLearner('t18ya'), await closedLearner('t18wa')];
     /** The statements waiting on a lock, of the other connections. */
     const waitingOnLocks = async () => (await pool.query(`SELECT query FROM pg_stat_activity
         WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'`)).rows.map((r) => String(r.query));
-    /** @param {{ slug: string }} l @param {string[]} skip */
-    const rewrittenDuring = async (l, skip) => {
+    /**
+     * The check of a learner's cohort while `rewrite` is held HOLD_MS, then committed. `changes` for its
+     * connections (the cohort's first try, then the first learner's); `lock`, the LOCK whose tries count.
+     * @param {{ slug: string }} l @param {string} rewrite @param {ConnectionChange[]} changes @param {string} lock
+     */
+    const rewrittenDuring = async (l, rewrite, changes, lock) => {
         const ddl = await pool.connect();
         const recorded = recordingPool(pool);
         try {
             await ddl.query('BEGIN');
-            await ddl.query('ALTER TABLE training_time_days ALTER COLUMN signals TYPE integer USING signals + 0');
-            const checking = verifyCohort({ cohortSlug: l.slug, pool: changedConnections(recorded.pool, [{}, { skip }]) });
+            await ddl.query(rewrite);
+            const checking = verifyCohort({ cohortSlug: l.slug, pool: changedConnections(recorded.pool, changes) });
             await sleep(HOLD_MS);
             const waiting = await waitingOnLocks();
             await ddl.query('COMMIT');
             const lines = checkedLines(await checking);
-            return { lines, waiting, tries: recorded.sent.filter((sql) => sql === CHECK_SQL.lockLearner).length };
+            return { lines, waiting, tries: recorded.sent.filter((sql) => sql === lock).length };
         } catch (error) {
             await ddl.query('ROLLBACK').catch(() => {});
             throw error;
@@ -1336,12 +1343,19 @@ async function t18(pool, { catalogId, ruleSetId }) {
             ddl.release();
         }
     };
-    const locked = await rewrittenDuring(y, []);
+    const rewriteDays = 'ALTER TABLE training_time_days ALTER COLUMN signals TYPE integer USING signals + 0';
+    const locked = await rewrittenDuring(y, rewriteDays, [], CHECK_SQL.lockLearner);
     check('T18', y.closed === 'closed' && locked.lines.join() === `${y.user} 2` && locked.waiting.length === 0 && locked.tries >= 2,
         `a table rewrite held ${HOLD_MS} ms, then committed: the check tried its LOCK ${locked.tries} times, ${locked.waiting.length === 0 ? 'no backend waiting on a lock' : `while ${locked.waiting.length} statement(s) waited on a lock (${locked.waiting.map((q) => (q === CHECK_SQL.lockLearner ? 'its LOCK' : q.slice(0, 60))).join(' | ')})`}, then ${locked.lines.join() === `${y.user} 2` ? 'read both days, matching' : locked.lines.join()}`);
-    const unlocked = await rewrittenDuring(w, [CHECK_SQL.lockLearner, CHECK_SQL.tryLockTimeout]);
+    const unlocked = await rewrittenDuring(w, rewriteDays, [{}, { skip: [CHECK_SQL.lockLearner, CHECK_SQL.tryLockTimeout] }], CHECK_SQL.lockLearner);
     check('T18', w.closed === 'closed' && unlocked.lines.join() === `${w.user} 0` && unlocked.waiting.join() === CHECK_SQL.indexesLearner,
         `control, without the LOCK and its 20 ms limit: the check waited in ${unlocked.waiting.join() === CHECK_SQL.indexesLearner ? 'its read of no rows, after its snapshot' : `${unlocked.waiting.length} statements`}, which reads ${unlocked.lines.join().split(' ')[1] ?? '?'} days of the rewritten table`);
+    const rewriteMemberships = "ALTER TABLE training_memberships ALTER COLUMN role TYPE text USING role || ''";
+    const cohortLocked = await rewrittenDuring(ya, rewriteMemberships, [], CHECK_SQL.lockCohort);
+    const cohortUnlocked = await rewrittenDuring(wa, rewriteMemberships, [{ skip: [CHECK_SQL.lockCohort, CHECK_SQL.tryLockTimeout] }], CHECK_SQL.lockCohort);
+    check('T18', ya.closed === 'closed' && cohortLocked.lines.join() === `${ya.user} 2` && cohortLocked.waiting.length === 0 && cohortLocked.tries >= 2
+        && wa.closed === 'closed' && cohortUnlocked.lines.length === 0 && cohortUnlocked.waiting.join() === CHECK_SQL.indexesCohort,
+        `the cohort's snapshot, the memberships rewritten: the check tried its LOCK ${cohortLocked.tries} times, ${cohortLocked.waiting.length === 0 ? 'no backend waiting on a lock' : `while ${cohortLocked.waiting.length} statement(s) waited on a lock`}, then ${matchesTwo(cohortLocked.lines, ya.user)}; control, without the LOCK and its 20 ms limit: it waited in ${cohortUnlocked.waiting.join() === CHECK_SQL.indexesCohort ? 'its read of no rows, after its snapshot' : `${cohortUnlocked.waiting.length} statements`}, then read ${cohortUnlocked.lines.length === 0 ? 'no learner' : cohortUnlocked.lines.join()}`);
 
     // A migration that changes two of the tables a snapshot locks, in the other order than its LOCK,
     // or that rebuilds an index of one (REINDEX holds the index in ACCESS EXCLUSIVE mode, and its table
@@ -1351,16 +1365,21 @@ async function t18(pool, { catalogId, ruleSetId }) {
     // deadlock), and the check reads the learner's days once the migration ends. Controls: a LOCK
     // that waits (no NOWAIT) holds the tables before the one it waits for; a try without its shorter
     // lock timeout and read of no rows waits in a read for the index while it holds its tables: either
-    // way PostgreSQL cancels the migration (40P01).
-    const [v, u, t, r, q] = [await closedLearner('t18v'), await closedLearner('t18u'), await closedLearner('t18t'), await closedLearner('t18r'), await closedLearner('t18q')];
+    // way PostgreSQL cancels the migration (40P01). The index case for the cohort's snapshot too (an
+    // index of the memberships rebuilt, then the cohorts altered).
+    const [v, u, t, r, q, ra, qa] = [await closedLearner('t18v'), await closedLearner('t18u'), await closedLearner('t18t'), await closedLearner('t18r'), await closedLearner('t18q'),
+        await closedLearner('t18ra'), await closedLearner('t18qa')];
     const addProbe = (/** @type {string} */ table) => `ALTER TABLE ${table} ADD COLUMN t18_probe integer`;
-    /** @param {{ slug: string }} l @param {string} first @param {string} second @param {ConnectionChange} [change] the learner's first try */
-    const migrationDuring = async (l, first, second, change) => {
+    /**
+     * @param {{ slug: string }} l @param {string} first @param {string} second
+     * @param {ConnectionChange[]} [changes] for the check's connections (the cohort's first try, then the first learner's)
+     */
+    const migrationDuring = async (l, first, second, changes = []) => {
         const ddl = await pool.connect();
         try {
             await ddl.query('BEGIN');
             await ddl.query(first);
-            const checking = verifyCohort({ cohortSlug: l.slug, pool: change ? changedConnections(pool, [{}, change]) : pool });
+            const checking = verifyCohort({ cohortSlug: l.slug, pool: changedConnections(pool, changes) });
             await sleep(HOLD_MS);
             const migrated = await ddl.query(second).then(() => 'ok', (error) => String(error.code));
             await ddl.query('ROLLBACK');
@@ -1378,10 +1397,15 @@ async function t18(pool, { catalogId, ruleSetId }) {
     check('T18', cohortShape.migrated === 'ok' && cohortShape.lines.join() === `${v.user} 2` && learnerShape.migrated === 'ok' && learnerShape.lines.join() === `${u.user} 2`
         && reindexShape.migrated === 'ok' && reindexShape.lines.join() === `${r.user} 2`,
         `a migration altering the memberships, then the cohorts: its second ALTER ${cohortShape.migrated}, the check ${matchesTwo(cohortShape.lines, v.user)}; the recounts' table, then the days': ${learnerShape.migrated}, ${matchesTwo(learnerShape.lines, u.user)}; an index of the days' rebuilt, then the recounts' table altered: ${reindexShape.migrated}, ${matchesTwo(reindexShape.lines, r.user)}`);
-    const waitingLock = await migrationDuring(t, addProbe('training_time_recomputes'), addProbe('training_time_days'), { send: new Map([[CHECK_SQL.lockLearner, CHECK_SQL.lockLearner.replace(/ NOWAIT$/, '')]]) });
-    const waitingRead = await migrationDuring(q, 'REINDEX INDEX training_time_days_cohort_idx', addProbe('training_time_recomputes'), { skip: [CHECK_SQL.tryLockTimeout, CHECK_SQL.indexesLearner] });
+    const waitingLock = await migrationDuring(t, addProbe('training_time_recomputes'), addProbe('training_time_days'), [{}, { send: new Map([[CHECK_SQL.lockLearner, CHECK_SQL.lockLearner.replace(/ NOWAIT$/, '')]]) }]);
+    const waitingRead = await migrationDuring(q, 'REINDEX INDEX training_time_days_cohort_idx', addProbe('training_time_recomputes'), [{}, { skip: [CHECK_SQL.tryLockTimeout, CHECK_SQL.indexesLearner] }]);
     check('T18', waitingLock.migrated === '40P01' && waitingLock.lines.join() === `${t.user} 2` && waitingRead.migrated === '40P01' && waitingRead.lines.join() === `${q.user} 2`,
         `controls: a LOCK that waits, the migration's second ALTER ${waitingLock.migrated === '40P01' ? 'is cancelled as a deadlock (40P01)' : waitingLock.migrated}, the check then ${matchesTwo(waitingLock.lines, t.user)}; a read that waits for the index, ${waitingRead.migrated === '40P01' ? 'the same (40P01)' : waitingRead.migrated}, ${matchesTwo(waitingRead.lines, q.user)}`);
+    const reindexMemberships = 'REINDEX INDEX training_memberships_cohort_idx';
+    const cohortReindex = await migrationDuring(ra, reindexMemberships, addProbe('training_cohorts'));
+    const cohortWaitingRead = await migrationDuring(qa, reindexMemberships, addProbe('training_cohorts'), [{ skip: [CHECK_SQL.tryLockTimeout, CHECK_SQL.indexesCohort] }]);
+    check('T18', cohortReindex.migrated === 'ok' && cohortReindex.lines.join() === `${ra.user} 2` && cohortWaitingRead.migrated === '40P01' && cohortWaitingRead.lines.join() === `${qa.user} 2`,
+        `the cohort's snapshot, an index of the memberships rebuilt, then the cohorts altered: ${cohortReindex.migrated}, the check ${matchesTwo(cohortReindex.lines, ra.user)}; control, its read waiting for the index: ${cohortWaitingRead.migrated === '40P01' ? 'the migration is cancelled as a deadlock (40P01)' : cohortWaitingRead.migrated}, ${matchesTwo(cohortWaitingRead.lines, qa.user)}`);
 
     // What each snapshot's statements lock (pg_locks, this backend's). Its reads, without its LOCK (a
     // renamed table too): exactly the tables its LOCK locks, for the cohort and for a learner with a

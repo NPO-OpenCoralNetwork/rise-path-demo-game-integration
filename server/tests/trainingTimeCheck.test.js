@@ -18,7 +18,7 @@
 //   of this cohort; the rest by id).
 // The single snapshot and the migration on PostgreSQL 16 are proved by scripts/db/verify-training.mjs
 // (T17, T18). Every rule value here is artificial.
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { COUNTING_VERSIONS, countingVersion } from '../../shared/training/countingVersions.js';
@@ -170,8 +170,8 @@ describe('tools/core/trainingTimeCheck.js', () => {
         const bare = (/** @type {string} */ name) => name.replace(/"/g, '').toLowerCase().replace(/^public\./, '');
         const createdIn = (/** @type {string} */ sql) => [...sql.matchAll(/\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?)/gi)]
             .map((m) => bare(m[1]));
-        assert.deepEqual(['CREATE UNLOGGED TABLE IF NOT EXISTS "public"."t_x" (', 'CREATE TABLE public.t_y(', 'CREATE TABLE "auth"."t_z" ('].map(createdIn), [['t_x'], ['t_y'], ['auth.t_z']],
-            'each spelling of a CREATE');
+        assert.deepEqual(['CREATE UNLOGGED TABLE IF NOT EXISTS "public"."t_x" (', 'CREATE TABLE public.t_y(', 'CREATE TABLE "auth"."t_z" (', 'create table t_w ('].map(createdIn),
+            [['t_x'], ['t_y'], ['auth.t_z'], ['t_w']], 'each spelling of a CREATE');
         const migrations = new URL('../migrations/', import.meta.url);
         const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f)).flatMap((f) => createdIn(fs.readFileSync(new URL(f, migrations), 'utf8'))))];
         assert.ok(created.includes('auth.users') && created.includes('training_time_recomputes') && created.includes('training_cohorts'), 'the tables are found');
@@ -179,6 +179,9 @@ describe('tools/core/trainingTimeCheck.js', () => {
         const tablesOf = (/** @type {string} */ sql) => created.filter((t) => new RegExp(`(?<![\\w."])${spelled(t)}(?![\\w."])`, 'i').test(sql));
         assert.deepEqual(['FROM public.training_cohorts c', 'FROM "training_cohorts"', 'JOIN "public"."training_cohorts" c', 'FROM training_cohorts', 'JOIN auth.users u'].map(tablesOf),
             [['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['auth.users']], 'each spelling of a table');
+        // In a list (before or after a comma, with or without a space), in a subquery or parentheses, in any case.
+        assert.deepEqual(['FROM training_cohorts, x', 'FROM x,training_cohorts', 'IN (SELECT id FROM training_cohorts)', 'FROM (training_cohorts c JOIN x ON true)', 'FROM TRAINING_COHORTS'].map(tablesOf),
+            [['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts']], 'a list, a subquery, any case');
         // Not the table: one of that name in another schema, a longer name, a name qualified by it (each quoted or not).
         for (const other of ['FROM audit.training_cohorts', 'JOIN "audit"."training_cohorts"', 'SELECT training_cohorts_id FROM x', 'FROM training_cohorts.x', 'FROM "training_cohorts"."x"']) {
             assert.deepEqual(tablesOf(other), [], other);
@@ -201,7 +204,7 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.match(CHECK_SQL.recountsByIds, /to_char\(from_day, 'YYYY-MM-DD'\) AS from_day, to_char\(to_day, 'YYYY-MM-DD'\) AS to_day, rule_set_id, catalog_version_id\n {2}FROM training_time_recomputes WHERE id = ANY\(\$1::bigint\[\]\) ORDER BY id$/);
     });
 
-    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked, or a lock wait over 20 ms after it, rolls the try back, holding nothing, and the next starts 0.1 s after it started; after LOCK_RETRY.tries tries (about 10 s), account_busy; any other error ends the check at once', async () => {
+    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked, or a lock wait over 20 ms after it, rolls the try back, holding nothing, and the next starts 0.1 s after it started (at once after a try over 0.1 s, on a clock that only goes forward); after LOCK_RETRY.tries tries (about 10 s), account_busy; any other error ends the check at once', async () => {
         assert.deepEqual([LOCK_RETRY.tries * LOCK_RETRY.everyMs, TRAINING_SQL.lockTimeout], [10_000, "SET LOCAL lock_timeout = '10s'"], 'about the lock timeout of the other operations');
         const busy = () => Object.assign(new Error('could not obtain lock on relation'), { code: '55P03' });
         // A clock that the sleeps move (and a statement made to take time).
@@ -260,6 +263,28 @@ describe('tools/core/trainingTimeCheck.js', () => {
         const sent2 = third.queries.length;
         const failed = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: third, sleep, now }));
         assert.deepEqual([failed.error_type, slept, third.queries.slice(sent2).filter((q) => q.sql === CHECK_SQL.learnerRows).length], ['table_not_found', [], 1]);
+        // A try over 0.1 s: the next starts at once (150 + 150 ms in all).
+        const { pool: slow } = await seeded();
+        slow.before(CHECK_SQL.indexesLearner, () => { clock += 150; });
+        slow.failOn(CHECK_SQL.indexesLearner, busy(), 1);
+        const slowFrom = clock;
+        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: slow, sleep, now, learner: A })).status, 'checked');
+        assert.equal(clock - slowFrom, 300, 'a try over 0.1 s: the next at once');
+        // verifyCohort's own clock (the script passes none) only goes forward: the wall clock set back
+        // 5 s during a try (an NTP step) does not lengthen the sleep after it.
+        const { pool: stepped } = await seeded();
+        let offset = 0;
+        const wall = Date.now;
+        const wallClock = mock.method(Date, 'now', () => wall() + offset);
+        stepped.before(CHECK_SQL.indexesLearner, () => { offset = -5_000; });
+        stepped.failOn(CHECK_SQL.indexesLearner, busy(), 1);
+        slept.length = 0;
+        try {
+            assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: stepped, sleep, learner: A })).status, 'checked');
+        } finally {
+            wallClock.mock.restore();
+        }
+        assert.ok(slept.length === 1 && slept[0] >= 0 && slept[0] <= LOCK_RETRY.everyMs, `slept ${slept}`);
     });
 
     it('differences: a changed value (that day only), evidence added to a closed window, a close row with another setting\'s versions, a version this code does not have', async () => {
