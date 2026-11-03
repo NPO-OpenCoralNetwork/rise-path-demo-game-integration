@@ -10,9 +10,10 @@
 #   2. scripts/db-migrate.mjs twice on a fourth database, its status, pgvector and vector(768);
 #   3. deploy/risepath-vm/sql/mcp_remote_role.sql: refused without a password of 24 or more characters,
 #      then twice with one, and what the role can log in to and read (no training_ table at all).
-# Time limits: each verify script 180 s (they take about 20 s), the 00:00 JST guard 185 s, the pulls
-# 240 s in all, the first boot 120 s. The workflow step allows 23 min: all of them together plus a minute
-# for the rest (server/tests/ciScripts.test.js), so a hang ends with this script's message.
+# Time limits: each verify script 180 s (verify-training.mjs takes about 60 s, after its own 00:00 JST
+# guard, which waits 95 s at most; the others 15 to 25 s), the 00:00 JST guard 185 s, the pulls 240 s in
+# all, the first boot 120 s. The workflow step allows 23 min: all of them together plus a minute for the
+# rest (server/tests/ciScripts.test.js), so a hang ends with this script's message.
 # Needs Docker, psql 16+, timeout (coreutils) and node_modules (npm ci). Dummy values only. Removes only
 # the container it created (RISEPATH_CI_KEEP=1 keeps it). Outputs: $RISEPATH_CI_OUT (default .artifacts/ci/db).
 # Without Docker: --existing-url postgresql://user[:password]@host:port (exactly these two arguments): the

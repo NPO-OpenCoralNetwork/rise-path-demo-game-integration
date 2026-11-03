@@ -660,6 +660,9 @@ describe('tools/core/trainingTime.js: a signal (recordSignal), stored', () => {
         assert.match(TRAINING_TIME_SQL.signalState, /WHERE s\.user_id = \$1::uuid AND s\.chain_id = \$3::uuid AND s\.account_deleted_at IS NULL/);
         assert.match(TRAINING_TIME_SQL.signalState, /WHERE s\.user_id = \$1::uuid AND s\.cohort_id = c\.id AND s\.account_deleted_at IS NULL AND s\.day >= d\.today - 1/);
         assert.match(TRAINING_TIME_SQL.signalState, /WHERE m\.user_id = \$1::uuid AND m\.cohort_id = c\.id AND m\.account_deleted_at IS NULL/);
+        // The guard: the last closed day's end + the widest gapMs among that day's live rows, of any
+        // kind (a recount's too; a marked one not).
+        assert.match(TRAINING_TIME_SQL.signalState, /\n {30}\+ \(SELECT max\(\(r\.params #>> '\{counting,gapMs\}'\)::bigint\)\n {35}FROM training_time_days y JOIN training_time_rule_sets r ON r\.id = y\.rule_set_id\n {34}WHERE y\.user_id = \$1::uuid AND y\.cohort_id = c\.id AND y\.day = x\.day AND y\.account_deleted_at IS NULL\) AS closed_until_ms\n {23}FROM training_time_days x\n {22}WHERE x\.user_id = \$1::uuid AND x\.cohort_id = c\.id AND x\.kind = 'close' AND x\.account_deleted_at IS NULL\n {22}ORDER BY x\.day DESC LIMIT 1\) lc ON true$/);
         assert.deepEqual([TRAINING_TIME_SQL.savepointState, TRAINING_TIME_SQL.rollbackState], ['SAVEPOINT live_state', 'ROLLBACK TO SAVEPOINT live_state']);
     });
 

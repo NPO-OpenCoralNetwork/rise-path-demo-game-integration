@@ -28,6 +28,7 @@ import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { TRAINING_TIME_SQL, closeDays, evidenceDigest, loadCatalog, loadRules, signalOf } from '../../tools/core/trainingTime.js';
 import { CHECK_SQL, LOCK_RETRY, SNAPSHOT_LOCKS, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
+import { CREATED, createdIn, lockedBy, reads, referencedBy, tablesOf } from './helpers/sqlTables.js';
 import { AUTH_SQL, createTrainingTimePool } from './helpers/trainingTimePool.js';
 
 const S = 1000;
@@ -167,16 +168,10 @@ describe('tools/core/trainingTimeCheck.js', () => {
         // subquery, the end of the text, with or without public. or quotes, on either side; a rename
         // is caught by T18 on PostgreSQL, which compares the locks a snapshot's reads take). A name in
         // an SQL comment or a string counts too: that can only fail this test or add a table to a LOCK.
-        const bare = (/** @type {string} */ name) => name.replace(/"/g, '').toLowerCase().replace(/^public\./, '');
-        const createdIn = (/** @type {string} */ sql) => [...sql.matchAll(/\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?)/gi)]
-            .map((m) => bare(m[1]));
+        // The functions (server/tests/helpers/sqlTables.js, which the recount's test uses too) first.
         assert.deepEqual(['CREATE UNLOGGED TABLE IF NOT EXISTS "public"."t_x" (', 'CREATE TABLE public.t_y(', 'CREATE TABLE "auth"."t_z" (', 'create table t_w ('].map(createdIn),
             [['t_x'], ['t_y'], ['auth.t_z'], ['t_w']], 'each spelling of a CREATE');
-        const migrations = new URL('../migrations/', import.meta.url);
-        const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f)).flatMap((f) => createdIn(fs.readFileSync(new URL(f, migrations), 'utf8'))))];
-        assert.ok(created.includes('auth.users') && created.includes('training_time_recomputes') && created.includes('training_cohorts'), 'the tables are found');
-        const spelled = (/** @type {string} */ t) => (t.includes('.') ? t.split('.').map((p) => `"?${p}"?`).join('\\.') : `(?:"?public"?\\.)?"?${t}"?`);
-        const tablesOf = (/** @type {string} */ sql) => created.filter((t) => new RegExp(`(?<![\\w."])${spelled(t)}(?![\\w."])`, 'i').test(sql));
+        assert.ok(CREATED.includes('auth.users') && CREATED.includes('training_time_recomputes') && CREATED.includes('training_cohorts'), 'the tables are found');
         assert.deepEqual(['FROM public.training_cohorts c', 'FROM "training_cohorts"', 'JOIN "public"."training_cohorts" c', 'FROM training_cohorts', 'JOIN auth.users u'].map(tablesOf),
             [['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['auth.users']], 'each spelling of a table');
         // In a list (before or after a comma, with or without a space), in a subquery or parentheses, in any case.
@@ -186,9 +181,12 @@ describe('tools/core/trainingTimeCheck.js', () => {
         for (const other of ['FROM audit.training_cohorts', 'JOIN "audit"."training_cohorts"', 'SELECT training_cohorts_id FROM x', 'FROM training_cohorts.x', 'FROM "training_cohorts"."x"']) {
             assert.deepEqual(tablesOf(other), [], other);
         }
-        const lockedBy = (/** @type {string} */ lock) => lock.replace(/^LOCK TABLE /, '').replace(/ IN ACCESS SHARE MODE NOWAIT$/, '').split(', ').map(bare);
         assert.deepEqual(lockedBy('LOCK TABLE "public"."t_x", auth.t_z IN ACCESS SHARE MODE NOWAIT'), ['t_x', 'auth.t_z'], 'each spelling in a LOCK');
-        const reads = (/** @type {string[]} */ sqls) => [...new Set(sqls.flatMap(tablesOf))].sort();
+        assert.deepEqual(['ROW EXCLUSIVE', 'ROW SHARE'].map((mode) => lockedBy(`LOCK TABLE t_x, t_y IN ${mode} MODE NOWAIT`)), [['t_x', 't_y'], ['t_x', 't_y']], 'in any mode');
+        assert.deepEqual(reads(['FROM t_x', 'JOIN training_cohorts c', 'FROM training_memberships, training_cohorts']), ['training_cohorts', 'training_memberships'], 'once each, sorted');
+        // The foreign keys of a table: its CREATE TABLE's REFERENCES and a later ALTER TABLE's (023's composite key).
+        assert.deepEqual(referencedBy('training_time_days'), ['training_catalog_versions', 'training_cohorts', 'training_time_recomputes', 'training_time_rule_sets']);
+        assert.deepEqual([referencedBy('training_time_unit_days'), referencedBy('training_time_signals'), referencedBy('auth.users')], [['training_time_days'], ['training_time_streams'], []]);
         assert.deepEqual(reads([TRAINING_SQL.cohortBySlug, TRAINING_TIME_SQL.learners]), [...lockedBy(CHECK_SQL.lockCohort)].sort());
         assert.deepEqual(reads([TRAINING_TIME_SQL.closeSettings, CHECK_SQL.learnerRows, CHECK_SQL.unitRows, CHECK_SQL.rulesByIds, CHECK_SQL.catalogsByIds, CHECK_SQL.recountsByIds, TRAINING_TIME_SQL.evidence]),
             [...lockedBy(CHECK_SQL.lockLearner)].sort());
