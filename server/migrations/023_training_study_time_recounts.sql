@@ -1,7 +1,7 @@
 -- Rise Path migration 023: job training, recounts of study time (doc/brushup-2026/training-plan.ja.md
--- §4.9, owner decision D12). The logic is tools/core/trainingTimeRecount.js; staff run it with
--- scripts/training-time.mjs --recompute (a dry run shows the differences and the plan's sha256; the
--- same sha256 writes it). Like 021 and 022, this applies on every deployment: the public Rise Path
+-- §4.9, owner decision D12): a staff recount after the staff member saw the differences (the plan's
+-- PR list, 4b) writes these rows; the check (tools/core/trainingTimeCheck.js, scripts/training-time.mjs
+-- --verify) reads them. Like 021 and 022, this applies on every deployment: the public Rise Path
 -- database gets the table and the column too, empty (TRAINING_ENABLED unset).
 --
 --   training_time_recomputes: one row per recount a staff member confirmed: the cohort, the days the

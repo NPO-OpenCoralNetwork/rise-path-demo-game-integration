@@ -3,7 +3,8 @@
 // - nothing happens unless TRAINING_ENABLED is exactly "true" (stdin is not even read);
 // - usage errors send nothing; the files come over stdin (refused when nothing is piped);
 // - a rules file's values never reach the output: errors name fields, results print sha256 only;
-// - each refusal has its message and exit code 2; a busy lock exits 3 and the other learners close.
+// - each refusal has its message and exit code 2; a busy lock exits 3 and the other learners close;
+// - --verify prints ok or each difference (exit 4), never a rule value, and writes nothing.
 // The values are artificial, not the school's (training-plan D9).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +13,7 @@ import { PassThrough } from 'node:stream';
 import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, hms, parseArgs, readStdinFrom, run } from '../../scripts/training-time.mjs';
 import { TRAINING_SQL } from '../../tools/core/training.js';
 import { loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
+import { CHECK_SQL } from '../../tools/core/trainingTimeCheck.js';
 import { createTrainingTimePool } from './helpers/trainingTimePool.js';
 
 const S = 1000;
@@ -49,6 +51,7 @@ async function runWith(argv, { pool = freshPool(), env = ON, stdin = null } = {}
             return stdin;
         },
         now: () => pool?.state?.clock ?? Date.now(),
+        sleep: async () => {},
     });
     return { code, out: lines.join('\n'), pool, reads };
 }
@@ -64,7 +67,7 @@ async function loaded() {
 describe('scripts/training-time.mjs: the switch and the arguments', () => {
     it('refuses everything unless TRAINING_ENABLED is exactly "true" (exit 2), before any statement or reading stdin', async () => {
         for (const env of [{}, { TRAINING_ENABLED: '' }, { TRAINING_ENABLED: 'TRUE' }, { TRAINING_ENABLED: '1' }]) {
-            for (const argv of [['--load-rules', '--by', 'a', '--note', 'b'], ['--close', SLUG], ['--stats', SLUG]]) {
+            for (const argv of [['--load-rules', '--by', 'a', '--note', 'b'], ['--close', SLUG], ['--stats', SLUG], ['--verify', SLUG]]) {
                 const { code, out, pool, reads } = await runWith(argv, { env, stdin: JSON.stringify(RULES_IN) });
                 assert.equal(code, EXIT.refused, JSON.stringify(env));
                 assert.match(out, /TRAINING_ENABLED is not "true"/);
@@ -81,6 +84,7 @@ describe('scripts/training-time.mjs: the switch and the arguments', () => {
             ['--set', SLUG, '--catalog', sha, '--rules', sha, '--from', '2026-11-05', '--by', 'a'], ['--show', 'Bad Slug'], ['--close', SLUG, '--learner', 'nope'],
             ['--show', SLUG, '--learner', A, '--learner', B], ['--set', SLUG, '--catalog', 'ABC', '--rules', sha, '--from', '2026-11-05', '--by', 'a', '--reason', 'r'],
             ['--set', SLUG, '--catalog', sha, '--rules', sha, '--from', '2026-02-30', '--by', 'a', '--reason', 'r'],
+            ['--verify'], ['--verify', SLUG, '--by', 'a'], ['--verify', SLUG, '--learner', 'nope'], ['--verify', SLUG, '--stats', SLUG],
         ]) {
             const { code, pool, reads } = await runWith(argv, { stdin: '{}' });
             assert.equal(code, EXIT.usage, argv.join(' '));
@@ -237,5 +241,106 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         assert.equal(broken.code, EXIT.refused);
         assert.match(broken.out, /a stored rules or unit list version does not parse with this code/);
         assert.equal((await runWith(['--stats', SLUG], { pool: null })).code, EXIT.unavailable);
+    });
+
+    it('--verify: every learner\'s closed days, ok (exit 0) or each difference (exit 4, never a rule value); one learner; a cohort or learner that is not there is refused', async () => {
+        const { pool, catalog, rules } = await loaded();
+        pool.addSetting({ cohortId: COHORT, catalogId: catalog.id, ruleSetId: rules.id, effectiveFrom: '2026-11-01' });
+        const from = Date.parse('2026-11-02T01:00:00Z');
+        for (let seq = 0; seq < 12; seq += 1) pool.addSignal({ userId: A, cohortId: COHORT, unit: 'sample-u1', chain: 'cccccccc-0000-4000-8000-000000000001', born: from, seq, at: from + seq * 7 * S, input: true });
+        await runWith(['--close', SLUG], { pool });
+        const ok = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([ok.code, ok.out.split('\n')], [EXIT.ok, [
+            `${A}: ok (3 day(s))`,
+            `${B}: ok (3 day(s))`,
+            `Checked ${SLUG}: 2 learner(s), 6 day(s); all match.`,
+        ]]);
+        assert.ok(pool.state.days.every((d) => d.kind === 'close'), 'nothing written');
+        const row = pool.state.days.find((d) => d.user_id === A && d.day === '2026-11-02');
+        row.counted_ms += 1000;
+        pool.addSignal({ userId: A, cohortId: COHORT, unit: 'sample-u1', chain: 'cccccccc-0000-4000-8000-000000000002', born: from, seq: 0, at: Date.parse('2026-11-03T02:00:00Z'), input: true });
+        const differs = await runWith(['--verify', SLUG, '--learner', A.toUpperCase()], { pool });
+        assert.equal(differs.code, EXIT.differs);
+        assert.deepEqual(differs.out.split('\n'), [
+            `${A}: 2 difference(s) in 3 day(s)`,
+            '  2026-11-02: the values differ: stored 0:01:18 (over the set time 0:00:00), counted 0:01:17 (over the set time 0:00:00)',
+            '  2026-11-03: the evidence differs from when it was counted (signals 0 then, 1 now, or their content)',
+            `Checked ${SLUG}: 1 learner(s), 3 day(s); 2 difference(s) in 1 learner(s). Keep this output in the school (learners' ids and times); report privately (SECURITY.md) that --verify found differences, without learner data, and change nothing until they are understood.`,
+        ]);
+        for (const value of VALUES) assert.ok(!differs.out.includes(value), value);
+        // The day's totals as stored, its time on another unit: the split differs. (Each check ends in a
+        // ROLLBACK, which puts back a copy of the state: read the rows again.)
+        const again = pool.state.days.find((d) => d.user_id === A && d.day === '2026-11-02');
+        again.counted_ms -= 1000;
+        pool.state.unitDays.find((u) => u.day_id === again.id).unit_key = 'sample-u2';
+        const split = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.deepEqual([split.code, split.out.split('\n').slice(0, 2)], [EXIT.differs, [`${A}: 2 difference(s) in 3 day(s)`, "  2026-11-02: the time per unit differs (the day's totals match)"]]);
+        // The unit put back. Then a recount row of 11-01 naming a unit list its recount did not use,
+        // 11-02's close row naming a unit list that is not its day's setting (K2 differs in a unit not
+        // studied: the same values), 11-03 counted with a version this code does not have.
+        const day = (/** @type {string} */ d) => pool.state.days.find((r) => r.user_id === A && r.day === d);
+        pool.state.unitDays.find((u) => u.day_id === day('2026-11-02').id).unit_key = 'sample-u1';
+        const k2 = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: COURSE.units.map((/** @type {any} */ u) => (u.key === 'sample-u2' ? { ...u, setMinutes: 31 } : u)) }, loadedBy: 'a', note: 'b', pool }));
+        const close01 = day('2026-11-01');
+        const recount = pool.addRecount({ cohortId: COHORT, fromDay: '2026-11-01', toDay: '2026-11-01', ruleSetId: rules.id,
+            rows: [{ userId: A, day: '2026-11-01', ruleSetId: rules.id, catalogId: k2.id, countedMs: 0, overCapMs: 0, signals: close01.signals, evidenceSha256: close01.evidence_sha256 }] });
+        day('2026-11-02').catalog_version_id = k2.id;
+        day('2026-11-03').algorithm = 'study-time/v9';
+        const kinds = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.deepEqual([kinds.code, kinds.out.split('\n').slice(0, 4)], [EXIT.differs, [
+            `${A}: 3 difference(s) in 3 day(s)`,
+            `  2026-11-01: its versions are not those of its recount ${recount}`,
+            "  2026-11-02: its versions are not the cohort's setting of that day",
+            "  2026-11-03: counted with study-time/v9, not with its rules' algorithm (study-time/v1)",
+        ]]);
+        // The rules row naming another algorithm than its rules (every day), then a unit list version
+        // this code cannot parse (the two days that name it).
+        day('2026-11-03').algorithm = 'study-time/v1';
+        pool.state.rules.find((/** @type {any} */ r) => r.id === rules.id).algorithm = 'study-time/v9';
+        const rulesRow = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.ok(rulesRow.out.split('\n').includes('  2026-11-03: its rules row names study-time/v9, another algorithm than its rules'), rulesRow.out);
+        pool.state.rules.find((/** @type {any} */ r) => r.id === rules.id).algorithm = 'study-time/v1';
+        pool.state.catalogs.find((/** @type {any} */ k) => k.id === k2.id).manifest.schema = 'risepath.training-course/v9';
+        const unparsed = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.deepEqual(unparsed.out.split('\n').filter((l) => l.includes('does not parse')),
+            ['  2026-11-01: its rules or unit list version does not parse with this code', '  2026-11-02: its rules or unit list version does not parse with this code']);
+        pool.state.catalogs.find((/** @type {any} */ k) => k.id === k2.id).manifest.schema = COURSE.schema;
+        // A recount of 11-01 with rules of study-time/v2 (the row as newer code would load it), then
+        // with v1 rules that do not parse with this code.
+        pool.state.rules.push({ id: '900', algorithm: 'study-time/v2', sha256: 'c'.repeat(64), params: { ...structuredClone(RULES_IN), algorithm: 'study-time/v2' }, loaded_by: 'a', note: 'b' });
+        const now01 = pool.state.days.filter((/** @type {any} */ r) => r.user_id === A && r.day === '2026-11-01').at(-1);
+        pool.addRecount({ cohortId: COHORT, fromDay: '2026-11-01', toDay: '2026-11-01', ruleSetId: '900',
+            rows: [{ userId: A, day: '2026-11-01', ruleSetId: '900', catalogId: now01.catalog_version_id, countedMs: 0, overCapMs: 0, signals: now01.signals, evidenceSha256: now01.evidence_sha256 }] });
+        const unknown = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.ok(unknown.out.split('\n').includes('  2026-11-01: its rules are study-time/v2, which this code cannot count'), unknown.out);
+        Object.assign(pool.state.rules.find((/** @type {any} */ r) => r.id === '900'), { algorithm: 'study-time/v1', params: { ...structuredClone(RULES_IN), counting: { ...RULES_IN.counting, gapMs: 1 } } });
+        const rulesUnparsed = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.ok(rulesUnparsed.out.split('\n').includes('  2026-11-01: its rules or unit list version does not parse with this code'), rulesUnparsed.out);
+        const nobody = await runWith(['--verify', SLUG, '--learner', 'aaaaaaaa-2222-4000-8000-0000000000e0'], { pool });
+        assert.deepEqual([nobody.code, nobody.out], [EXIT.refused, `Refused: aaaaaaaa-2222-4000-8000-0000000000e0 is not a learner of ${SLUG}.`]);
+        const none = await runWith(['--verify', 'nope'], { pool });
+        assert.deepEqual([none.code, none.out], [EXIT.refused, 'Refused: there is no cohort nope.']);
+        pool.state.rules[0].params.counting.gapMs = 1;
+        const broken = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([broken.code, broken.out], [EXIT.refused, 'Refused: a stored rules or unit list version does not parse with this code. Nothing was changed; ask the developers.']);
+        // Any other error is no busy lock: a database without migration 023 (the LOCK names its table)
+        // ends at the first try.
+        pool.state.rules[0].params.counting.gapMs = RULES_IN.counting.gapMs;
+        pool.failOn(CHECK_SQL.lockLearner, Object.assign(new Error('relation "training_time_recomputes" does not exist'), { code: '42P01' }), 1);
+        const sent0 = pool.queries.length;
+        const missing = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([missing.code, missing.out, pool.queries.slice(sent0).filter((q) => q.sql === CHECK_SQL.lockLearner).length],
+            [EXIT.unavailable, 'Unavailable: the database could not do it (table_not_found). Try again later.', 1]);
+        // A migration's DDL holding a table makes the snapshot's LOCK … NOWAIT fail; a REINDEX holding
+        // one of their indexes makes its read of no rows wait 20 ms and fail (a learner's, then the
+        // cohort's). Each is tried LOCK_RETRY.tries times, then exit 3. failOn keeps every failure, so
+        // each comes earlier than the last, and the run stops at it.
+        for (const sql of [CHECK_SQL.indexesLearner, CHECK_SQL.lockLearner, CHECK_SQL.indexesCohort, CHECK_SQL.lockCohort]) {
+            pool.failOn(sql, Object.assign(new Error('could not obtain lock on relation'), { code: '55P03' }));
+            const busy = await runWith(['--verify', SLUG], { pool });
+            assert.deepEqual([busy.code, busy.out], [EXIT.unavailable, 'Unavailable: a lock was busy for 10 s (a migration may be running). Try again.'], sql.slice(0, 50));
+            assert.deepEqual(pool.tx().slice(-2), [sql, 'ROLLBACK'], `stopped at ${sql.slice(0, 50)}`);
+        }
+        assert.equal((await runWith(['--verify', SLUG], { pool: null })).code, EXIT.unavailable);
     });
 });

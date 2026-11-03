@@ -2,7 +2,7 @@
 /**
  * The counting versions this code can count a day with (doc/brushup-2026/training-plan.ja.md §4.9,
  * D12). Every day row names the version it was counted with (training_time_days.algorithm, from its
- * rules); a recount and a check (tools/core/trainingTimeRecount.js) count each day with its own
+ * rules); the check (tools/core/trainingTimeCheck.js) and a recount count each day with its own
  * version's functions, and refuse a version this code does not have rather than count it with
  * another one. A change that alters any result of a version (the golden in
  * server/tests/trainingStudyTime.test.js) needs a new version name: the old one stays here, with

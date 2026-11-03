@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * Staff: study time of job training (doc/brushup-2026/training-plan.ja.md §4.9, D12; tables of
+ * Staff: study time of job training (doc/brushup-2026/training-plan.ja.md §4.9; tables of
  * server/migrations/022_training_study_time.sql and 023_training_study_time_recounts.sql, logic in
- * tools/core/trainingTime.js and trainingTimeRecount.js).
+ * tools/core/trainingTime.js and trainingTimeCheck.js).
  *
  * Run it in the school deployment's api container (DATABASE_URL_PHASE1 and TRAINING_ENABLED are
  * already there). The unit list and the rules file are private (D2, D9): they live outside the
@@ -16,8 +16,6 @@
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --close 2026-11-web [--learner <account uuid>]
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --stats 2026-11-web
  *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --verify 2026-11-web [--learner <account uuid>]
- *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --recompute 2026-11-web --from YYYY-MM-DD --to YYYY-MM-DD [--rules <sha256>] [--catalog <sha256>] --by <who> --reason <text> --dry-run
- *   docker compose --env-file stack.env exec -T api node scripts/training-time.mjs --recompute 2026-11-web … --expect <plan sha256>
  *
  * --load-catalog  a unit list (risepath.training-course/v1) as a version that never changes, named by
  *                 its sha256; the same content again is the version already there.
@@ -26,23 +24,21 @@
  *                 earliest, tomorrow once a setting is in effect; never after the cohort's last day;
  *                 once the cohort has study time, only the course in effect today. Settings are only
  *                 added.
- * --show          the cohort's settings and recounts (versions by sha256), or one learner's closed
- *                 days (each with its earlier rows and the recount that wrote it) and units.
+ * --show          the cohort's settings (versions by sha256), or one learner's closed days and units.
  * --close         closes the final days of every learner of the cohort (or one), each in its own
  *                 transaction. The api closes a learner's final days too, when the learner's page
  *                 sends a signal or reads its study time; this closes those of pages that stopped.
  * --stats         the cohort's row counts (marked rows of deleted accounts too) and its last closed day.
- * --verify        checks every closed day of the cohort's learners (or one): its versions, the
- *                 setting or recount it came from, its evidence and its values. Reads only.
- * --recompute     D12: other rules, another unit list, or both (by sha256) for the days from..to;
- *                 every later closed day is counted again with its own versions. --dry-run prints
- *                 each changed day before and after, and the plan's sha256 (it binds --by and
- *                 --reason too); nothing is written. The same command with --expect <that sha256>
- *                 instead writes it, only if nothing changed since: the old rows stay.
+ * --verify        checks every closed day of the cohort's learners (or one): the versions it was
+ *                 counted with, the setting or recount they came from, its evidence and its values.
+ *                 Reads only, in one snapshot per learner, with no advisory lock. Its tables are
+ *                 locked for reading first, without waiting: while a migration's DDL holds one (or
+ *                 an index of one, for over 20 ms), it holds nothing and tries again, for about 10 s.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a
- * lock busy for 10 s: try again), 4 --verify found a difference (report it privately, SECURITY.md).
+ * lock busy for 10 s: try again), 4 --verify found a difference (keep the output in the school; report
+ * privately that there was one, without learner data, SECURITY.md).
  */
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -61,7 +57,6 @@ import {
     setCohortTime,
 } from '../tools/core/trainingTime.js';
 import { verifyCohort } from '../tools/core/trainingTimeCheck.js';
-import { cohortRecounts, learnerHistory, planRecount, recountCohort } from '../tools/core/trainingTimeRecount.js';
 import { jstDayOf } from '../shared/training/studyTime.js';
 
 export const USAGE = [
@@ -73,7 +68,6 @@ export const USAGE = [
     '  node scripts/training-time.mjs --close <cohort slug> [--learner <account uuid>]',
     '  node scripts/training-time.mjs --stats <cohort slug>',
     '  node scripts/training-time.mjs --verify <cohort slug> [--learner <account uuid>]',
-    '  node scripts/training-time.mjs --recompute <cohort slug> --from YYYY-MM-DD --to YYYY-MM-DD [--rules <sha256>] [--catalog <sha256>] --by <who> --reason <text> (--dry-run | --expect <plan sha256>)',
 ].join('\n');
 
 export const EXIT = Object.freeze({ ok: 0, usage: 1, refused: 2, unavailable: 3, differs: 4 });
@@ -94,17 +88,17 @@ export const STAFF_CLOSER = 'staff';
  *   log: (line: string) => void,
  *   readStdin: () => Promise<string | null>,
  *   now?: () => number,
+ *   sleep?: (ms: number) => Promise<void>,
  * }} Deps
  *   readStdin: the whole of stdin, or null when nothing was piped (a terminal, or no bytes within STDIN_WAIT_MS)
+ *   sleep: the wait between --verify's tries for its read locks (verifyCohort's own when left out)
  */
 
-const MODES = /** @type {const} */ (['loadCatalog', 'loadRules', 'set', 'show', 'close', 'stats', 'verify', 'recompute']);
-const MODE_LIST = 'choose exactly one of --load-catalog, --load-rules, --set, --show, --close, --stats, --verify, --recompute';
+const MODES = /** @type {const} */ (['loadCatalog', 'loadRules', 'set', 'show', 'close', 'stats', 'verify']);
+const MODE_LIST = 'choose exactly one of --load-catalog, --load-rules, --set, --show, --close, --stats, --verify';
 const FLAGS = Object.freeze({
-    '--load-catalog': 'loadCatalog', '--load-rules': 'loadRules', '--set': 'set', '--show': 'show', '--close': 'close', '--stats': 'stats',
-    '--verify': 'verify', '--recompute': 'recompute',
+    '--load-catalog': 'loadCatalog', '--load-rules': 'loadRules', '--set': 'set', '--show': 'show', '--close': 'close', '--stats': 'stats', '--verify': 'verify',
     '--by': 'by', '--note': 'note', '--reason': 'reason', '--catalog': 'catalog', '--rules': 'rules', '--from': 'from', '--learner': 'learner',
-    '--to': 'to', '--expect': 'expect', '--dry-run': 'dryRun',
 });
 /** The options each mode takes (and needs). */
 const OPTIONS = Object.freeze({
@@ -115,10 +109,8 @@ const OPTIONS = Object.freeze({
     close: { needs: [], takes: ['learner'] },
     stats: { needs: [], takes: [] },
     verify: { needs: [], takes: ['learner'] },
-    recompute: { needs: ['from', 'to', 'by', 'reason'], takes: ['from', 'to', 'rules', 'catalog', 'by', 'reason', 'expect', 'dryRun'] },
 });
-/** Modes and options that take no value. */
-const NO_VALUE = new Set(['loadCatalog', 'loadRules', 'dryRun']);
+const NO_VALUE = new Set(['loadCatalog', 'loadRules']);
 
 /** @param {string[]} argv */
 export function parseArgs(argv) {
@@ -142,11 +134,6 @@ export function parseArgs(argv) {
         }
         if (isMode && NO_VALUE.has(name)) {
             out.mode = /** @type {any} */ (name);
-            continue;
-        }
-        if (NO_VALUE.has(name)) {
-            if (name in out.values) out.error ??= `${arg} is given twice`;
-            else out.values[name] = 'yes';
             continue;
         }
         const next = argv[i + 1];
@@ -173,15 +160,8 @@ export function parseArgs(argv) {
     }
     if (out.slug !== undefined && !COHORT_SLUG.test(out.slug)) return { ...out, error: 'a cohort slug takes a-z, 0-9 and "-" (up to 80, not starting with "-")' };
     if (out.values.learner !== undefined && !canonicalUserId(out.values.learner)) return { ...out, error: '--learner needs an account id (a UUID)' };
-    if (out.mode === 'recompute') {
-        if (('dryRun' in out.values) === ('expect' in out.values)) return { ...out, error: '--recompute needs exactly one of --dry-run or --expect' };
-        if (!('rules' in out.values) && !('catalog' in out.values)) return { ...out, error: '--recompute needs --rules, --catalog or both' };
-    }
     return out;
 }
-
-/** A signed difference of two durations, h:mm:ss (hms takes no negative value). @param {number} from @param {number} to */
-const signed = (from, to) => `${to >= from ? '+' : '-'}${hms(Math.abs(to - from))}`;
 
 /** h:mm:ss of a duration. @param {number} ms */
 export const hms = (ms) => {
@@ -189,14 +169,19 @@ export const hms = (ms) => {
     return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
-/** A refusal of the core module: a usage error, or the database (3; a busy lock says so). @param {{ error: string, error_type: string }} result @param {Deps} deps */
-function failed(result, deps) {
+/**
+ * A refusal of the core module: a usage error, or the database (3; a busy lock says so, with what may
+ * hold it: a close or an account deletion, or for --verify, which only reads and locks its tables for
+ * reading, a migration's DDL).
+ * @param {{ error: string, error_type: string }} result @param {Deps} deps @param {string} [holder]
+ */
+function failed(result, deps, holder = 'an account deletion or a close may be running') {
     if (result.error_type === 'validation') {
         deps.log(`${result.error}\n${USAGE}`);
         return EXIT.usage;
     }
     if (result.error_type === 'account_busy') {
-        deps.log('Unavailable: a lock was busy for 10 s (an account deletion or a close may be running). Try again.');
+        deps.log(`Unavailable: a lock was busy for 10 s (${holder}). Try again.`);
         return EXIT.unavailable;
     }
     if (result.error_type === 'invalid_setting') {
@@ -304,18 +289,8 @@ async function showOne(args, deps) {
     if (args.values.learner !== undefined) {
         const result = await learnerDays({ userId: args.values.learner, cohortId: cohort.id, pool: deps.getPool() });
         if ('error_type' in result) return failed(result, deps);
-        const history = await learnerHistory({ userId: args.values.learner, cohortId: cohort.id, pool: deps.getPool() });
-        if ('error_type' in history) return failed(history, deps);
         deps.log(`${result.userId} in ${cohort.slug}: ${result.days.length} closed day(s)${result.days.length ? `, through ${result.days.at(-1)?.day}` : ''}`);
-        for (const d of result.days) {
-            const rows = history.filter((r) => r.day === d.day);
-            const current = rows.at(-1);
-            deps.log(`  ${d.day}  ${hms(d.countedMs).padStart(9)}  over the set time ${hms(d.overCapMs)}  signals ${d.signals}${d.kind === 'close' ? '' : `  (${d.kind}${current?.recomputeId ? ` ${current.recomputeId}` : ''})`}`);
-            // The rows a recount replaced: the earlier values stay (D12).
-            for (const r of rows.slice(0, -1)) {
-                deps.log(`      earlier: ${hms(r.countedMs)}, over the set time ${hms(r.overCapMs)}, ${r.kind}${r.recomputeId ? ` ${r.recomputeId}` : ''} ${r.computedAt ?? '-'} by ${r.computedBy}`);
-            }
-        }
+        for (const d of result.days) deps.log(`  ${d.day}  ${hms(d.countedMs).padStart(9)}  over the set time ${hms(d.overCapMs)}  signals ${d.signals}${d.kind === 'close' ? '' : `  (${d.kind})`}`);
         for (const u of result.units) deps.log(`  unit ${u.unitKey}: ${hms(u.countedMs)} counted, ${hms(u.overCapMs)} over the set time`);
         return EXIT.ok;
     }
@@ -326,11 +301,6 @@ async function showOne(args, deps) {
     deps.log(`${cohort.slug} (${cohort.id}): ${cohort.name}, ${cohort.startsOn ?? '-'} … ${cohort.endsOn ?? '-'}, ${settings.length} setting(s)${current ? '' : '; none in effect today: nothing is counted'}`);
     for (const s of settings) {
         deps.log(`  from ${s.effectiveFrom}${s === current ? ' (in effect today)' : ''}: unit list ${s.courseKey} (${s.units} unit(s)) ${s.catalogSha256}, rules ${s.algorithm} ${s.rulesSha256}; set ${s.setAt ?? '-'} by ${s.setBy}: ${s.reason}`);
-    }
-    const recounts = await cohortRecounts({ cohortId: cohort.id, pool: deps.getPool() });
-    if ('error_type' in recounts) return failed(recounts, deps);
-    for (const r of recounts) {
-        deps.log(`  recount ${r.id}, ${r.fromDay} … ${r.toDay}: rules ${r.rulesSha256 ?? "each day's own"}, unit list ${r.catalogSha256 ?? "each day's own"}; plan ${r.planSha256}; ${r.recomputedAt ?? '-'} by ${r.recomputedBy}: ${r.reason}`);
     }
     return EXIT.ok;
 }
@@ -369,6 +339,7 @@ function differenceLine(d) {
     const detail = /** @type {any} */ (d.detail);
     switch (d.what) {
         case 'values':
+            if (detail.stored.countedMs === detail.counted.countedMs && detail.stored.overCapMs === detail.counted.overCapMs) return `  ${d.day}: the time per unit differs (the day's totals match)`;
             return `  ${d.day}: the values differ: stored ${hms(detail.stored.countedMs)} (over the set time ${hms(detail.stored.overCapMs)}), counted ${hms(detail.counted.countedMs)} (over the set time ${hms(detail.counted.overCapMs)})`;
         case 'evidence':
             return `  ${d.day}: the evidence differs from when it was counted (signals ${detail.stored} then, ${detail.found} now, or their content)`;
@@ -377,15 +348,19 @@ function differenceLine(d) {
         case 'recount':
             return `  ${d.day}: its versions are not those of its recount ${detail.recount ?? '-'}`;
         default:
-            return `  ${d.day}: counted with ${detail.algorithm}, which this code cannot count (or its versions do not parse)`;
+            // 'version', by its cause (tools/core/trainingTimeCheck.js versionCause).
+            if (detail.cause === 'unparsed') return `  ${d.day}: its rules or unit list version does not parse with this code`;
+            if (detail.cause === 'rules_row') return `  ${d.day}: its rules row names ${detail.rulesAlgorithm}, another algorithm than its rules`;
+            if (detail.cause === 'row') return `  ${d.day}: counted with ${detail.algorithm}, not with its rules' algorithm (${detail.rulesAlgorithm})`;
+            return `  ${d.day}: its rules are ${detail.rulesAlgorithm}, which this code cannot count`;
     }
 }
 
 /** @param {ReturnType<typeof parseArgs>} args @param {Deps} deps */
 async function verifyOne(args, deps) {
     const slug = String(args.slug);
-    const result = await verifyCohort({ cohortSlug: slug, learner: args.values.learner, pool: deps.getPool() });
-    if ('error_type' in result) return failed(result, deps);
+    const result = await verifyCohort({ cohortSlug: slug, learner: args.values.learner, pool: deps.getPool(), sleep: deps.sleep });
+    if ('error_type' in result) return failed(result, deps, 'a migration may be running');
     if (result.status !== 'checked') {
         deps.log(result.status === 'no_cohort' ? `Refused: there is no cohort ${slug}.` : `Refused: ${args.values.learner} is not a learner of ${slug}.`);
         return EXIT.refused;
@@ -408,114 +383,8 @@ async function verifyOne(args, deps) {
         deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); all match.`);
         return EXIT.ok;
     }
-    deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); ${differences} difference(s) in ${learners} learner(s). Report them privately (SECURITY.md) and recount nothing until they are understood.`);
+    deps.log(`Checked ${slug}: ${result.learners.length} learner(s), ${days} day(s); ${differences} difference(s) in ${learners} learner(s). Keep this output in the school (learners' ids and times); report privately (SECURITY.md) that --verify found differences, without learner data, and change nothing until they are understood.`);
     return EXIT.differs;
-}
-
-/**
- * A recount's refusal, in a line (the day only where a rule value could show).
- * @param {any} result @param {string} slug @param {ReturnType<typeof parseArgs>} args @param {Deps} deps
- */
-function recountRefused(result, slug, args, deps) {
-    switch (result.status) {
-        case 'no_cohort':
-            deps.log(`Refused: there is no cohort ${slug}.`);
-            break;
-        case 'outside_dates':
-            deps.log(`Refused: ${args.values.from} … ${args.values.to} is not within ${slug}'s dates.`);
-            break;
-        case 'no_rules':
-            deps.log('Refused: no rules have that sha256 (--load-rules first).');
-            break;
-        case 'no_catalog':
-            deps.log('Refused: no unit list has that sha256 (--load-catalog first).');
-            break;
-        case 'invalid_version':
-            deps.log('Refused: that version does not parse with this code, or this code cannot count its algorithm; ask the developers.');
-            break;
-        case 'not_final':
-            deps.log(`Refused: ${result.day} is not final yet under those rules. Try again later.`);
-            break;
-        case 'course_differs':
-            deps.log(`Refused: the unit list is of another course than ${result.userId}'s day ${result.day}.`);
-            break;
-        case 'not_closed':
-            deps.log(`Refused: ${result.learners.length} learner(s) have days up to ${args.values.to} that are not closed. Run --close ${slug} first (or wait until those days are final): ${result.learners.join(', ')}`);
-            break;
-        case 'unverified':
-            deps.log(`Refused: ${result.learners.length} learner(s) have closed days that do not check. Run --verify ${slug}, report it privately (SECURITY.md) and recount nothing until it is understood:`);
-            for (const l of result.learners) {
-                deps.log(`${l.userId}:`);
-                for (const d of l.differences) deps.log(differenceLine(d));
-            }
-            break;
-        case 'unknown_version':
-            deps.log(`Refused: ${result.userId}'s day ${result.day} was counted with a version this code does not have; ask the developers.`);
-            break;
-        default:
-            deps.log(`Refused: the plan is not the one confirmed (its sha256 is not ${args.values.expect}): something changed since the dry run, or --from, --to, --rules, --catalog, --by or --reason differ. Run --dry-run again and review it.`);
-    }
-    return EXIT.refused;
-}
-
-/** @param {Units} before @param {Units} after */
-function unitLines(before, after) {
-    const keys = [...new Set([...before.map((u) => u[0]), ...after.map((u) => u[0])])].sort();
-    const of = (/** @type {Units} */ units, /** @type {string} */ key) => units.find((u) => u[0] === key) ?? [key, 0, 0];
-    return keys.map((key) => {
-        const [, c1, o1] = of(before, key);
-        const [, c2, o2] = of(after, key);
-        return `      unit ${key}: ${hms(c1)} → ${hms(c2)} counted, ${hms(o1)} → ${hms(o2)} over the set time`;
-    });
-}
-/** @typedef {Array<[string, number, number]>} Units */
-
-/** @param {ReturnType<typeof parseArgs>} args @param {Deps} deps */
-async function recomputeOne(args, deps) {
-    const slug = String(args.slug);
-    const { from, to, rules, catalog, by, reason, expect } = args.values;
-    const input = { cohortSlug: slug, fromDay: from, toDay: to, rulesSha256: rules, catalogSha256: catalog, recomputedBy: by, reason, pool: deps.getPool() };
-    if (expect === undefined) {
-        const plan = await planRecount(input);
-        if ('error_type' in plan) return failed(plan, deps);
-        if (plan.status !== 'plan') return recountRefused(plan, slug, args, deps);
-        const p = /** @type {any} */ (plan).plan;
-        deps.log(`Recount of ${slug}, ${from} … ${to}: rules ${p.rules ?? "each day's own"}, unit list ${p.catalog ?? "each day's own"}; by ${p.by}: ${p.reason}`);
-        let days = 0;
-        let before = 0;
-        let after = 0;
-        for (const l of plan.learners) {
-            deps.log(`${l.userId}: ${l.days.length} day(s)`);
-            for (const d of l.days) {
-                days += 1;
-                before += d.before.countedMs;
-                after += d.after.countedMs;
-                const versions = [
-                    d.before.rules === d.after.rules ? '' : `; rules ${d.before.rules.slice(0, 12)}… → ${d.after.rules.slice(0, 12)}…`,
-                    d.before.catalog === d.after.catalog ? '' : `; unit list ${d.before.catalog.slice(0, 12)}… → ${d.after.catalog.slice(0, 12)}…`,
-                ].join('');
-                deps.log(`  ${d.day}  ${hms(d.before.countedMs)} → ${hms(d.after.countedMs)} (${signed(d.before.countedMs, d.after.countedMs)}), over the set time ${hms(d.before.overCapMs)} → ${hms(d.after.overCapMs)}${versions}`);
-                if (JSON.stringify(d.before.units) !== JSON.stringify(d.after.units)) for (const line of unitLines(d.before.units, d.after.units)) deps.log(line);
-            }
-        }
-        deps.log(days
-            ? `${plan.learners.length} learner(s), ${days} day(s) change: counted ${hms(before)} → ${hms(after)} (${signed(before, after)}).`
-            : 'No day changes.');
-        deps.log(`Plan sha256 ${plan.sha256}. Nothing was written. To write it, run the same command with --expect ${plan.sha256} instead of --dry-run.`);
-        return EXIT.ok;
-    }
-    const result = await recountCohort({ ...input, expect });
-    if ('error_type' in result) return failed(result, deps);
-    switch (result.status) {
-        case 'recounted':
-            deps.log(`Recounted ${result.days} day(s) of ${result.learners} learner(s) in ${slug} (recount ${result.id}, plan ${result.sha256}). The earlier rows stay; the learners see the new values.`);
-            return EXIT.ok;
-        case 'unchanged':
-            deps.log(`Nothing to recount: no day changes (plan ${result.sha256}). Nothing was written.`);
-            return EXIT.ok;
-        default:
-            return recountRefused(result, slug, args, deps);
-    }
 }
 
 /** @param {ReturnType<typeof parseArgs>} args @param {Deps} deps */
@@ -554,7 +423,6 @@ export async function run(argv, deps) {
         case 'show': return showOne(args, deps);
         case 'close': return closeSome(args, deps);
         case 'verify': return verifyOne(args, deps);
-        case 'recompute': return recomputeOne(args, deps);
         default: return statsOne(args, deps);
     }
 }

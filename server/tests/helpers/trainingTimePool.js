@@ -2,21 +2,24 @@
 /**
  * An in-memory stand-in for the study time tables (server/migrations/022_training_study_time.sql
  * and 023_training_study_time_recounts.sql) and what tools/core/trainingTime.js and
- * trainingTimeRecount.js read of 018 and 021 (auth.users stubs, tombstones, cohorts, memberships).
- * It answers the modules' own statements (TRAINING_TIME_SQL, RECOUNT_SQL, and TRAINING_SQL's
+ * trainingTimeCheck.js read of 018 and 021 (auth.users stubs, tombstones, cohorts, memberships).
+ * It answers the modules' own statements (TRAINING_TIME_SQL, CHECK_SQL, and TRAINING_SQL's
  * locks, cohort and membership reads and tombstone read) and the two requireAuth sends for a session
  * (AUTH_SQL: the tombstone read, and the stub insert with migration 018's rule: no stub for a deleted
  * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN, and the
- * snapshot BEGIN of a staff read, snapshot the state, ROLLBACK restores; the state's savepoint too;
- * each answered with node-pg's command tag; a read-only snapshot refuses a write). Any other
- * statement throws, so a changed query fails loudly; the SQL itself runs on PostgreSQL 16 in
- * scripts/db/verify-training.mjs. Not a test file (npm test runs *.test.js).
+ * snapshot BEGIN of a staff read, keep a copy that ROLLBACK restores; the state's savepoint too;
+ * each answered with node-pg's command tag; a BEGIN whose text ends in READ ONLY refuses every write
+ * until it ends; the check's LOCK TABLE … IN ACCESS SHARE MODE NOWAIT, its shorter lock timeout and
+ * its read of no rows that locks the indexes are answered, nothing waits). Rows
+ * ordered by a unit key come in the order of the VM's database collation (en_US.utf8 ignores '-':
+ * 'unit1' before 'unit-a'), not JavaScript's. Any other statement throws, so a changed query fails loudly;
+ * the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file (npm test
+ * runs *.test.js).
  */
 import { TRAINING_SQL } from '../../../tools/core/training.js';
 import { TRAINING_TIME_SQL } from '../../../tools/core/trainingTime.js';
 import { CHECK_SQL } from '../../../tools/core/trainingTimeCheck.js';
-import { RECOUNT_SQL } from '../../../tools/core/trainingTimeRecount.js';
 import { jstDayOf, jstDayRange, nextDay } from '../../../shared/training/studyTime.js';
 
 const DAY_MAX_MS = 86_400_000;
@@ -28,6 +31,15 @@ const result = (rows) => ({ rowCount: rows.length, rows });
 const ended = (command) => ({ command, rowCount: 0, rows: [] });
 /** A PostgreSQL error with its SQLSTATE. @param {string} code @param {string} message */
 const pgError = (code, message) => Object.assign(new Error(message), { code });
+/** A statement that writes (the module's inserts, a WITH … INSERT among them). */
+const WRITES = /\b(INSERT\s+INTO|DELETE\s+FROM)\b|\bUPDATE\s+\S+\s+SET\b/i;
+const EN_US = new Intl.Collator('en-US', { ignorePunctuation: true });
+/**
+ * ORDER BY a unit key as en_US.utf8 orders it: '-' ignored first. Keys equal once '-' is removed are
+ * then put in code-unit order, which glibc may not do (no test uses such keys).
+ * @param {string} a @param {string} b
+ */
+const byCollation = (a, b) => EN_US.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
 
 /** What requireAuth sends for a session, exactly (tools/core/accountDeletions.js readAccountState, server/db.js ensureAuthUser). */
 export const AUTH_SQL = Object.freeze({
@@ -61,7 +73,7 @@ export function createTrainingTimePool(seed = {}) {
         /** @type {any[]} */ signals: [],
         /** @type {any[]} */ days: [],
         /** @type {any[]} */ unitDays: [],
-        /** @type {any[]} */ recounts: [],
+        /** training_time_recomputes (023): a test adds a recount's record with addRecount. @type {any[]} */ recounts: [],
         next: 1,
     };
     /** Inside a REPEATABLE READ READ ONLY transaction (TRAINING_TIME_SQL.beginSnapshot): writes refuse. */
@@ -72,7 +84,7 @@ export function createTrainingTimePool(seed = {}) {
     let savepoint = null;
     /** @type {{ sql: string, params: unknown[], tx: boolean }[]} */
     const queries = [];
-    /** @type {{ sql: string, error: any }[]} */
+    /** @type {{ sql: string, error: any, times: number }[]} */
     const failures = [];
     /** @type {unknown[]} */
     const releases = [];
@@ -96,15 +108,20 @@ export function createTrainingTimePool(seed = {}) {
     const runner = (tx) => async (/** @type {string} */ sql, /** @type {any[]} */ params = []) => {
         queries.push({ sql, params, tx });
         for (const hook of hooks.filter((h) => h.sql === sql)) hook.run();
-        const failure = failures.find((f) => f.sql === sql);
-        if (failure) throw failure.error;
+        const failure = failures.find((f) => f.sql === sql && f.times > 0);
+        if (failure) {
+            failure.times -= 1;
+            throw failure.error;
+        }
+        if (readOnly && WRITES.test(sql)) throw pgError('25006', 'cannot execute a write in a read-only transaction');
         const [p1, p2] = params;
         switch (sql) {
             case 'BEGIN':
             case TRAINING_TIME_SQL.beginSnapshot:
                 snapshot = structuredClone(state);
                 savepoint = null;
-                readOnly = sql === TRAINING_TIME_SQL.beginSnapshot;
+                // As PostgreSQL decides it: by the text (a test pins TRAINING_TIME_SQL.beginSnapshot's).
+                readOnly = /\bREAD ONLY$/.test(sql);
                 return ended('BEGIN');
             case 'COMMIT':
                 snapshot = null;
@@ -246,7 +263,7 @@ export function createTrainingTimePool(seed = {}) {
                         sums.set(u.unit_key, { counted: s.counted + u.counted_ms, over: s.over + u.over_cap_ms });
                     }
                 }
-                return result([...sums.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([unit, s]) => ({ unit_key: unit, counted_ms: String(s.counted), over_cap_ms: String(s.over) })));
+                return result([...sums.entries()].sort(([a], [b]) => byCollation(a, b)).map(([unit, s]) => ({ unit_key: unit, counted_ms: String(s.counted), over_cap_ms: String(s.over) })));
             }
             case TRAINING_TIME_SQL.evidence: {
                 const [user, cohort, fromDay, toDay, fromIso, toIso] = params;
@@ -315,8 +332,14 @@ export function createTrainingTimePool(seed = {}) {
                     last_closed: closed.at(-1) ?? null,
                 }]);
             }
-            case RECOUNT_SQL.clock:
-                return result([{ now_ms: String(Math.floor(state.clock)) }]);
+            case CHECK_SQL.lockCohort:
+            case CHECK_SQL.lockLearner:
+                return ended('LOCK');
+            case CHECK_SQL.tryLockTimeout:
+                return ended('SET');
+            case CHECK_SQL.indexesCohort:
+            case CHECK_SQL.indexesLearner:
+                return result([]);
             case CHECK_SQL.learnerRows:
                 return result(state.days
                     .filter((d) => d.user_id === p1 && d.cohort_id === p2 && d.account_deleted_at === null)
@@ -330,19 +353,17 @@ export function createTrainingTimePool(seed = {}) {
                 const ids = /** @type {string[]} */ (p1).map(String);
                 return result(state.unitDays
                     .filter((u) => ids.includes(u.day_id))
-                    .sort((x, y) => Number(x.day_id) - Number(y.day_id) || x.unit_key.localeCompare(y.unit_key))
+                    .sort((x, y) => Number(x.day_id) - Number(y.day_id) || byCollation(x.unit_key, y.unit_key))
                     .map((u) => ({ day_id: u.day_id, unit_key: u.unit_key, counted_ms: u.counted_ms, over_cap_ms: u.over_cap_ms })));
             }
-            case CHECK_SQL.rulesByIds:
-            case RECOUNT_SQL.rulesBySha: {
-                const match = sql === RECOUNT_SQL.rulesBySha ? (/** @type {any} */ r) => r.sha256 === p1 : (/** @type {any} */ r) => /** @type {string[]} */ (p1).map(String).includes(r.id);
-                return result(state.rules.filter(match).sort((x, y) => Number(x.id) - Number(y.id))
+            case CHECK_SQL.rulesByIds: {
+                const ids = /** @type {string[]} */ (p1).map(String);
+                return result(state.rules.filter((r) => ids.includes(r.id)).sort((x, y) => Number(x.id) - Number(y.id))
                     .map((r) => ({ id: r.id, sha256: r.sha256, algorithm: r.algorithm, params: structuredClone(r.params) })));
             }
-            case CHECK_SQL.catalogsByIds:
-            case RECOUNT_SQL.catalogBySha: {
-                const match = sql === RECOUNT_SQL.catalogBySha ? (/** @type {any} */ c) => c.sha256 === p1 : (/** @type {any} */ c) => /** @type {string[]} */ (p1).map(String).includes(c.id);
-                return result(state.catalogs.filter(match).sort((x, y) => Number(x.id) - Number(y.id))
+            case CHECK_SQL.catalogsByIds: {
+                const ids = /** @type {string[]} */ (p1).map(String);
+                return result(state.catalogs.filter((c) => ids.includes(c.id)).sort((x, y) => Number(x.id) - Number(y.id))
                     .map((c) => ({ id: c.id, sha256: c.sha256, course_key: c.course_key, manifest: structuredClone(c.manifest) })));
             }
             case CHECK_SQL.recountsByIds: {
@@ -350,50 +371,6 @@ export function createTrainingTimePool(seed = {}) {
                 return result(state.recounts.filter((r) => ids.includes(r.id)).sort((x, y) => Number(x.id) - Number(y.id))
                     .map((r) => ({ id: r.id, cohort_id: r.cohort_id, from_day: r.from_day, to_day: r.to_day, rule_set_id: r.rule_set_id, catalog_version_id: r.catalog_version_id })));
             }
-            case RECOUNT_SQL.insertRecount: {
-                if (readOnly) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
-                const [cohort, fromDay, toDay, ruleSetId, catalogId, planSha, by, reason] = params;
-                if (!(String(fromDay) <= String(toDay)) || (ruleSetId === null && catalogId === null) || !/^[0-9a-f]{64}$/.test(String(planSha))
-                    || !(String(by).length >= 1 && String(by).length <= 100) || !(String(reason).length >= 1 && String(reason).length <= 500)) {
-                    throw pgError('23514', 'new row for relation "training_time_recomputes" violates check constraint');
-                }
-                if (!state.cohorts.some((c) => c.id === cohort)) throw pgError('23503', 'training_time_recomputes_cohort_id_fkey');
-                const row = {
-                    id: id(), cohort_id: cohort, from_day: String(fromDay), to_day: String(toDay), rule_set_id: ruleSetId === null ? null : String(ruleSetId),
-                    catalog_version_id: catalogId === null ? null : String(catalogId), plan_sha256: planSha, recomputed_at: state.clock, recomputed_by: by, reason,
-                };
-                state.recounts.push(row);
-                return result([{ id: row.id }]);
-            }
-            case RECOUNT_SQL.insertRecountDays: {
-                if (readOnly) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
-                const [user, cohort, by, recountId, days, algorithms, ruleSetIds, catalogIds, counted, over, signals, digests] = params;
-                if (!state.stubs.includes(String(user))) return result([]);
-                // The composite foreign key: a recount of the same cohort.
-                if (!state.recounts.some((r) => r.id === String(recountId) && r.cohort_id === cohort)) throw pgError('23503', 'training_time_days_recompute_fkey');
-                const rows = [];
-                for (const [i, day] of /** @type {string[]} */ (days).entries()) {
-                    const c = /** @type {number[]} */ (counted)[i];
-                    const o = /** @type {number[]} */ (over)[i];
-                    if (!(c >= 0 && o >= 0 && c + o <= DAY_MAX_MS) || !/^[0-9a-f]{64}$/.test(/** @type {string[]} */ (digests)[i])) throw pgError('23514', 'new row for relation "training_time_days" violates check constraint');
-                    const row = {
-                        id: id(), user_id: user, cohort_id: cohort, day, kind: 'recompute', algorithm: /** @type {string[]} */ (algorithms)[i],
-                        rule_set_id: String(/** @type {string[]} */ (ruleSetIds)[i]), catalog_version_id: String(/** @type {string[]} */ (catalogIds)[i]),
-                        counted_ms: c, over_cap_ms: o, signals: /** @type {number[]} */ (signals)[i], evidence_sha256: /** @type {string[]} */ (digests)[i],
-                        computed_at: state.clock, computed_by: by, account_deleted_at: null, recompute_id: String(recountId),
-                    };
-                    state.days.push(row);
-                    rows.push({ id: row.id, day: row.day });
-                }
-                return result(rows);
-            }
-            case RECOUNT_SQL.cohortRecounts:
-                return result(state.recounts.filter((r) => r.cohort_id === p1).sort((x, y) => Number(x.id) - Number(y.id)).map((r) => ({
-                    id: r.id, recomputed_at: new Date(r.recomputed_at), recomputed_by: r.recomputed_by, reason: r.reason, from_day: r.from_day, to_day: r.to_day,
-                    rules_sha256: r.rule_set_id === null ? null : state.rules.find((x) => x.id === r.rule_set_id)?.sha256 ?? null,
-                    catalog_sha256: r.catalog_version_id === null ? null : state.catalogs.find((x) => x.id === r.catalog_version_id)?.sha256 ?? null,
-                    plan_sha256: r.plan_sha256,
-                })));
             default:
                 throw new Error(`trainingTimePool: unexpected statement: ${sql.slice(0, 120)}`);
         }
@@ -440,10 +417,7 @@ export function createTrainingTimePool(seed = {}) {
         const closed = cohort && state.days
             .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.kind === 'close' && d.account_deleted_at === null)
             .sort((x, y) => y.day.localeCompare(x.day))[0];
-        // The widest gapMs among the last closed day's live rows of any kind (a recount may widen it).
-        const closedGap = closed ? Math.max(...state.days
-            .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.day === closed.day && d.account_deleted_at === null)
-            .map((d) => state.rules.find((r) => r.id === d.rule_set_id).params.counting.gapMs)) : null;
+        const closedGap = closed ? state.rules.find((r) => r.id === closed.rule_set_id).params.counting.gapMs : null;
         return {
             now_ms: String(now),
             stub: state.stubs.includes(user),
@@ -482,8 +456,8 @@ export function createTrainingTimePool(seed = {}) {
         tx: () => queries.filter((q) => q.tx).map((q) => q.sql),
         /** @param {number} ms */
         setClock: (ms) => { state.clock = ms; },
-        /** Make a statement throw (an Error with a SQLSTATE). @param {string} sql @param {any} error */
-        failOn: (sql, error) => failures.push({ sql, error }),
+        /** Make a statement throw (an Error with a SQLSTATE), every time or its next `times`. @param {string} sql @param {any} error @param {number} [times] */
+        failOn: (sql, error, times = Infinity) => failures.push({ sql, error, times }),
         /** Run `run` (move the clock, add a row) just before each matching statement. @param {string} sql @param {() => void} run */
         before: (sql, run) => hooks.push({ sql, run }),
         /**
@@ -505,6 +479,31 @@ export function createTrainingTimePool(seed = {}) {
                 }
                 db.stubs = db.stubs.filter((s) => s !== user);
             }
+        },
+        /**
+         * A recount's record (training_time_recomputes; the code that writes it comes with the recount),
+         * and its rows: each day's row as the recount would append it (kind 'recompute', naming the
+         * record), with its unit rows. Returns the record's id.
+         * @param {{ cohortId: string, fromDay: string, toDay: string, ruleSetId?: string | null, catalogId?: string | null,
+         *   rows?: Array<{ userId: string, day: string, algorithm?: string, ruleSetId: string, catalogId: string, countedMs: number, overCapMs: number,
+         *     signals: number, evidenceSha256: string, units?: Array<[string, number, number]> }> }} r
+         */
+        addRecount: (r) => {
+            const record = {
+                id: id(), cohort_id: r.cohortId, from_day: r.fromDay, to_day: r.toDay, rule_set_id: r.ruleSetId ?? null, catalog_version_id: r.catalogId ?? null,
+                plan_sha256: 'a'.repeat(64), recomputed_at: state.clock, recomputed_by: 'test', reason: 'test',
+            };
+            state.recounts.push(record);
+            for (const row of r.rows ?? []) {
+                const dayId = id();
+                state.days.push({
+                    id: dayId, user_id: row.userId, cohort_id: r.cohortId, day: row.day, kind: 'recompute', algorithm: row.algorithm ?? 'study-time/v1',
+                    rule_set_id: row.ruleSetId, catalog_version_id: row.catalogId, counted_ms: row.countedMs, over_cap_ms: row.overCapMs, signals: row.signals,
+                    evidence_sha256: row.evidenceSha256, computed_at: state.clock, computed_by: 'test', account_deleted_at: null, recompute_id: record.id,
+                });
+                for (const [unit, counted, over] of row.units ?? []) state.unitDays.push({ day_id: dayId, unit_key: unit, counted_ms: counted, over_cap_ms: over });
+            }
+            return record.id;
         },
         /**
          * A setting as a row (bypassing the script's checks; set_at is given, so a past day is possible).
