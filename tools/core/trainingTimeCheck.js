@@ -22,11 +22,13 @@
  * half seen. Before its snapshot, each locks the tables it reads in ACCESS SHARE mode, NOWAIT
  * (lockedSnapshot): a migration's DDL on them is never read through an older snapshot (a table
  * rewrite is not MVCC-safe: such a snapshot sees the table empty); while DDL holds or waits for one of
- * them, the try rolls back, holding nothing, and the next comes LOCK_RETRY.everyMs later, for about
- * the lock timeout (then account_busy). Any other lock wait of a try (an index a REINDEX holds) ends
- * after 20 ms, a try that starts over too, and comes before it has read anything: it never waits
- * long while holding a lock, far under PostgreSQL's deadlock_timeout, so a migration is not cancelled
- * as a deadlock with it. ACCESS SHARE conflicts only with ACCESS EXCLUSIVE, so signals, closes and
+ * them, the try rolls back, holding nothing, and the next starts LOCK_RETRY.everyMs after it started,
+ * for about the lock timeout (then account_busy). Any other lock wait of a try ends after 20 ms, a try
+ * that starts over too: on an index a REINDEX holds, before the try has read anything (a read of no
+ * rows of its tables locks all their indexes); on a TOAST table or its index (a value stored out of
+ * line, which a read locks only while it fetches it), during the reads. So it never waits long while
+ * holding a lock, far under PostgreSQL's deadlock_timeout, and a migration is not cancelled as a
+ * deadlock with it. ACCESS SHARE conflicts only with ACCESS EXCLUSIVE, so signals, closes and
  * deletion marks go on, and no advisory lock is taken. It writes nothing.
  *
  * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
@@ -80,8 +82,11 @@ export const CHECK_SQL = Object.freeze({
     lockCohort: `LOCK TABLE ${COHORT_TABLES} IN ACCESS SHARE MODE NOWAIT`,
     lockLearner: `LOCK TABLE ${LEARNER_TABLES} IN ACCESS SHARE MODE NOWAIT`,
     // Then any other lock wait of the try ends after 20 ms, well under PostgreSQL's deadlock_timeout
-    // (1 s); and planning a read of all its tables locks every index of them (a REINDEX holds an index,
-    // not its table), so a wait on one comes first, before the try has read anything.
+    // (1 s); and planning a read of all its tables locks every index of them, so a wait on one comes
+    // first, before the try has read anything (a REINDEX holds its index in ACCESS EXCLUSIVE mode, and
+    // its table only in SHARE mode, which the LOCK's ACCESS SHARE does not conflict with). A TOAST
+    // table and its index are locked only while a read fetches a value stored out of line: a wait
+    // there comes during the reads, and ends after 20 ms as well.
     tryLockTimeout: "SET LOCAL lock_timeout = '20ms'",
     indexesCohort: `SELECT 1 FROM ${COHORT_TABLES} LIMIT 0`,
     indexesLearner: `SELECT 1 FROM ${LEARNER_TABLES} LIMIT 0`,
@@ -324,16 +329,17 @@ export async function readLearner(db, userId, cohortId, extra = []) {
 
 /**
  * Staff: check a cohort's closed days (the header), every live learner or one.
- * @param {{ cohortSlug: string, learner?: unknown, pool?: TrainingPool | null, sleep?: (ms: number) => Promise<void> }} params
- *   sleep: the wait between tries for the read locks (lockedSnapshot)
+ * @param {{ cohortSlug: string, learner?: unknown, pool?: TrainingPool | null, sleep?: (ms: number) => Promise<void>, now?: () => number }} params
+ *   sleep: the wait between tries for the read locks, and now: the clock in ms it is measured with
+ *   (lockedSnapshot)
  * @returns {Promise<{ status: 'checked', learners: Array<{ userId: string, days: number, differences: Difference[] }> }
  *   | { status: 'no_cohort' | 'not_a_learner' } | CoreError>} CoreError 'invalid_setting' when a
  *   stored setting does not parse with this code
  */
-export async function verifyCohort({ cohortSlug, learner, pool = getPool(), sleep = pause }) {
+export async function verifyCohort({ cohortSlug, learner, pool = getPool(), sleep = pause, now = monotonic }) {
     const one = learner === undefined || learner === null ? null : canonicalUserId(learner);
     if (learner !== undefined && learner !== null && !one) return { error: 'An account id (a UUID) is required.', error_type: 'validation' };
-    const head = await lockedSnapshot(pool, SNAPSHOT_LOCKS.cohort, (db) => readCohort(db, cohortSlug), sleep);
+    const head = await lockedSnapshot(pool, SNAPSHOT_LOCKS.cohort, (db) => readCohort(db, cohortSlug), sleep, now);
     if (!head) return { status: 'no_cohort' };
     if ('error_type' in head) return head;
     const { cohort, learners } = head;
@@ -348,7 +354,7 @@ export async function verifyCohort({ cohortSlug, learner, pool = getPool(), slee
                 ? verifyLearner({ records: await readLearner(db, userId, cohort.id), settings, cohortId: cohort.id, cohort: cohortRange(cohort.startsOn, cohort.endsOn) })
                 : { ...INVALID_SETTING };
             return value;
-        }, sleep);
+        }, sleep, now);
         if ('error_type' in checked) return checked;
         out.push({ userId, ...checked });
     }
@@ -358,10 +364,15 @@ export async function verifyCohort({ cohortSlug, learner, pool = getPool(), slee
 /** A stored version that no longer parses with this code stops the counting (no guess). */
 export const INVALID_SETTING = Object.freeze({ error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' });
 
-/** The tries for a snapshot's read locks: 100, 0.1 s apart, about TRAINING_LOCK_TIMEOUT (10 s). */
+/**
+ * The tries for a snapshot's read locks: 100, each started 0.1 s after the last one started (a try
+ * that waited 20 ms sleeps 80), so about TRAINING_LOCK_TIMEOUT (10 s) in all.
+ */
 export const LOCK_RETRY = Object.freeze({ tries: 100, everyMs: 100 });
 /** @param {number} ms @returns {Promise<void>} */
 const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+/** A clock in ms that only goes forward. */
+const monotonic = () => performance.now();
 /** A try that found one of its tables or their indexes locked. */
 const LOCKED = Object.freeze({ locked: true });
 /** The statements that start a snapshot's try, before its reads. */
@@ -374,17 +385,20 @@ export const SNAPSHOT_LOCKS = Object.freeze({
  * A REPEATABLE READ READ ONLY snapshot that first locks its tables (a LOCK … IN ACCESS SHARE MODE
  * NOWAIT; it takes no snapshot), lowers its lock timeout to 20 ms and plans a read of all of them
  * (locking their indexes), then runs `work` and rolls back. A 55P03 anywhere in a try (one of the
- * tables held or waited for in a conflicting mode, a migration's DDL; or an index held, a REINDEX,
- * for 20 ms) rolls the try back, holding nothing; the next comes LOCK_RETRY.everyMs later, and after
- * LOCK_RETRY.tries tries, account_busy. So it waits at most 20 ms while holding a lock, before it
- * has read anything, far under PostgreSQL's deadlock_timeout (1 s): a migration that locks two of
- * these tables is not cancelled as a deadlock with it. Its snapshot comes after any DDL on its tables.
+ * tables held or waited for in a conflicting mode, a migration's DDL; or, for 20 ms, an index a
+ * REINDEX holds, or a TOAST table or its index while a read fetches a value stored out of line) rolls
+ * the try back, holding nothing; any other error ends it (transaction() classifies it). The next try
+ * starts LOCK_RETRY.everyMs after the last one started, and after LOCK_RETRY.tries tries, about 10 s,
+ * account_busy. So a try waits at most 20 ms while it holds a lock, far under PostgreSQL's
+ * deadlock_timeout (1 s): a migration that locks two of these tables is not cancelled as a deadlock
+ * with it. No table rewrite commits between its snapshot and its reads.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {readonly string[]} locks SNAPSHOT_LOCKS.cohort or .learner
  * @param {(db: Queryable) => Promise<T>} work @param {(ms: number) => Promise<void>} sleep
+ * @param {() => number} now the clock in ms the tries are spaced with
  * @returns {Promise<T | CoreError>}
  */
-export async function lockedSnapshot(pool, locks, work, sleep) {
+export async function lockedSnapshot(pool, locks, work, sleep, now) {
     /** @type {(db: Queryable) => Promise<{ commit: boolean, value: T | typeof LOCKED }>} */
     const attempt = async (db) => {
         try {
@@ -396,10 +410,11 @@ export async function lockedSnapshot(pool, locks, work, sleep) {
         }
     };
     for (let tries = 1; ; tries += 1) {
+        const began = now();
         const value = await transaction(pool, 'verifyCohort', attempt, { snapshot: true });
         if (value !== LOCKED) return /** @type {T | CoreError} */ (value);
         if (tries >= LOCK_RETRY.tries) return { error: 'A table stayed locked. Try again.', error_type: 'account_busy' };
-        await sleep(LOCK_RETRY.everyMs);
+        await sleep(Math.max(0, LOCK_RETRY.everyMs - (now() - began)));
     }
 }
 

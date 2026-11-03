@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { PassThrough } from 'node:stream';
 import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, hms, parseArgs, readStdinFrom, run } from '../../scripts/training-time.mjs';
 import { TRAINING_SQL } from '../../tools/core/training.js';
-import { TRAINING_TIME_SQL, loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
+import { loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
 import { CHECK_SQL } from '../../tools/core/trainingTimeCheck.js';
 import { createTrainingTimePool } from './helpers/trainingTimePool.js';
 
@@ -323,12 +323,19 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         pool.state.rules[0].params.counting.gapMs = 1;
         const broken = await runWith(['--verify', SLUG], { pool });
         assert.deepEqual([broken.code, broken.out], [EXIT.refused, 'Refused: a stored rules or unit list version does not parse with this code. Nothing was changed; ask the developers.']);
-        // A migration's DDL holding a table: the snapshot's LOCK … NOWAIT fails at every try (a
-        // learner's tables, then the cohorts' or memberships'); an index held by a REINDEX makes a
-        // SELECT wait (the learners', the cohort's). failOn keeps every failure, so each comes earlier
-        // than the last, and the run stops at it.
+        // Any other error is no busy lock: a database without migration 023 (the LOCK names its table)
+        // ends at the first try.
         pool.state.rules[0].params.counting.gapMs = RULES_IN.counting.gapMs;
-        for (const sql of [CHECK_SQL.lockLearner, TRAINING_TIME_SQL.learners, TRAINING_SQL.cohortBySlug, CHECK_SQL.lockCohort]) {
+        pool.failOn(CHECK_SQL.lockLearner, Object.assign(new Error('relation "training_time_recomputes" does not exist'), { code: '42P01' }), 1);
+        const sent0 = pool.queries.length;
+        const missing = await runWith(['--verify', SLUG], { pool });
+        assert.deepEqual([missing.code, missing.out, pool.queries.slice(sent0).filter((q) => q.sql === CHECK_SQL.lockLearner).length],
+            [EXIT.unavailable, 'Unavailable: the database could not do it (table_not_found). Try again later.', 1]);
+        // A migration's DDL holding a table makes the snapshot's LOCK … NOWAIT fail; a REINDEX holding
+        // one of their indexes makes its read of no rows wait 20 ms and fail (a learner's, then the
+        // cohort's). Each is tried LOCK_RETRY.tries times, then exit 3. failOn keeps every failure, so
+        // each comes earlier than the last, and the run stops at it.
+        for (const sql of [CHECK_SQL.indexesLearner, CHECK_SQL.lockLearner, CHECK_SQL.indexesCohort, CHECK_SQL.lockCohort]) {
             pool.failOn(sql, Object.assign(new Error('could not obtain lock on relation'), { code: '55P03' }));
             const busy = await runWith(['--verify', SLUG], { pool });
             assert.deepEqual([busy.code, busy.out], [EXIT.unavailable, 'Unavailable: a lock was busy for 10 s (a migration may be running). Try again.'], sql.slice(0, 50));

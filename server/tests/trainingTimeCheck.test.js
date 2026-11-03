@@ -165,17 +165,26 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.equal(CHECK_SQL.tryLockTimeout, "SET LOCAL lock_timeout = '20ms'");
         // Every table the migrations create that a statement names, however it is written (a list, a
         // subquery, the end of the text, with or without public. or quotes, on either side; a rename
-        // is caught by T18 on PostgreSQL, which compares the locks a snapshot's reads take).
+        // is caught by T18 on PostgreSQL, which compares the locks a snapshot's reads take). A name in
+        // an SQL comment or a string counts too: that can only fail this test or add a table to a LOCK.
         const bare = (/** @type {string} */ name) => name.replace(/"/g, '').toLowerCase().replace(/^public\./, '');
+        const createdIn = (/** @type {string} */ sql) => [...sql.matchAll(/\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?)/gi)]
+            .map((m) => bare(m[1]));
+        assert.deepEqual(['CREATE UNLOGGED TABLE IF NOT EXISTS "public"."t_x" (', 'CREATE TABLE public.t_y(', 'CREATE TABLE "auth"."t_z" ('].map(createdIn), [['t_x'], ['t_y'], ['auth.t_z']],
+            'each spelling of a CREATE');
         const migrations = new URL('../migrations/', import.meta.url);
-        const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f)).flatMap((f) => [...fs.readFileSync(new URL(f, migrations), 'utf8')
-            .matchAll(/\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?)/gi)].map((m) => bare(m[1]))))];
+        const created = [...new Set(fs.readdirSync(migrations).filter((f) => /^\d{3}_.+\.sql$/.test(f)).flatMap((f) => createdIn(fs.readFileSync(new URL(f, migrations), 'utf8'))))];
         assert.ok(created.includes('auth.users') && created.includes('training_time_recomputes') && created.includes('training_cohorts'), 'the tables are found');
         const spelled = (/** @type {string} */ t) => (t.includes('.') ? t.split('.').map((p) => `"?${p}"?`).join('\\.') : `(?:"?public"?\\.)?"?${t}"?`);
         const tablesOf = (/** @type {string} */ sql) => created.filter((t) => new RegExp(`(?<![\\w."])${spelled(t)}(?![\\w."])`, 'i').test(sql));
-        assert.deepEqual(['FROM public.training_cohorts c', 'FROM "training_cohorts"', 'JOIN "public"."training_cohorts" c', 'FROM training_cohorts', 'JOIN auth.users u', 'x.training_cohorts_id'].map(tablesOf),
-            [['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['auth.users'], []], 'each spelling of a table');
+        assert.deepEqual(['FROM public.training_cohorts c', 'FROM "training_cohorts"', 'JOIN "public"."training_cohorts" c', 'FROM training_cohorts', 'JOIN auth.users u'].map(tablesOf),
+            [['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['training_cohorts'], ['auth.users']], 'each spelling of a table');
+        // Not the table: one of that name in another schema, a longer name, a name qualified by it (each quoted or not).
+        for (const other of ['FROM audit.training_cohorts', 'JOIN "audit"."training_cohorts"', 'SELECT training_cohorts_id FROM x', 'FROM training_cohorts.x', 'FROM "training_cohorts"."x"']) {
+            assert.deepEqual(tablesOf(other), [], other);
+        }
         const lockedBy = (/** @type {string} */ lock) => lock.replace(/^LOCK TABLE /, '').replace(/ IN ACCESS SHARE MODE NOWAIT$/, '').split(', ').map(bare);
+        assert.deepEqual(lockedBy('LOCK TABLE "public"."t_x", auth.t_z IN ACCESS SHARE MODE NOWAIT'), ['t_x', 'auth.t_z'], 'each spelling in a LOCK');
         const reads = (/** @type {string[]} */ sqls) => [...new Set(sqls.flatMap(tablesOf))].sort();
         assert.deepEqual(reads([TRAINING_SQL.cohortBySlug, TRAINING_TIME_SQL.learners]), [...lockedBy(CHECK_SQL.lockCohort)].sort());
         assert.deepEqual(reads([TRAINING_TIME_SQL.closeSettings, CHECK_SQL.learnerRows, CHECK_SQL.unitRows, CHECK_SQL.rulesByIds, CHECK_SQL.catalogsByIds, CHECK_SQL.recountsByIds, TRAINING_TIME_SQL.evidence]),
@@ -192,18 +201,21 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.match(CHECK_SQL.recountsByIds, /to_char\(from_day, 'YYYY-MM-DD'\) AS from_day, to_char\(to_day, 'YYYY-MM-DD'\) AS to_day, rule_set_id, catalog_version_id\n {2}FROM training_time_recomputes WHERE id = ANY\(\$1::bigint\[\]\) ORDER BY id$/);
     });
 
-    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked, or a lock wait over 20 ms after it, rolls the try back, holding nothing, and the next comes 0.1 s later; after LOCK_RETRY.tries tries, account_busy', async () => {
+    it('read locks without waiting: a LOCK … NOWAIT that finds a table locked, or a lock wait over 20 ms after it, rolls the try back, holding nothing, and the next starts 0.1 s after it started; after LOCK_RETRY.tries tries (about 10 s), account_busy; any other error ends the check at once', async () => {
         assert.deepEqual([LOCK_RETRY.tries * LOCK_RETRY.everyMs, TRAINING_SQL.lockTimeout], [10_000, "SET LOCAL lock_timeout = '10s'"], 'about the lock timeout of the other operations');
         const busy = () => Object.assign(new Error('could not obtain lock on relation'), { code: '55P03' });
+        // A clock that the sleeps move (and a statement made to take time).
+        let clock = 0;
+        const now = () => clock;
         /** @type {number[]} */
         const slept = [];
-        const sleep = async (/** @type {number} */ ms) => { slept.push(ms); };
+        const sleep = async (/** @type {number} */ ms) => { slept.push(ms); clock += ms; };
         const { pool } = await seeded();
         // The cohort's LOCK finds a table locked once, the first learner's twice.
         pool.failOn(CHECK_SQL.lockCohort, busy(), 1);
         pool.failOn(CHECK_SQL.lockLearner, busy(), 2);
         const sent0 = pool.queries.length;
-        const checked = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep }));
+        const checked = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep, now }));
         assert.deepEqual(checked.learners.map((/** @type {any} */ l) => [l.userId, l.days, l.differences]), [[A, 3, []], [B, 3, []]]);
         assert.deepEqual(slept, [100, 100, 100]);
         const sent = pool.queries.slice(sent0).map((q) => q.sql);
@@ -213,22 +225,41 @@ describe('tools/core/trainingTimeCheck.js', () => {
         slept.length = 0;
         pool.failOn(CHECK_SQL.lockLearner, busy());
         const tries0 = pool.queries.length;
-        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep })).error_type, 'account_busy');
+        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool, sleep, now })).error_type, 'account_busy');
         assert.equal(pool.queries.slice(tries0).filter((q) => q.sql === CHECK_SQL.lockLearner).length, LOCK_RETRY.tries);
         assert.equal(slept.length, LOCK_RETRY.tries - 1);
         // A lock wait over the try's 20 ms after the LOCK (an index a REINDEX holds, met by the read of
-        // no rows, or later in a read): the try starts over as well; for good, account_busy.
+        // no rows, or a value stored out of line, later in a read): the try starts over as well; for
+        // good, account_busy.
         const { pool: other } = await seeded();
         other.failOn(CHECK_SQL.indexesLearner, busy(), 1);
         other.failOn(CHECK_SQL.learnerRows, busy(), 1);
         slept.length = 0;
-        const again = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep, learner: A }));
+        const again = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep, now, learner: A }));
         assert.deepEqual([again.learners.map((/** @type {any} */ l) => [l.userId, l.days, l.differences]), slept], [[[A, 3, []]], [100, 100]]);
         other.failOn(CHECK_SQL.learnerRows, busy());
         slept.length = 0;
         const sent1 = other.queries.length;
-        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep })).error_type, 'account_busy');
+        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other, sleep, now })).error_type, 'account_busy');
         assert.deepEqual([other.queries.slice(sent1).filter((q) => q.sql === CHECK_SQL.learnerRows).length, slept.length], [LOCK_RETRY.tries, LOCK_RETRY.tries - 1]);
+        // Each try's read of no rows waiting its 20 ms for an index, for good: the next try starts 0.1 s
+        // after the last one started (it sleeps 80 ms), so the tries end within 10 s (100 tries of 20 ms,
+        // 99 sleeps of 80 ms), not 12.
+        const { pool: timed } = await seeded();
+        timed.before(CHECK_SQL.indexesLearner, () => { clock += 20; });
+        timed.failOn(CHECK_SQL.indexesLearner, busy());
+        slept.length = 0;
+        const started = clock;
+        assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: timed, sleep, now })).error_type, 'account_busy');
+        assert.deepEqual([slept.length, [...new Set(slept)], clock - started], [LOCK_RETRY.tries - 1, [80], 9_920]);
+        // Any other error of a try is no busy lock: it ends the check at once, unretried (a missing
+        // table in a read, 42P01; the script's test has one at the LOCK).
+        const { pool: third } = await seeded();
+        third.failOn(CHECK_SQL.learnerRows, Object.assign(new Error('relation does not exist'), { code: '42P01' }), 1);
+        slept.length = 0;
+        const sent2 = third.queries.length;
+        const failed = /** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: third, sleep, now }));
+        assert.deepEqual([failed.error_type, slept, third.queries.slice(sent2).filter((q) => q.sql === CHECK_SQL.learnerRows).length], ['table_not_found', [], 1]);
     });
 
     it('differences: a changed value (that day only), evidence added to a closed window, a close row with another setting\'s versions, a version this code does not have', async () => {
