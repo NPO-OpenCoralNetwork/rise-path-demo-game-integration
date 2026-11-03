@@ -17,8 +17,13 @@
  * recount (the override inside the recount's days, the row it replaced for the version not
  * overridden, and the row it replaced outside those days); its evidence (the signals in its window,
  * their count and sha256) and its values (counted, over the set time, each unit) are what its
- * versions give. Each learner is read in one REPEATABLE READ READ ONLY snapshot and no lock, so a
- * signal, a close or an account deletion committing meanwhile is not half seen. It writes nothing.
+ * versions give. The cohort and its learners, then each learner, are read in a REPEATABLE READ READ
+ * ONLY snapshot of their own, so a signal, a close or an account deletion committing meanwhile is not
+ * half seen. Before its snapshot, each locks the tables it reads in ACCESS SHARE mode: a migration's
+ * DDL on them is waited for (up to the lock timeout, then account_busy) and seen whole, never through
+ * an older snapshot (a table rewrite is not MVCC-safe: such a snapshot sees the table empty). ACCESS
+ * SHARE conflicts only with ACCESS EXCLUSIVE, so signals, closes and deletion marks go on, and no
+ * advisory lock is taken. It writes nothing.
  *
  * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
  */
@@ -29,8 +34,6 @@ import { countingVersion } from '../../shared/training/countingVersions.js';
 import { cohortRange, jstDayRange } from '../../shared/training/studyTime.js';
 import { parseTimeRules } from '../../shared/training/timeRules.js';
 import { canonicalUserId } from './accountDeletions.js';
-import { classifyDbError } from './dbErrors.js';
-import { noDatabase } from './dbTransaction.js';
 import { TRAINING_SQL } from './training.js';
 import { TRAINING_TIME_SQL, evidenceDigest, parseSettings, settingOf, signalOf, transaction } from './trainingTime.js';
 
@@ -60,6 +63,10 @@ import { TRAINING_TIME_SQL, evidenceDigest, parseSettings, settingOf, signalOf, 
 
 /** The statements, exactly as sent. $1 is the canonical account id, or the ids to read. */
 export const CHECK_SQL = Object.freeze({
+    // First in a snapshot, before any SELECT (a LOCK takes no snapshot): the tables its reads use.
+    lockCohort: 'LOCK TABLE training_cohorts, training_memberships IN ACCESS SHARE MODE',
+    lockLearner: 'LOCK TABLE training_cohort_time_settings, training_time_rule_sets, training_catalog_versions, training_time_days, training_time_unit_days, '
+        + 'training_time_recomputes, training_time_streams, training_time_signals IN ACCESS SHARE MODE',
     // Every live row of a learner in a cohort, in day and id order (the newest of a day is its current value).
     learnerRows: `SELECT id, to_char(day, 'YYYY-MM-DD') AS day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals,
        evidence_sha256, recompute_id, computed_at, computed_by
@@ -172,7 +179,7 @@ export function verifyLearner({ records, settings, cohortId, cohort }) {
         const provenance = provenanceOf({ row, rows: records.rows, recounts: records.recounts, settings, cohortId });
         if (provenance) differences.push({ day: row.day, ...provenance });
         if (!counted || counted.algorithm !== row.algorithm) {
-            differences.push({ day: row.day, what: 'version', detail: { algorithm: row.algorithm, rules: rules?.sha256 ?? null, catalog: catalog?.sha256 ?? null } });
+            differences.push({ day: row.day, what: 'version', detail: { algorithm: row.algorithm, rulesAlgorithm: rules?.algorithm ?? null, cause: versionCause(rules, catalog), rules: rules?.sha256 ?? null, catalog: catalog?.sha256 ?? null } });
         } else {
             if (counted.signals !== row.signals || counted.evidenceSha256 !== row.evidenceSha256) {
                 differences.push({ day: row.day, what: 'evidence', detail: { stored: row.signals, found: counted.signals } });
@@ -190,6 +197,19 @@ export function verifyLearner({ records, settings, cohortId, cohort }) {
 
 /** @param {{ countedMs: number, overCapMs: number, units: Units }} v */
 const valuesOf = (v) => ({ countedMs: v.countedMs, overCapMs: v.overCapMs, units: v.units });
+
+/**
+ * Why a row is not counted with its versions: 'unparsed' (its rules or unit list version does not
+ * parse with this code), 'rules_row' (the rules row names another algorithm than its rules), 'unknown'
+ * (this code has no counting version of its rules' algorithm), 'row' (the day row names another
+ * algorithm than its rules).
+ * @param {RulesVersion | undefined} rules @param {CatalogVersion | undefined} catalog
+ */
+function versionCause(rules, catalog) {
+    if (!rules?.rules || !catalog?.setMs) return 'unparsed';
+    if (rules.algorithm !== rules.rules.algorithm) return 'rules_row';
+    return countingVersion(rules.rules.algorithm) ? 'row' : 'unknown';
+}
 
 /**
  * Whether a current row's versions are the ones it was allowed to use: a close row the cohort's
@@ -216,7 +236,8 @@ function provenanceOf({ row, rows, recounts, settings, cohortId }) {
 /**
  * Read what a learner's check and recount need, in the caller's transaction: every live row, the
  * unit rows of the current ones, the versions and recounts they name, and the evidence of the closed
- * days (the widest window of the versions used, `extra` included).
+ * days (the widest window of the versions used, `extra` included). In a REPEATABLE READ snapshot the
+ * caller sends CHECK_SQL.lockLearner before its first SELECT (the module header).
  * @param {Queryable} db @param {string} userId @param {string} cohortId @param {RulesVersion[]} [extra]
  * @returns {Promise<LearnerRecords>}
  */
@@ -290,16 +311,16 @@ export async function readLearner(db, userId, cohortId, extra = []) {
 export async function verifyCohort({ cohortSlug, learner, pool = getPool() }) {
     const one = learner === undefined || learner === null ? null : canonicalUserId(learner);
     if (learner !== undefined && learner !== null && !one) return { error: 'An account id (a UUID) is required.', error_type: 'validation' };
-    const cohort = await cohortFrom(pool, cohortSlug);
-    if (!cohort) return { status: 'no_cohort' };
-    if ('error_type' in cohort) return cohort;
-    const learners = await liveLearners(pool, cohort.id);
-    if ('error_type' in learners) return learners;
+    const head = await transaction(pool, 'verifyCohort', async (db) => ({ commit: false, value: await readCohort(db, cohortSlug) }), { snapshot: true });
+    if (!head) return { status: 'no_cohort' };
+    if ('error_type' in head) return head;
+    const { cohort, learners } = head;
     if (one && !learners.includes(one)) return { status: 'not_a_learner' };
     /** @type {Array<{ userId: string, days: number, differences: Difference[] }>} */
     const out = [];
     for (const userId of one ? [one] : learners) {
         const checked = await transaction(pool, 'verifyCohort', async (db) => {
+            await db.query(CHECK_SQL.lockLearner);
             const settings = parseSettings((await db.query(TRAINING_TIME_SQL.closeSettings, [cohort.id])).rows ?? []);
             /** @type {{ days: number, differences: Difference[] } | CoreError} */
             const value = settings
@@ -317,26 +338,18 @@ export async function verifyCohort({ cohortSlug, learner, pool = getPool() }) {
 export const INVALID_SETTING = Object.freeze({ error: 'A stored rules or unit list version does not parse with this code.', error_type: 'invalid_setting' });
 
 /**
- * @param {TrainingPool | null | undefined} pool @param {string} cohortSlug
- * @returns {Promise<{ id: string, startsOn: string | null, endsOn: string | null } | null | CoreError>}
+ * A cohort and its live learners (in id order, the order every lock is taken in), in the caller's
+ * transaction: their two tables locked first (CHECK_SQL.lockCohort; the module header). Errors are
+ * thrown, so transaction() turns a lock wait over its timeout into account_busy. null: no cohort.
+ * @param {Queryable} db @param {string} cohortSlug
+ * @returns {Promise<{ cohort: { id: string, startsOn: string | null, endsOn: string | null }, learners: string[] } | null>}
  */
-export async function cohortFrom(pool, cohortSlug) {
-    if (!pool) return noDatabase();
-    try {
-        const row = (await pool.query(TRAINING_SQL.cohortBySlug, [cohortSlug])).rows?.[0];
-        return row ? { id: String(row.id), startsOn: row.starts_on ?? null, endsOn: row.ends_on ?? null } : null;
-    } catch (err) {
-        return classifyDbError(/** @type {any} */ (err), 'cohortBySlug');
-    }
-}
-
-/** A cohort's live learners, in id order (the order every lock is taken in). @param {TrainingPool | Queryable | null | undefined} db @param {string} cohortId */
-export async function liveLearners(db, cohortId) {
-    if (!db) return noDatabase();
-    try {
-        return ((await db.query(TRAINING_TIME_SQL.learners, [cohortId])).rows ?? []).map((r) => String(r.user_id)).sort();
-    } catch (err) {
-        return /** @type {CoreError} */ (classifyDbError(/** @type {any} */ (err), 'cohortLearners'));
-    }
+export async function readCohort(db, cohortSlug) {
+    await db.query(CHECK_SQL.lockCohort);
+    const row = (await db.query(TRAINING_SQL.cohortBySlug, [cohortSlug])).rows?.[0];
+    if (!row) return null;
+    const cohort = { id: String(row.id), startsOn: row.starts_on ?? null, endsOn: row.ends_on ?? null };
+    const learners = ((await db.query(TRAINING_TIME_SQL.learners, [cohort.id])).rows ?? []).map((r) => String(r.user_id)).sort();
+    return { cohort, learners };
 }
 

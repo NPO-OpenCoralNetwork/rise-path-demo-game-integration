@@ -100,7 +100,8 @@ export const TRAINING_TIME_SQL = Object.freeze({
     settingsLock: "SELECT pg_advisory_xact_lock(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     settingsLockShared: "SELECT pg_advisory_xact_lock_shared(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     jstToday: "SELECT to_char((clock_timestamp() AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS today",
-    // A staff read in one snapshot that takes no lock (transaction's snapshot option).
+    // A staff read in one snapshot (transaction's snapshot option): no advisory lock, its tables locked
+    // for reading (ACCESS SHARE) before its first SELECT (tools/core/trainingTimeCheck.js).
     beginSnapshot: 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
     settingCourses: `SELECT to_char(s.effective_from, 'YYYY-MM-DD') AS effective_from, k.course_key
   FROM training_cohort_time_settings s JOIN training_catalog_versions k ON k.id = s.catalog_version_id
@@ -654,8 +655,8 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
  * One transaction on its own connection. `work` decides whether to commit. A lock wait over
  * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'. PostgreSQL ends the COMMIT of a transaction that
  * a failed statement aborted as a rollback, without an error: that is an error here, never the
- * work's result. snapshot: one REPEATABLE READ READ ONLY snapshot (a staff read that takes no lock,
- * tools/core/trainingTimeCheck.js), else READ COMMITTED.
+ * work's result. snapshot: one REPEATABLE READ READ ONLY snapshot (a staff read with no advisory
+ * lock, tools/core/trainingTimeCheck.js), else READ COMMITTED.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {string} operation
  * @param {(client: Queryable) => Promise<{ commit: boolean, value: T }>} work

@@ -9,9 +9,10 @@
  * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
  * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN, and the
  * snapshot BEGIN of a staff read, keep a copy that ROLLBACK restores; the state's savepoint too;
- * each answered with node-pg's command tag; a read-only snapshot refuses every write). Rows ordered
- * by a unit key come in the order of the VM's database collation (en_US.utf8 ignores '-': 'unit1'
- * before 'unit-a'), not JavaScript's. Any other statement throws, so a changed query fails loudly;
+ * each answered with node-pg's command tag; a BEGIN whose text ends in READ ONLY refuses every write
+ * until it ends; the check's LOCK TABLE … IN ACCESS SHARE MODE is answered, nothing waits). Rows
+ * ordered by a unit key come in the order of the VM's database collation (en_US.utf8 ignores '-':
+ * 'unit1' before 'unit-a'), not JavaScript's. Any other statement throws, so a changed query fails loudly;
  * the SQL itself runs on PostgreSQL 16 in scripts/db/verify-training.mjs. Not a test file (npm test
  * runs *.test.js).
  */
@@ -32,7 +33,11 @@ const pgError = (code, message) => Object.assign(new Error(message), { code });
 /** A statement that writes (the module's inserts, a WITH … INSERT among them). */
 const WRITES = /\b(INSERT\s+INTO|DELETE\s+FROM)\b|\bUPDATE\s+\S+\s+SET\b/i;
 const EN_US = new Intl.Collator('en-US', { ignorePunctuation: true });
-/** ORDER BY a unit key as en_US.utf8 orders it ('-' ignored first, then code units). @param {string} a @param {string} b */
+/**
+ * ORDER BY a unit key as en_US.utf8 orders it: '-' ignored first. Keys equal once '-' is removed are
+ * then put in code-unit order, which glibc may not do (no test uses such keys).
+ * @param {string} a @param {string} b
+ */
 const byCollation = (a, b) => EN_US.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
 
 /** What requireAuth sends for a session, exactly (tools/core/accountDeletions.js readAccountState, server/db.js ensureAuthUser). */
@@ -111,7 +116,8 @@ export function createTrainingTimePool(seed = {}) {
             case TRAINING_TIME_SQL.beginSnapshot:
                 snapshot = structuredClone(state);
                 savepoint = null;
-                readOnly = sql === TRAINING_TIME_SQL.beginSnapshot;
+                // As PostgreSQL decides it: by the text (a test pins TRAINING_TIME_SQL.beginSnapshot's).
+                readOnly = /\bREAD ONLY$/.test(sql);
                 return ended('BEGIN');
             case 'COMMIT':
                 snapshot = null;
@@ -322,6 +328,9 @@ export function createTrainingTimePool(seed = {}) {
                     last_closed: closed.at(-1) ?? null,
                 }]);
             }
+            case CHECK_SQL.lockCohort:
+            case CHECK_SQL.lockLearner:
+                return ended('LOCK');
             case CHECK_SQL.learnerRows:
                 return result(state.days
                     .filter((d) => d.user_id === p1 && d.cohort_id === p2 && d.account_deleted_at === null)

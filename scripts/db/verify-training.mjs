@@ -85,15 +85,20 @@
  *       its own cohort (the composite foreign key); a recount's record names an override, its days in
  *       order and the plan's sha256 in lower-case hex, and refuses UPDATE and DELETE (23001). The check
  *       (verifyCohort) on PostgreSQL: days closed by the core check (a day with three units, which the
- *       database's collation may order otherwise than the code: en_US.utf8 ignores '-'; a chain out of
- *       the last day across 00:00 JST); recount rows as a recount writes them (the override's values
- *       and evidence window, one more signal after 00:00, the second day with the first's new unit
- *       time carried) check; a changed value and a version this code does not have are found. The
- *       deletion's marks reach the recount rows with the foreign key and the CHECK in place; the record
- *       stays
- *   T18 the check reads each learner in one snapshot: an account deletion committing between its
- *       read of the rows and of the evidence changes nothing it reports; control: with a plain BEGIN
- *       (READ COMMITTED) the same deletion makes every day with evidence differ
+ *       database's collation may order otherwise than the code: en_US.utf8 ignores '-'; the check
+ *       again with the unit rows in reverse order, on any cluster; a chain out of the last day across
+ *       00:00 JST, a lone signal before the first day); recount rows as a recount writes them (the
+ *       override's values and evidence window, one more signal on each day, the second day with the
+ *       first's new unit time carried) check; a changed value and a version this code does not have
+ *       are found. The deletion's marks reach the recount rows with the foreign key and the CHECK in
+ *       place; the record stays
+ *   T18 the check's snapshot is REPEATABLE READ and read only (a write in it: 25006). It reads each
+ *       learner in one snapshot: an account deletion committing between its read of the rows and of
+ *       the evidence changes nothing it reports; control: with a plain BEGIN (READ COMMITTED) the same
+ *       deletion makes every day with evidence differ. A table rewrite (ALTER COLUMN … USING, not
+ *       MVCC-safe) held HOLD_MS and committed while the check waits: the check, which locks its tables
+ *       (ACCESS SHARE) before its snapshot, reads both days; control: without that LOCK its snapshot,
+ *       taken before the wait, reads no day of the rewritten table
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
  * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
  */
@@ -1174,15 +1179,17 @@ async function t17(pool, { catalogId, ruleSetId }) {
         `a recount's record: a unit list only ${records[0]}, rules only ${records[1]}; its days backwards ${records[2]}, no override ${records[3]}, the plan's sha256 in upper case ${records[4]}; UPDATE ${changes[0]}, DELETE ${changes[1]} (rp_rows_immutable)`);
 
     // The check on PostgreSQL. The cohort's unit list has 'unit1' too: on the second day three units,
-    // which the VM's and CI's collation (en_US.utf8 ignores '-') returns in another order than the
-    // code's (unit1 unit-a unit-b). Two days closed by the core: unit-a on both (its set time, 2 min,
-    // reached on the first), unit1, and a chain on unit-b out of the second day across 00:00 JST, its
-    // last signal 26 s after it. Then a recount of both with other rules (smaller pieces, evidence
-    // read further ahead: that last signal is in the second day's window now) as a recount writes it:
-    // the override and the replaced rows' unit list, the second day with the first's new unit time
-    // carried.
+    // which the VM's and CI's collation (en_US.utf8 ignores '-') returns in another order (unit1
+    // unit-a unit-b) than the code's (unit-a unit-b unit1); the check runs once more with the unit
+    // rows in reverse order, so any cluster proves it. Two days closed by the core: unit-a on both (its
+    // set time, 2 min, reached on the first), unit1, a chain on unit-b out of the second day across
+    // 00:00 JST, its last signal 26 s after it, and a lone signal 120 s before the first day. Then a
+    // recount of both with other rules (smaller pieces, evidence read further back and ahead: those
+    // two signals are in the days' windows now) as a recount writes it: the override and the replaced
+    // rows' unit list, the second day with the first's new unit time carried.
     const start = (/** @type {string} */ day) => jstDayRange(day).start;
     const signals = [
+        ...await storeChain(pool, { user, cohort, unit: 'unit-b', from: start(d1) - 120 * S, n: 1 }),
         ...await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d1) + 10 * 3_600_000, n: 20 }),
         ...await storeChain(pool, { user, cohort, unit: 'unit-a', from: start(d2) + 9 * 3_600_000, n: 20 }),
         ...await storeChain(pool, { user, cohort, unit: 'unit1', from: start(d2) + 11 * 3_600_000, n: 12 }),
@@ -1194,6 +1201,10 @@ async function t17(pool, { catalogId, ruleSetId }) {
     const collated = String((await pool.query(`SELECT string_agg(u.unit_key, ' ' ORDER BY u.unit_key) AS k
         FROM training_time_unit_days u JOIN training_time_days d ON d.id = u.day_id WHERE d.user_id = $1 AND d.day = $2::date`, [user, d2])).rows[0].k);
     const afterClose = await verified();
+    // The learner's snapshot is the check's second connection (its first reads the cohort).
+    const reversedSql = CHECK_SQL.unitRows.replace(/ unit_key$/, ' unit_key DESC');
+    const reversed = reversedSql === CHECK_SQL.unitRows ? ['the unit rows statement changed'] : checkedLines(await verifyCohort({ cohortSlug: slug,
+        pool: changedConnections(pool, [{}, { send: new Map([[CHECK_SQL.unitRows, reversedSql]]) }]) }));
     const rules2 = String(/** @type {any} */ (await loadRules({ input: RULES_IN_2, loadedBy: 'verify', note: 'T17', pool })).id);
     const recount = await recountRecord(pool, cohort, d1, d2, rules2);
     const want = countDays({ fromDay: d1, toDay: d2, signals, rulesOf: () => RULES_2, setMsOf: () => setMsOf(manifest), carriedMs: new Map(), cohort: cohortRange(d1, d2) }).days;
@@ -1219,11 +1230,14 @@ async function t17(pool, { catalogId, ruleSetId }) {
     const rowsNow = await dayRows(pool, user, cohort);
     const old = rowsNow.filter((r) => r.kind === 'close').map((r) => `${r.counted_ms / S}+${r.over_cap_ms / S}`);
     const fresh = want.map((d) => `${d.countedMs / S}+${d.units.reduce((n, u) => n + u.overCapMs, 0) / S}`);
-    // The second day's evidence: the close's (R1) and the recount's (R2, one more signal after 00:00).
-    const read = rowsNow.filter((r) => r.day === d2).map((r) => r.signals);
-    check('T17', closed.status === 'closed' && afterClose.join() === `${user} 2` && afterRecount.join() === `${user} 2` && old.join() !== fresh.join()
-        && want[1].units.length === 3 && read.length === 2 && read[1] === read[0] + 1 && tampered.join() === `${user} 2 ${d2}:values` && unknown.join() === `${user} 2 ${d1}:version`,
-        `the check on PostgreSQL (the second day's units as the database orders them: ${collated}): the closed days (${old.join(', ')} s) ${afterClose.join() === `${user} 2` ? 'match' : afterClose.join()}; recounted with other rules (${fresh.join(', ')} s; the second day's evidence ${read.join(' then ')} signals) ${afterRecount.join() === `${user} 2` ? 'match' : afterRecount.join()}; a changed value: ${foundIn(tampered)}; a version this code does not have: ${foundIn(unknown)}`);
+    // Each day's evidence: the close's (R1) and the recount's (R2: one more signal, before 00:00 of
+    // the first day and after 00:00 of the second).
+    const read = [d1, d2].map((day) => rowsNow.filter((r) => r.day === day).map((r) => r.signals));
+    const matches = (/** @type {string[]} */ lines) => (lines.join() === `${user} 2` ? 'match' : lines.join());
+    check('T17', closed.status === 'closed' && afterClose.join() === `${user} 2` && reversed.join() === `${user} 2` && afterRecount.join() === `${user} 2`
+        && old.join() !== fresh.join() && want[1].units.length === 3 && read.every((r) => r.length === 2 && r[1] === r[0] + 1)
+        && tampered.join() === `${user} 2 ${d2}:values` && unknown.join() === `${user} 2 ${d1}:version`,
+        `the check on PostgreSQL: the closed days (${old.join(', ')} s) ${matches(afterClose)} (the second day's units as this database orders them: ${collated}; in reverse order: ${matches(reversed)}); recounted with other rules (${fresh.join(', ')} s; evidence ${read.map((r) => r.join(' then ')).join(', ')} signals) ${matches(afterRecount)}; a changed value: ${foundIn(tampered)}; a version this code does not have: ${foundIn(unknown)}`);
 
     // The deletion's marks reach the recount rows (the foreign key and the CHECK in place); the record
     // stays and the rows still name it; the check then has no learner to read.
@@ -1238,10 +1252,10 @@ async function t17(pool, { catalogId, ruleSetId }) {
 
 /** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
 async function t18(pool, { catalogId, ruleSetId }) {
-    // The check reads each learner in one snapshot (REPEATABLE READ READ ONLY, no lock): an account
-    // deletion committing between its read of the rows and its read of the evidence (which takes live
-    // streams only) changes nothing it reports. Control: the same check with a plain BEGIN (READ
-    // COMMITTED) finds no evidence for the learner's days, so every day differs.
+    // The check reads each learner in one snapshot (REPEATABLE READ READ ONLY, no advisory lock): an
+    // account deletion committing between its read of the rows and its read of the evidence (which
+    // takes live streams only) changes nothing it reports. Control: the same check with a plain BEGIN
+    // (READ COMMITTED) finds no evidence for the learner's days, so every day differs.
     const [d1, d2] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
     const start = (/** @type {string} */ day) => jstDayRange(day).start;
     /** A learner alone in a cohort, with study on both days, closed. @param {string} tag */
@@ -1254,9 +1268,26 @@ async function t18(pool, { catalogId, ruleSetId }) {
         return { user, slug: await slugOf(pool, cohort), closed: String(closed.status) };
     };
     const [x, z] = [await closedLearner('t18x'), await closedLearner('t18z')];
-    /** The check of a learner's cohort with the learner's deletion committed after its read of the rows. @param {{ user: string, slug: string }} l @param {Map<string, string>} send */
+    // The check's snapshot as PostgreSQL runs it: REPEATABLE READ and read only (a write is refused).
+    const c = await pool.connect();
+    /** @type {any} */
+    let mode = null;
+    let write = 'ok';
+    try {
+        await c.query(TRAINING_TIME_SQL.beginSnapshot);
+        mode = (await c.query("SELECT current_setting('transaction_isolation') AS iso, current_setting('transaction_read_only') AS ro")).rows[0];
+        write = await c.query('INSERT INTO auth.users (id) VALUES ($1::uuid)', [uid('t18p')]).then(() => 'ok', (error) => String(error.code));
+    } finally {
+        await c.query('ROLLBACK').catch(() => {});
+        c.release();
+    }
+    check('T18', mode?.iso === 'repeatable read' && mode?.ro === 'on' && write === '25006', `the check's snapshot: ${mode?.iso}, read only ${mode?.ro}; a write in it: ${write}`);
+    /**
+     * The check of a learner's cohort with the learner's deletion committed after its read of the rows
+     * (its second connection: the first reads the cohort). @param {{ user: string, slug: string }} l @param {Map<string, string>} send
+     */
     const deletedDuring = async (l, send) => checkedLines(await verifyCohort({ cohortSlug: l.slug,
-        pool: changedConnections(pool, [{ send, after: CHECK_SQL.learnerRows, run: () => deleteNow(pool, l.user) }]) }));
+        pool: changedConnections(pool, [{}, { send, after: CHECK_SQL.learnerRows, run: () => deleteNow(pool, l.user) }]) }));
     const live = (/** @type {string} */ user) => count(pool, 'SELECT count(*) AS n FROM training_time_days WHERE user_id = $1 AND account_deleted_at IS NULL', [user]);
     const snapshot = await deletedDuring(x, new Map());
     const xLive = await live(x.user);
@@ -1266,6 +1297,37 @@ async function t18(pool, { catalogId, ruleSetId }) {
     const zLive = await live(z.user);
     check('T18', z.closed === 'closed' && control.join() === `${z.user} 2 ${d1}:evidence ${d1}:values ${d2}:evidence ${d2}:values` && zLive === 0,
         `control, a plain BEGIN: the same deletion (then ${zLive} live day rows) makes every day differ: ${foundIn(control)}`);
+
+    // A migration's table rewrite (not MVCC-safe) held HOLD_MS and committed while the check waits:
+    // the check locks its tables (ACCESS SHARE) before its snapshot, so it waits and reads the
+    // rewritten table whole. Control: without that LOCK, its snapshot (taken by its first SELECT,
+    // before the wait) sees the rewritten table empty.
+    const [y, w] = [await closedLearner('t18y'), await closedLearner('t18w')];
+    /** @param {{ slug: string }} l @param {string[]} skip */
+    const rewrittenDuring = async (l, skip) => {
+        const ddl = await pool.connect();
+        try {
+            await ddl.query('BEGIN');
+            await ddl.query('ALTER TABLE training_time_days ALTER COLUMN signals TYPE integer USING signals + 0');
+            const started = Date.now();
+            const checking = verifyCohort({ cohortSlug: l.slug, pool: changedConnections(pool, [{}, { skip }]) });
+            await sleep(HOLD_MS);
+            await ddl.query('COMMIT');
+            const lines = checkedLines(await checking);
+            return { lines, waited: Date.now() - started };
+        } catch (error) {
+            await ddl.query('ROLLBACK').catch(() => {});
+            throw error;
+        } finally {
+            ddl.release();
+        }
+    };
+    const locked = await rewrittenDuring(y, []);
+    check('T18', y.closed === 'closed' && locked.lines.join() === `${y.user} 2` && locked.waited >= BLOCKED_MS,
+        `a table rewrite committed while the check waited ${locked.waited} ms for its lock: ${locked.lines.join() === `${y.user} 2` ? 'both days read and matching' : locked.lines.join()}`);
+    const unlocked = await rewrittenDuring(w, [CHECK_SQL.lockLearner]);
+    check('T18', w.closed === 'closed' && unlocked.lines.join() === `${w.user} 0`,
+        `control, without the lock: the snapshot taken before the wait reads ${unlocked.lines.join().split(' ')[1] ?? '?'} days of the rewritten table`);
 }
 
 export async function main(argv = process.argv.slice(2)) {

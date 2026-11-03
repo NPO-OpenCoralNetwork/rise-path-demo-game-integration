@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { PassThrough } from 'node:stream';
 import { EXIT, STDIN_LIMIT, STDIN_WAIT_MS, hms, parseArgs, readStdinFrom, run } from '../../scripts/training-time.mjs';
 import { TRAINING_SQL } from '../../tools/core/training.js';
-import { loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
+import { TRAINING_TIME_SQL, loadCatalog, loadRules } from '../../tools/core/trainingTime.js';
 import { CHECK_SQL } from '../../tools/core/trainingTimeCheck.js';
 import { createTrainingTimePool } from './helpers/trainingTimePool.js';
 
@@ -290,8 +290,20 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
             `${A}: 3 difference(s) in 3 day(s)`,
             `  2026-11-01: its versions are not those of its recount ${recount}`,
             "  2026-11-02: its versions are not the cohort's setting of that day",
-            '  2026-11-03: counted with study-time/v9, which this code cannot count (or its versions do not parse)',
+            "  2026-11-03: counted with study-time/v9, not with its rules' algorithm (study-time/v1)",
         ]]);
+        // The rules row naming another algorithm than its rules (every day), then a unit list version
+        // this code cannot parse (the two days that name it).
+        day('2026-11-03').algorithm = 'study-time/v1';
+        pool.state.rules.find((/** @type {any} */ r) => r.id === rules.id).algorithm = 'study-time/v9';
+        const rulesRow = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.ok(rulesRow.out.split('\n').includes('  2026-11-03: its rules row names study-time/v9, another algorithm than its rules'), rulesRow.out);
+        pool.state.rules.find((/** @type {any} */ r) => r.id === rules.id).algorithm = 'study-time/v1';
+        pool.state.catalogs.find((/** @type {any} */ k) => k.id === k2.id).manifest.schema = 'risepath.training-course/v9';
+        const unparsed = await runWith(['--verify', SLUG, '--learner', A], { pool });
+        assert.deepEqual(unparsed.out.split('\n').filter((l) => l.includes('does not parse')),
+            ['  2026-11-01: its rules or unit list version does not parse with this code', '  2026-11-02: its rules or unit list version does not parse with this code']);
+        pool.state.catalogs.find((/** @type {any} */ k) => k.id === k2.id).manifest.schema = COURSE.schema;
         const nobody = await runWith(['--verify', SLUG, '--learner', 'aaaaaaaa-2222-4000-8000-0000000000e0'], { pool });
         assert.deepEqual([nobody.code, nobody.out], [EXIT.refused, `Refused: aaaaaaaa-2222-4000-8000-0000000000e0 is not a learner of ${SLUG}.`]);
         const none = await runWith(['--verify', 'nope'], { pool });
@@ -299,11 +311,14 @@ describe('scripts/training-time.mjs: settings, show, close, stats', () => {
         pool.state.rules[0].params.counting.gapMs = 1;
         const broken = await runWith(['--verify', SLUG], { pool });
         assert.deepEqual([broken.code, broken.out], [EXIT.refused, 'Refused: a stored rules or unit list version does not parse with this code. Nothing was changed; ask the developers.']);
-        // A table locked for 10 s (it takes no lock itself: only a migration's ALTER and the like can hold it up).
+        // A table locked for 10 s by a migration's DDL (the check only reads, and locks its tables for
+        // reading): a learner's tables, then the learners', then the cohorts'.
         pool.state.rules[0].params.counting.gapMs = RULES_IN.counting.gapMs;
-        pool.failOn(CHECK_SQL.learnerRows, Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' }));
-        const busy = await runWith(['--verify', SLUG], { pool });
-        assert.deepEqual([busy.code, busy.out], [EXIT.unavailable, 'Unavailable: a lock was busy for 10 s (a migration may be running). Try again.']);
+        for (const sql of [CHECK_SQL.lockLearner, TRAINING_TIME_SQL.learners, TRAINING_SQL.cohortBySlug]) {
+            pool.failOn(sql, Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' }));
+            const busy = await runWith(['--verify', SLUG], { pool });
+            assert.deepEqual([busy.code, busy.out], [EXIT.unavailable, 'Unavailable: a lock was busy for 10 s (a migration may be running). Try again.'], sql.slice(0, 50));
+        }
         assert.equal((await runWith(['--verify', SLUG], { pool: null })).code, EXIT.unavailable);
     });
 });

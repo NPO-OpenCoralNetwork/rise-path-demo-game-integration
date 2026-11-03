@@ -31,7 +31,8 @@
  * --stats         the cohort's row counts (marked rows of deleted accounts too) and its last closed day.
  * --verify        checks every closed day of the cohort's learners (or one): the versions it was
  *                 counted with, the setting or recount they came from, its evidence and its values.
- *                 Reads only, in one snapshot per learner, with no lock.
+ *                 Reads only, in one snapshot per learner, with no advisory lock (its tables are
+ *                 locked for reading first: a migration's DDL on them makes it wait, up to 10 s).
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a
@@ -167,7 +168,8 @@ export const hms = (ms) => {
 
 /**
  * A refusal of the core module: a usage error, or the database (3; a busy lock says so, with what may
- * hold it: a close or an account deletion, or for --verify, which takes no lock, a migration).
+ * hold it: a close or an account deletion, or for --verify, which only reads and locks its tables for
+ * reading, a migration's DDL).
  * @param {{ error: string, error_type: string }} result @param {Deps} deps @param {string} [holder]
  */
 function failed(result, deps, holder = 'an account deletion or a close may be running') {
@@ -343,7 +345,11 @@ function differenceLine(d) {
         case 'recount':
             return `  ${d.day}: its versions are not those of its recount ${detail.recount ?? '-'}`;
         default:
-            return `  ${d.day}: counted with ${detail.algorithm}, which this code cannot count (or its versions do not parse)`;
+            // 'version', by its cause (tools/core/trainingTimeCheck.js versionCause).
+            if (detail.cause === 'unparsed') return `  ${d.day}: its rules or unit list version does not parse with this code`;
+            if (detail.cause === 'rules_row') return `  ${d.day}: its rules row names ${detail.rulesAlgorithm}, another algorithm than its rules`;
+            if (detail.cause === 'row') return `  ${d.day}: counted with ${detail.algorithm}, not with its rules' algorithm (${detail.rulesAlgorithm})`;
+            return `  ${d.day}: its rules are ${detail.rulesAlgorithm}, which this code cannot count`;
     }
 }
 
