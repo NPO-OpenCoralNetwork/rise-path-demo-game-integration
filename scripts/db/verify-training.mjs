@@ -1355,7 +1355,7 @@ async function t18(pool, { catalogId, ruleSetId }) {
     const cohortUnlocked = await rewrittenDuring(wa, rewriteMemberships, [{ skip: [CHECK_SQL.lockCohort, CHECK_SQL.tryLockTimeout] }], CHECK_SQL.lockCohort);
     check('T18', ya.closed === 'closed' && cohortLocked.lines.join() === `${ya.user} 2` && cohortLocked.waiting.length === 0 && cohortLocked.tries >= 2
         && wa.closed === 'closed' && cohortUnlocked.lines.length === 0 && cohortUnlocked.waiting.join() === CHECK_SQL.indexesCohort,
-        `the cohort's snapshot, the memberships rewritten: the check tried its LOCK ${cohortLocked.tries} times, ${cohortLocked.waiting.length === 0 ? 'no backend waiting on a lock' : `while ${cohortLocked.waiting.length} statement(s) waited on a lock`}, then ${matchesTwo(cohortLocked.lines, ya.user)}; control, without the LOCK and its 20 ms limit: it waited in ${cohortUnlocked.waiting.join() === CHECK_SQL.indexesCohort ? 'its read of no rows, after its snapshot' : `${cohortUnlocked.waiting.length} statements`}, then read ${cohortUnlocked.lines.length === 0 ? 'no learner' : cohortUnlocked.lines.join()}`);
+        `the cohort's snapshot, the memberships rewritten: the check tried its LOCK ${cohortLocked.tries} times, ${cohortLocked.waiting.length === 0 ? 'no backend waiting on a lock' : `while ${cohortLocked.waiting.length} statement(s) waited on a lock (${cohortLocked.waiting.map((s) => (s === CHECK_SQL.lockCohort ? 'its LOCK' : s.slice(0, 60))).join(' | ')})`}, then ${matchesTwo(cohortLocked.lines, ya.user)}; control, without the LOCK and its 20 ms limit: it waited in ${cohortUnlocked.waiting.join() === CHECK_SQL.indexesCohort ? 'its read of no rows, after its snapshot' : `${cohortUnlocked.waiting.length} statements`}, then read ${cohortUnlocked.lines.length === 0 ? 'no learner' : cohortUnlocked.lines.join()}`);
 
     // A migration that changes two of the tables a snapshot locks, in the other order than its LOCK,
     // or that rebuilds an index of one (REINDEX holds the index in ACCESS EXCLUSIVE mode, and its table
@@ -1466,8 +1466,11 @@ async function t18(pool, { catalogId, ruleSetId }) {
         `the indexes of those tables a try's opening statements lock (its read of no rows): the cohort's ${indexes.cohort}, a learner's ${indexes.learner}; control, the LOCK and the 20 ms limit alone: ${indexes.lockAlone}`);
 }
 
-/** 'reads both days, matching' for a one-learner answer with two days and no difference. @param {string[]} lines @param {string} user */
-const matchesTwo = (lines, user) => (lines.join() === `${user} 2` ? 'reads both days, matching' : lines.join());
+/**
+ * 'reads both days, matching' for a one-learner answer with two days and no difference, 'reads no
+ * learner' for an answer without one. @param {string[]} lines @param {string} user
+ */
+const matchesTwo = (lines, user) => (lines.join() === `${user} 2` ? 'reads both days, matching' : lines.length === 0 ? 'reads no learner' : lines.join());
 
 /**
  * A pool for the core that records the statements its connections send (after changedConnections'

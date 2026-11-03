@@ -271,18 +271,19 @@ describe('tools/core/trainingTimeCheck.js', () => {
         assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: slow, sleep, now, learner: A })).status, 'checked');
         assert.equal(clock - slowFrom, 300, 'a try over 0.1 s: the next at once');
         // verifyCohort's own clock (the script passes none) only goes forward: the wall clock set back
-        // 5 s during a try (an NTP step) does not lengthen the sleep after it.
+        // 5 s during a try (an NTP step) does not lengthen the sleep after it. The module is loaded
+        // again under the mocked Date, so Date.now, new Date() and a Date.now kept at load all step.
         const { pool: stepped } = await seeded();
-        let offset = 0;
-        const wall = Date.now;
-        const wallClock = mock.method(Date, 'now', () => wall() + offset);
-        stepped.before(CHECK_SQL.indexesLearner, () => { offset = -5_000; });
+        const wallAt = at('2026-11-04T03:00:00Z');
+        stepped.before(CHECK_SQL.indexesLearner, () => { mock.timers.setTime(wallAt - 5_000); });
         stepped.failOn(CHECK_SQL.indexesLearner, busy(), 1);
         slept.length = 0;
+        mock.timers.enable({ apis: ['Date'], now: wallAt });
         try {
-            assert.equal(/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: stepped, sleep, learner: A })).status, 'checked');
+            const { verifyCohort: underWallClock } = await import('../../tools/core/trainingTimeCheck.js?wall-clock');
+            assert.equal(/** @type {any} */ (await underWallClock({ cohortSlug: SLUG, pool: stepped, sleep, learner: A })).status, 'checked');
         } finally {
-            wallClock.mock.restore();
+            mock.timers.reset();
         }
         assert.ok(slept.length === 1 && slept[0] >= 0 && slept[0] <= LOCK_RETRY.everyMs, `slept ${slept}`);
     });

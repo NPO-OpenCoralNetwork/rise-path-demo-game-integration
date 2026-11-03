@@ -22,14 +22,15 @@
  * half seen. Before its snapshot, each locks the tables it reads in ACCESS SHARE mode, NOWAIT
  * (lockedSnapshot): a migration's DDL on them is never read through an older snapshot (a table
  * rewrite is not MVCC-safe: such a snapshot sees the table empty); while DDL holds or waits for one of
- * them, the try rolls back, holding nothing, and the next starts LOCK_RETRY.everyMs after it started,
- * for about the lock timeout (then account_busy). Any other lock wait of a try ends after 20 ms, a try
- * that starts over too: on an index a REINDEX holds, before the try has read anything (a read of no
- * rows of its tables locks all their indexes); on a TOAST table or its index (a value stored out of
- * line, which a read locks only while it fetches it), during the reads. So it never waits long while
- * holding a lock, far under PostgreSQL's deadlock_timeout, and a migration is not cancelled as a
- * deadlock with it. ACCESS SHARE conflicts only with ACCESS EXCLUSIVE, so signals, closes and
- * deletion marks go on, and no advisory lock is taken. It writes nothing.
+ * them, the try rolls back, holding nothing, and the next starts LOCK_RETRY.everyMs after it started
+ * (at once after a longer try), for about the lock timeout (then account_busy). Any other lock wait
+ * of a try ends after 20 ms, a try that starts over too: on an index a REINDEX holds, before the try
+ * has read anything (a read of no rows of its tables locks all their indexes); on a TOAST table or
+ * its index (a value stored out of line, which a read locks only while it fetches it), during the
+ * reads. So it never waits long while holding a lock, far under PostgreSQL's deadlock_timeout, and a
+ * migration is not cancelled as a deadlock with it. ACCESS SHARE conflicts only with ACCESS
+ * EXCLUSIVE, so signals, closes and deletion marks go on, and no advisory lock is taken. It writes
+ * nothing.
  *
  * Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
  */
