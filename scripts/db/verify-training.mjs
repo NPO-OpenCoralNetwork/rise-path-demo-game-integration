@@ -78,7 +78,8 @@
  *       transaction is the statement order npm test pins.)
  *   T15 signalState's other columns: the clock guard's window end (the last closed day with the
  *       widest gapMs among its live rows, a recount's included: the close's alone, then wider with a
- *       recount row, not narrowed by a later one; a marked row and a later day's recount are not read),
+ *       recount row, not narrowed by a later one; a marked row, and a recount of a later or an earlier
+ *       day, are not read),
  *       yesterday's gapMs, today's unit list, the places (each chain's last signal, yesterday's and
  *       today's streams)
  *   T16 a signal's state read that fails (a statement on a missing table) rolls back to its
@@ -1134,12 +1135,13 @@ async function t15(pool, { catalogId, ruleSetId }) {
     // computes them in JavaScript): the clock guard's end of the last closed day's evidence window
     // with the widest gapMs among that day's live rows (its close's alone; then with recount rows of
     // that day: a wider one widens it, a later and narrower one does not narrow it, a marked one is
-    // not read; not today's gapMs, not the first closed day's; a marked close row and a recompute row
-    // of a later day are not read), yesterday's gapMs (not today's), whether today's unit list has
-    // the unit, and each chain's last signal among the cohort's chains seen yesterday or today (a
-    // chain across 00:00 by its newer stream; one of two days ago is not a place).
+    // not read; not today's gapMs, not an earlier closed day's, even a wider recount's; a marked
+    // close row and a recompute row of a later day are not read), yesterday's gapMs (not today's),
+    // whether today's unit list has the unit, and each chain's last signal among the cohort's chains
+    // seen yesterday or today (a chain across 00:00 by its newer stream; one of two days ago is not a
+    // place).
     const gapOf = async (/** @type {number} */ gapMs) => String((/** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, gapMs } }, loadedBy: 'verify', note: 'T15', pool }))).id);
-    const [rules29, rules17, rules41, rules53] = [await gapOf(29 * S), await gapOf(17 * S), await gapOf(41 * S), await gapOf(53 * S)];
+    const [rules29, rules17, rules41, rules53, rules47] = [await gapOf(29 * S), await gapOf(17 * S), await gapOf(41 * S), await gapOf(53 * S), await gapOf(47 * S)];
     const [d3, d2, yesterday, today] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2), await dayFromToday(pool, -1), await dayFromToday(pool, 0)];
     const user = uid('t15u');
     // Settings: from three days ago gapMs 23 s (RULES), from today 17 s.
@@ -1152,6 +1154,8 @@ async function t15(pool, { catalogId, ruleSetId }) {
         VALUES ($1, $2, $3::date, $4, 'study-time/v1', $5, $6, 0, 0, 0, $7, 'verify', ${marked ? "clock_timestamp() + interval '1 hour'" : 'NULL'}, $8)`,
     [user, cohort, day, kind, ruleSet, catalogId, 'f'.repeat(64), kind === 'recompute' ? await recountRecord(pool, cohort, day, day, ruleSet) : null]);
     await dayRow(d3, ruleSetId);
+    // An earlier closed day recounted with a wider gapMs than any row of the last one: not read.
+    await dayRow(d3, rules47, 'recompute');
     await dayRow(d2, rules29);
     await dayRow(yesterday, rules17, 'recompute');
     await dayRow(yesterday, rules17, 'close', true);
@@ -1173,7 +1177,7 @@ async function t15(pool, { catalogId, ruleSetId }) {
     const unknown = (await pool.query(TRAINING_TIME_SQL.signalState, [user, cohort, across, 'unit-zzz'])).rows[0];
     const until = Number(state?.closed_until_ms) - jstDayRange(d2).end;
     check('T15', state?.last_closed === d2 && until === 29 * S,
-        `the clock guard: the last closed day ${state?.last_closed} (${d2} expected) and its window's end ${until / S} s after its end (its own gapMs 29 s; today's 17 s)`);
+        `the clock guard: the last closed day ${state?.last_closed} (${d2} expected) and its window's end ${until / S} s after its end (its own gapMs 29 s; not today's 17 s, nor an earlier day's recount's 47 s)`);
     // Recount rows of that day, in this order: one counted with a wider gapMs, one with a wider one
     // still that an account deletion marked, and the day's current row, counted with a narrower one.
     await dayRow(d2, rules41, 'recompute');

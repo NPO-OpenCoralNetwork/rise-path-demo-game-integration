@@ -20,7 +20,7 @@
  *   its chain (a stored signal, a duplicate or too_soon, none of them a stop or after one, before the
  *   cohort's end), else null (the page sends no more signals of that chain, not even a stop). The
  *   numbers never go down from one answer to the next unless the database clock goes back or a staff
- *   recount (D12) lowers a closed day (tools/core/trainingTime.js liveTime).
+ *   recount (D12) changes closed days (tools/core/trainingTime.js liveTime).
  * beatMs is the only rule value an answer carries (as beatMs or nextInMs).
  *
  * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:

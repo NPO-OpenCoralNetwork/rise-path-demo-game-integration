@@ -642,7 +642,7 @@ describe('scripts/training-time.mjs: recounts (--recompute) and their record (--
         const C = 'aaaaaaaa-2323-4000-8000-0000000000c3';
         pool.state.stubs.push(C);
         pool.state.memberships.push({ user_id: C, cohort_id: COHORT, role: 'learner', added_at: Date.parse('2026-10-31T03:00:00Z'), account_deleted_at: null });
-        assert.deepEqual(await refused(recompute({ rules: rules2.sha256 })), rejected(`Refused: 1 learner(s) have days up to 2026-11-02 that are not closed. Run --close ${SLUG} first, or wait until those days are final: ${C}`));
+        assert.deepEqual(await refused(recompute({ rules: rules2.sha256 })), rejected(`Refused: 1 learner(s) have days up to 2026-11-02 that are not closed. Run --close ${SLUG} first: ${C}`));
         assert.deepEqual(pool.state.recounts, []);
         assert.equal(pool.state.days.filter((/** @type {any} */ d) => d.kind === 'recompute').length, 0);
         assert.equal((await runWith([...recompute({ rules: rules2.sha256 }), '--dry-run'], { pool: null })).code, EXIT.unavailable);
@@ -730,5 +730,87 @@ describe('scripts/training-time.mjs: recounts (--recompute) and their record (--
         for (const out of [first.dry, second.dry, show.out, a.out, b.out]) noRuleValue(out);
         const nobody = await runWith(['--show', SLUG, '--learner', 'aaaaaaaa-2323-4000-8000-0000000000e0'], { pool });
         assert.deepEqual([nobody.code, nobody.out], [EXIT.ok, 'aaaaaaaa-2323-4000-8000-0000000000e0 in web-2026-11: 0 closed day(s)']);
+    });
+
+    it('--recompute --dry-run: a unit counted on one side only; a unit list alone that moves set time between two units (the totals stay, the split changes); a change every printed value hides is named', async () => {
+        const study = (/** @type {any} */ pool, /** @type {string} */ userId, /** @type {string} */ unit, /** @type {number} */ chain, /** @type {number} */ born, /** @type {number[]} */ pairs) => {
+            const id = `cccccccc-0000-4000-8000-${String(chain).padStart(12, '0')}`;
+            let at = born;
+            pool.addSignal({ userId, cohortId: COHORT, unit, chain: id, born, seq: 0, at, input: true });
+            pairs.forEach((ms, i) => {
+                at += ms;
+                pool.addSignal({ userId, cohortId: COHORT, unit, chain: id, born, seq: i + 1, at, input: true });
+            });
+        };
+        const short = (/** @type {string} */ sha) => `${sha.slice(0, 12)}…`;
+        // Rules that count only time with focus: the fixture's signals have none, so a unit's time goes
+        // to zero (its line keeps the unit, 0:00:00 after).
+        const one = await recountable();
+        const focus = /** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, requireFocus: true } }, loadedBy: 'a', note: 'b', pool: one.pool }));
+        const zero = await runWith([...recompute({ to: '2026-11-01', rules: focus.sha256 }), '--dry-run'], { pool: one.pool });
+        assert.deepEqual([zero.code, zero.out.split('\n')], [EXIT.ok, [
+            `Recount of ${SLUG}, 2026-11-01 … 2026-11-01: rules ${focus.sha256}, unit list each day's own; by staff-a: ${REASON}`,
+            `${A}: 1 day(s)`,
+            `  2026-11-01  0:01:17 → 0:00:00 (-0:01:17), over the set time 0:00:00 → 0:00:00; rules ${short(one.rules.sha256)} → ${short(focus.sha256)}`,
+            '    unit sample-u2: 0:01:17 → 0:00:00 counted, 0:00:00 → 0:00:00 over the set time',
+            `${B}: 2 day(s)`,
+            `  2026-11-01  0:01:17 → 0:00:00 (-0:01:17), over the set time 0:00:00 → 0:00:00; rules ${short(one.rules.sha256)} → ${short(focus.sha256)}`,
+            '    unit sample-u1: 0:01:17 → 0:00:00 counted, 0:00:00 → 0:00:00 over the set time',
+            '  2026-11-03  0:00:43 → 0:01:17 (+0:00:34), over the set time 0:00:34 → 0:00:00',
+            '    unit sample-u1: 0:00:43 → 0:01:17 counted, 0:00:34 → 0:00:00 over the set time',
+            '2 learner(s), 3 day(s) change: counted 0:03:17 → 0:01:17 (-0:02:00).',
+            `Plan sha256 ${planSha(zero.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(zero.out)} instead of --dry-run.`,
+        ]]);
+        // Two units of 1 and 2 minutes, each studied 3 minutes on 11-01 (A); another unit list of the
+        // course with the set times swapped: 3 minutes counted and 3 over either way, split otherwise.
+        const unit = (/** @type {string} */ key, /** @type {number} */ setMinutes) => ({ key, title: { jp: key, en: key }, setMinutes });
+        const { pool, rules } = await loaded();
+        const xy = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 1), unit('unit-y', 2)] }, loadedBy: 'a', note: 'b', pool }));
+        const yx = /** @type {any} */ (await loadCatalog({ input: { ...COURSE, units: [unit('unit-x', 2), unit('unit-y', 1)] }, loadedBy: 'a', note: 'b', pool }));
+        pool.addSetting({ cohortId: COHORT, catalogId: xy.id, ruleSetId: rules.id, effectiveFrom: '2026-11-01' });
+        study(pool, A, 'unit-x', 31, Date.parse('2026-11-01T01:00:00Z'), Array(30).fill(6 * S));
+        study(pool, A, 'unit-y', 32, Date.parse('2026-11-01T02:00:00Z'), Array(30).fill(6 * S));
+        assert.equal((await runWith(['--close', SLUG], { pool })).code, EXIT.ok);
+        const swapped = await runWith([...recompute({ to: '2026-11-01', catalog: yx.sha256 }), '--dry-run'], { pool });
+        const list = `; unit list ${short(xy.sha256)} → ${short(yx.sha256)}`;
+        assert.deepEqual([swapped.code, swapped.out.split('\n')], [EXIT.ok, [
+            `Recount of ${SLUG}, 2026-11-01 … 2026-11-01: rules each day's own, unit list ${yx.sha256}; by staff-a: ${REASON}`,
+            `${A}: 1 day(s)`,
+            `  2026-11-01  0:03:00 → 0:03:00 (±0:00:00), over the set time 0:03:00 → 0:03:00${list}`,
+            '    unit unit-x: 0:01:00 → 0:02:00 counted, 0:02:00 → 0:01:00 over the set time',
+            '    unit unit-y: 0:02:00 → 0:01:00 counted, 0:01:00 → 0:02:00 over the set time',
+            `${B}: 1 day(s)`,
+            `  2026-11-01  0:00:00 → 0:00:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${list}`,
+            '2 learner(s), 2 day(s) change: counted 0:03:00 → 0:03:00 (±0:00:00).',
+            `Plan sha256 ${planSha(swapped.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(swapped.out)} instead of --dry-run.`,
+        ]]);
+        // B on 11-01: ten pairs of 6.93 s and one of 7.5 s (76.8 s); rules whose pair counts up to 7 s
+        // give 76.3 s. 11-03 (its own rules) then counts 43.7 s and 33.3 s over instead of 43.2 s and
+        // 33.8 s: each prints as before, so the line says it changes by less than a second.
+        const sub = await loaded();
+        const capped = /** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, creditCapMs: 7 * S } }, loadedBy: 'a', note: 'b', pool: sub.pool }));
+        sub.pool.addSetting({ cohortId: COHORT, catalogId: sub.catalog.id, ruleSetId: sub.rules.id, effectiveFrom: '2026-11-01' });
+        study(sub.pool, B, 'sample-u1', 33, Date.parse('2026-11-01T01:00:00Z'), [...Array(10).fill(6_930), 7_500]);
+        study(sub.pool, B, 'sample-u1', 34, Date.parse('2026-11-03T01:00:00Z'), Array(11).fill(7 * S));
+        assert.equal((await runWith(['--close', SLUG], { pool: sub.pool })).code, EXIT.ok);
+        const hidden = await runWith([...recompute({ to: '2026-11-01', rules: capped.sha256 }), '--dry-run'], { pool: sub.pool });
+        const versions = `; rules ${short(sub.rules.sha256)} → ${short(capped.sha256)}`;
+        assert.deepEqual([hidden.code, hidden.out.split('\n')], [EXIT.ok, [
+            `Recount of ${SLUG}, 2026-11-01 … 2026-11-01: rules ${capped.sha256}, unit list each day's own; by staff-a: ${REASON}`,
+            `${A}: 1 day(s)`,
+            `  2026-11-01  0:00:00 → 0:00:00 (±0:00:00), over the set time 0:00:00 → 0:00:00${versions}`,
+            `${B}: 2 day(s)`,
+            `  2026-11-01  0:01:16 → 0:01:16 (±0:00:00), over the set time 0:00:00 → 0:00:00${versions}`,
+            '    unit sample-u1: 0:01:16 → 0:01:16 counted, 0:00:00 → 0:00:00 over the set time',
+            '  2026-11-03  0:00:43 → 0:00:43 (±0:00:00), over the set time 0:00:33 → 0:00:33; it changes by less than a second',
+            '    unit sample-u1: 0:00:43 → 0:00:43 counted, 0:00:33 → 0:00:33 over the set time',
+            '2 learner(s), 3 day(s) change: counted 0:02:00 → 0:02:00 (±0:00:00).',
+            `Plan sha256 ${planSha(hidden.out)}. Nothing was written. To write it, run the same command with --expect ${planSha(hidden.out)} instead of --dry-run.`,
+        ]]);
+        for (const out of [zero.out, swapped.out, hidden.out]) {
+            noRuleValue(out, ['7000', '6930', '7500']);
+            assert.doesNotMatch(out, ISO_TIME);
+            differencesMatch(out);
+        }
     });
 });

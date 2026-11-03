@@ -499,8 +499,9 @@ export function createTrainingTimePool(seed = {}) {
         const closed = cohort && state.days
             .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.kind === 'close' && d.account_deleted_at === null)
             .sort((x, y) => y.day.localeCompare(x.day))[0];
-        // The widest gapMs among the last closed day's live rows, of any kind (max() skips a NULL, so
-        // a rules row without a numeric gapMs is skipped).
+        // The widest gapMs among the last closed day's live rows, of any kind (max() skips a NULL: a
+        // rules row without a gapMs; a gapMs that is not an integer is not modelled, every stored rules
+        // version parsed with one).
         const gaps = closed ? state.days
             .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.day === closed.day && d.account_deleted_at === null)
             .map((d) => state.rules.find((r) => r.id === d.rule_set_id)?.params?.counting?.gapMs)

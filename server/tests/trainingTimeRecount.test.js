@@ -234,14 +234,25 @@ describe('tools/core/trainingTimeRecount.js: the plan', () => {
         assert.deepEqual(changedOf(plan), [[A, [['2026-11-01', 70, 0, 50, 0], ['2026-11-02', 50, 20, 50, 0], ['2026-11-03', 0, 70, 20, 50]]]]);
         assert.deepEqual(plan.learners[0].days.map((/** @type {any} */ d) => [d.after.rules, d.after.catalog]), [[r2.sha256, k3.sha256], [r2.sha256, k3.sha256], [r1.sha256, catalog.sha256]]);
         assert.deepEqual([plan.plan.rules, plan.plan.catalog], [r2.sha256, k3.sha256]);
-        // The 3-minute list alone on 11-01: the same numbers (70 s under either set time), another version.
-        const versions = await dry(pool, { catalogSha256: k3.sha256 });
-        assert.deepEqual(changedOf(versions), [[A, [['2026-11-01', 70, 0, 70, 0]]]]);
-        assert.deepEqual([versions.plan.rules, versions.learners[0].days[0].after.catalog, versions.learners[0].days[0].after.rules], [null, k3.sha256, r1.sha256]);
-        const written = await write(pool, { catalogSha256: k3.sha256, expect: versions.sha256 });
-        assert.deepEqual([written.status, written.days], ['recounted', 1]);
-        assert.deepEqual(pool.state.recounts.map((/** @type {any} */ r) => [r.rule_set_id, r.catalog_version_id]), [[null, k3.id]]);
+        // Written: the record names both versions, each row its own, and the rows check.
+        const both = await write(pool, { toDay: '2026-11-02', rulesSha256: r2.sha256, catalogSha256: k3.sha256, expect: plan.sha256 });
+        assert.deepEqual([both.status, both.days], ['recounted', 3]);
+        assert.deepEqual(pool.state.recounts.map((/** @type {any} */ r) => [r.from_day, r.to_day, r.rule_set_id, r.catalog_version_id]), [['2026-11-01', '2026-11-02', r2.id, k3.id]]);
+        assert.deepEqual(DAYS.map((day) => [rowOf(pool, day).kind, rowOf(pool, day).rule_set_id, rowOf(pool, day).catalog_version_id]),
+            [['recompute', r2.id, k3.id], ['recompute', r2.id, k3.id], ['recompute', r1.id, catalog.id]]);
         assert.deepEqual((/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool }))).learners[0].differences, []);
+        // The 3-minute list alone on 11-01 (another cohort as seeded): the same numbers (70 s under
+        // either set time), another version.
+        const other = await seeded();
+        await close(other.pool);
+        const k = /** @type {any} */ (await loadCatalog({ input: COURSE_3, loadedBy: 'staff-a', note: 'u1 three minutes', pool: other.pool }));
+        const versions = await dry(other.pool, { catalogSha256: k.sha256 });
+        assert.deepEqual(changedOf(versions), [[A, [['2026-11-01', 70, 0, 70, 0]]]]);
+        assert.deepEqual([versions.plan.rules, versions.learners[0].days[0].after.catalog, versions.learners[0].days[0].after.rules], [null, k.sha256, other.r1.sha256]);
+        const written = await write(other.pool, { catalogSha256: k.sha256, expect: versions.sha256 });
+        assert.deepEqual([written.status, written.days], ['recounted', 1]);
+        assert.deepEqual(other.pool.state.recounts.map((/** @type {any} */ r) => [r.rule_set_id, r.catalog_version_id]), [[null, k.id]]);
+        assert.deepEqual((/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool: other.pool }))).learners[0].differences, []);
     });
 
     it('a later recount never undoes an earlier one: a day\'s own versions are its current row\'s, inside the range for the version not overridden and on every later day', async () => {
@@ -353,6 +364,7 @@ describe('tools/core/trainingTimeRecount.js: refusals', () => {
         await refusal({ cohortSlug: 'no-dates', rulesSha256: r2.sha256 }, { status: 'no_dates' });
         await refusal({ fromDay: '2026-10-31', rulesSha256: r2.sha256 }, { status: 'outside_dates' });
         await refusal({ toDay: '2026-12-01', rulesSha256: r2.sha256 }, { status: 'outside_dates' });
+        assert.deepEqual(await dry(pool, { fromDay: '2026-11-29', toDay: '2026-11-30', rulesSha256: r2.sha256 }), { status: 'not_final', day: '2026-11-30' }, 'the cohort\'s last day is inside its dates');
         await refusal({ rulesSha256: 'e'.repeat(64) }, { status: 'no_rules' });
         await refusal({ catalogSha256: 'e'.repeat(64) }, { status: 'no_catalog' });
         // Versions loaded by other code (loadRules and loadCatalog refuse them here).
@@ -407,6 +419,15 @@ describe('tools/core/trainingTimeRecount.js: refusals', () => {
             assert.deepEqual(await dry(pool, { fromDay: '2026-11-02', toDay: '2026-11-03', catalogSha256: k.sha256 }), { status: 'course_differs', day: '2026-11-02' });
             assert.deepEqual(pool.state.recounts, []);
         }
+        // Another course: the earliest day of any learner, whichever learner it is (one added on 11-02
+        // has no 11-01).
+        for (const late of [A, B]) {
+            const s = await seeded({ learners: [A, B] });
+            s.pool.state.memberships.find((/** @type {any} */ m) => m.user_id === late).added_at = at('2026-11-02T01:00:00Z');
+            for (const user of [A, B]) await close(s.pool, user);
+            const k = /** @type {any} */ (await loadCatalog({ input: OTHER_COURSE, loadedBy: 'staff-a', note: 'other', pool: s.pool }));
+            assert.deepEqual(await dry(s.pool, { toDay: '2026-11-03', catalogSha256: k.sha256 }), { status: 'course_differs', day: '2026-11-01' }, `added on 11-02: ${late}`);
+        }
         // Both learners' rows do not check: both are listed, in id order.
         const both = await seeded({ learners: [B, A] });
         for (const user of [A, B]) {
@@ -448,6 +469,15 @@ describe('tools/core/trainingTimeRecount.js: refusals', () => {
         assert.deepEqual(of(RECOUNT_SQL.insertRecountDays), [A], 'rows for A only');
         assert.deepEqual([of(RECOUNT_SQL.learnerMember), of(CHECK_SQL.learnerRows)], [[A, B, C], [A, B]], 'C\'s rows are not read');
         assert.deepEqual(await values(pool, C), [['2026-11-02', 'close', 70, 0], ['2026-11-03', 'close', 50, 20]]);
+        // A cohort with no setting yet: nothing counts in it, so no learner's rows are read and nothing is written.
+        pool.state.cohorts.push({ id: 'c2200000-0000-4000-8000-000000000002', slug: 'no-setting', name: 'X', starts_on: '2026-11-01', ends_on: '2026-11-30' });
+        pool.state.memberships.push({ user_id: A, cohort_id: 'c2200000-0000-4000-8000-000000000002', role: 'learner', added_at: at('2026-10-31T01:00:00Z'), account_deleted_at: null });
+        const sent1 = pool.queries.length;
+        const none = await dry(pool, { cohortSlug: 'no-setting', rulesSha256: r2.sha256 });
+        assert.deepEqual([none.status, none.learners], ['plan', []]);
+        assert.deepEqual(await write(pool, { cohortSlug: 'no-setting', rulesSha256: r2.sha256, expect: none.sha256 }), { status: 'unchanged', sha256: none.sha256 });
+        assert.deepEqual(pool.queries.slice(sent1).filter((q) => [RECOUNT_SQL.learnerMember, CHECK_SQL.learnerRows].includes(q.sql)).map((q) => q.sql === CHECK_SQL.learnerRows),
+            [false, false], 'the membership read (dry run and write), no rows');
         assert.deepEqual((/** @type {any} */ (await verifyCohort({ cohortSlug: SLUG, pool }))).learners.map((/** @type {any} */ l) => l.differences), [[], [], []]);
     });
 });
@@ -646,7 +676,7 @@ describe('tools/core/trainingTimeRecount.js: the write', () => {
 });
 
 describe('the clock guard and the staff reads', () => {
-    it('a recount of the last closed day with a wider gapMs widens the guard (a signal at its end + that gap stores nothing, 1 ms later it is stored); a narrower recount does not narrow it; a marked row is not read', async () => {
+    it('a recount of the last closed day with a wider gapMs widens the guard (a signal at its end + that gap stores nothing, 1 ms later it is stored); a narrower recount does not narrow it; a marked row, or a recount of an earlier day, is not read', async () => {
         const { pool, wide, narrow } = await seeded();
         await close(pool);
         const day = { fromDay: '2026-11-03', toDay: '2026-11-03' };
@@ -667,6 +697,17 @@ describe('the clock guard and the staff reads', () => {
         pool.state.days.find((/** @type {any} */ d) => d.day === '2026-11-03' && d.rule_set_id === wide.id).account_deleted_at = at('2026-11-04T03:00:00Z');
         assert.equal(await send(end + 23 * S, 72), 'clock_behind');
         assert.equal(await send(end + 23 * S + 1, 73), 'accepted');
+        // A wider recount of an earlier day is not read: the last closed day's rows decide.
+        const earlier = await seeded();
+        await close(earlier.pool);
+        const before = { fromDay: '2026-11-02', toDay: '2026-11-02', rulesSha256: earlier.wide.sha256 };
+        assert.equal((await write(earlier.pool, { ...before, expect: (await dry(earlier.pool, before)).sha256 })).status, 'recounted');
+        const sendEarlier = async (/** @type {number} */ clock, /** @type {number} */ n) => {
+            earlier.pool.setClock(clock);
+            return /** @type {any} */ (await recordSignal({ userId: A, cohortId: COHORT, signal: signal(n), pool: earlier.pool })).status;
+        };
+        assert.equal(await sendEarlier(end + 23 * S, 74), 'clock_behind');
+        assert.equal(await sendEarlier(end + 23 * S + 1, 75), 'accepted', 'not 11-02\'s 6 hours');
     });
 
     it('a cohort\'s recounts (who, why, when, the days, the versions and the plan by sha256); a learner\'s rows (each day\'s earlier rows and the recount that wrote each, no row\'s time) and units, in one snapshot', async () => {

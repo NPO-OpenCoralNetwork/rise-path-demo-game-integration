@@ -41,10 +41,11 @@
  *                 every later closed day is counted again with its own versions and the new carry.
  *                 First with --dry-run: it prints each changed day before and after, and the plan's
  *                 sha256, which binds --by and --reason too; nothing is written. The same command
- *                 with --expect <that sha256> instead of --dry-run writes it, only when nothing
- *                 changed since; the old rows stay. Both read as --verify does; the write then holds
- *                 the locks of the learners it counts only while it reads their rows again and
- *                 writes, and waits at most 20 ms for any lock while it holds one.
+ *                 with --expect <that sha256> instead of --dry-run writes it, only while the plan is
+ *                 still that one and the counted learners' rows and evidence are as it read them
+ *                 again just before its locks; the old rows stay. Both read as --verify does; the
+ *                 write then holds the locks of the learners it counts only while it reads their
+ *                 rows again and writes, and waits at most 20 ms for any lock while it holds one.
  *
  * Refuses everything unless TRAINING_ENABLED is exactly "true" here (the public Rise Path stack
  * leaves it unset). Exit: 0 done (or already so), 1 usage, 2 refused, 3 unavailable (database, or a
@@ -455,17 +456,22 @@ async function verifyOne(args, deps) {
 const shortSha = (sha) => (sha ? `${sha.slice(0, 12)}…` : '-');
 
 /**
- * A changed day's units, one line each (every unit of the day before or after, in code-unit order).
+ * A changed day's units, one line each (every unit of the day before or after, in code-unit order),
+ * and whether any of them prints differently before and after (hms shows whole seconds).
  * @param {Units} before @param {Units} after
+ * @returns {{ lines: string[], shown: boolean }}
  */
 function unitLines(before, after) {
     const keys = [...new Set([...before.map((u) => u[0]), ...after.map((u) => u[0])])].sort();
     const of = (/** @type {Units} */ units, /** @type {string} */ key) => units.find((u) => u[0] === key) ?? [key, 0, 0];
-    return keys.map((key) => {
+    let shown = false;
+    const lines = keys.map((key) => {
         const [, c1, o1] = of(before, key);
         const [, c2, o2] = of(after, key);
+        shown ||= hms(c1) !== hms(c2) || hms(o1) !== hms(o2);
         return `    unit ${key}: ${hms(c1)} → ${hms(c2)} counted, ${hms(o1)} → ${hms(o2)} over the set time`;
     });
+    return { lines, shown };
 }
 
 /**
@@ -490,8 +496,11 @@ function printPlan(plan, slug, deps) {
                 d.before.rules === d.after.rules ? '' : `; rules ${shortSha(d.before.rules)} → ${shortSha(d.after.rules)}`,
                 d.before.catalog === d.after.catalog ? '' : `; unit list ${shortSha(d.before.catalog)} → ${shortSha(d.after.catalog)}`,
             ].join('');
-            deps.log(`  ${d.day}  ${hms(d.before.countedMs)} → ${hms(d.after.countedMs)} (${signed(d.before.countedMs, d.after.countedMs)}), over the set time ${hms(d.before.overCapMs)} → ${hms(d.after.overCapMs)}${versions}`);
-            if (!sameUnits(d.before.units, d.after.units)) for (const line of unitLines(d.before.units, d.after.units)) deps.log(line);
+            const units = sameUnits(d.before.units, d.after.units) ? { lines: [], shown: false } : unitLines(d.before.units, d.after.units);
+            // A change every printed value hides (each is whole seconds) is still named.
+            const shown = versions !== '' || units.shown || hms(d.before.countedMs) !== hms(d.after.countedMs) || hms(d.before.overCapMs) !== hms(d.after.overCapMs);
+            deps.log(`  ${d.day}  ${hms(d.before.countedMs)} → ${hms(d.after.countedMs)} (${signed(d.before.countedMs, d.after.countedMs)}), over the set time ${hms(d.before.overCapMs)} → ${hms(d.after.overCapMs)}${versions}${shown ? '' : '; it changes by less than a second'}`);
+            for (const line of units.lines) deps.log(line);
         }
     }
     if (!days) {
@@ -541,7 +550,7 @@ function recountRefused(result, args, deps) {
             deps.log(`Refused: ${result.day} is not final yet${args.values.rules ? ' under those rules or its own' : ''}. Try again later.`);
             return EXIT.refused;
         case 'not_closed':
-            deps.log(`Refused: ${result.learners.length} learner(s) have days up to ${args.values.to} that are not closed. Run --close ${slug} first, or wait until those days are final: ${result.learners.join(', ')}`);
+            deps.log(`Refused: ${result.learners.length} learner(s) have days up to ${args.values.to} that are not closed. Run --close ${slug} first: ${result.learners.join(', ')}`);
             return EXIT.refused;
         case 'course_differs':
             deps.log(`Refused: the --catalog unit list is of another course than ${result.day}'s own; a recount keeps each day's course.`);
