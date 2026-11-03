@@ -131,7 +131,7 @@ describe(`migration ${FILE}`, () => {
         assert.match(read('scripts/db/verify-training.mjs'), new RegExp(`const FILE = '${FILE}'`));
         // Every training_ table of every migration, none reachable by the remote MCP role.
         const all = migrations.flatMap((name) => [...flatten(fs.readFileSync(new URL(name, DIR), 'utf8')).matchAll(/create table if not exists (training_[a-z_]+) \(/g)].map((m) => m[1]));
-        assert.equal(all.length, 9);
+        assert.equal(all.length, 10);
         const checks = read('scripts/ci/db-checks.sh');
         assert.ok(checks.includes(`"0 of ${all.length}"`), `db-checks.sh: no privilege on any of the ${all.length} training_ tables`);
     });
