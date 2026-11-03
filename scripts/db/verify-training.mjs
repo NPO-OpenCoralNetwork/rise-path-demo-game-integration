@@ -3,11 +3,12 @@
 /**
  * Proves migrations 022 and 023 (job training: study time records and their recounts) and the code
  * that uses them (tools/core/trainingTime.js: configuration, closing, the signal write and the live
- * values; tools/core/trainingTimeCheck.js: the check of closed days; the membership add of
- * tools/core/training.js; the deletion's two marks) on a real, THROWAWAY PostgreSQL (16, as the VM's
- * pgvector/pgvector:0.8.7-pg16). npm test pins the SQL text (server/tests/migration022.test.js,
- * migration023.test.js, trainingTimeCore.test.js, trainingTimeCheck.test.js) and runs the code on an
- * in-memory fake; CI runs this script on the VM's image (job "Database checks",
+ * values; tools/core/trainingTimeCheck.js: the check of closed days; tools/core/trainingTimeRecount.js:
+ * the staff recount, its dry run and its write; the membership add of tools/core/training.js; the
+ * deletion's two marks) on a real, THROWAWAY PostgreSQL (16, as the VM's pgvector/pgvector:0.8.7-pg16).
+ * npm test pins the SQL text (server/tests/migration022.test.js, migration023.test.js,
+ * trainingTimeCore.test.js, trainingTimeCheck.test.js, trainingTimeRecount.test.js) and runs the code
+ * on an in-memory fake; CI runs this script on the VM's image (job "Database checks",
  * scripts/ci/db-checks.sh). It is the 確かめ方 of server/migrations/README.md for 022 and 023.
  *
  *   createdb -h 127.0.0.1 -p 55622 -U postgres verify_tr
@@ -76,8 +77,10 @@
  *       first close commits in between and the GET fails. (That the close and the read are one
  *       transaction is the statement order npm test pins.)
  *   T15 signalState's other columns: the clock guard's window end (the last closed day with the
- *       gapMs it was counted with; a marked row and a recompute row are not read), yesterday's gapMs,
- *       today's unit list, the places (each chain's last signal, yesterday's and today's streams)
+ *       widest gapMs among its live rows, a recount's included: the close's alone, then wider with a
+ *       recount row, not narrowed by a later one; a marked row and a later day's recount are not read),
+ *       yesterday's gapMs, today's unit list, the places (each chain's last signal, yesterday's and
+ *       today's streams)
  *   T16 a signal's state read that fails (a statement on a missing table) rolls back to its
  *       savepoint: the signal is stored, the answer names the error; control: without the savepoint
  *       the COMMIT of the aborted transaction stores nothing, and the write answers an error
@@ -109,8 +112,36 @@
  *       index (the learner's; the cohort's), PostgreSQL cancels the migration as a deadlock (40P01).
  *       The tables each snapshot's reads lock (pg_locks) are those its LOCK locks; a try's opening
  *       statements lock every index of them, the LOCK and the 20 ms limit alone none
+ *   T19 a staff recount (D12) through the core, of days already final (other rules for the first of
+ *       three days; the later ones change through the carry). The dry run's reads (its first
+ *       snapshot's, a learner's, a learner's history), each without its LOCK, lock exactly the tables
+ *       their LOCK locks, and their opening statements every index of them. The write without its
+ *       LOCKs and its read of no rows (its COMMIT sent as ROLLBACK), read by its pid after its last
+ *       statement, holds exactly the tables its LOCKs lock, none in a stronger mode; its read of no
+ *       rows after the LOCKs locks every index of them (control: the LOCKs and the 20 ms limit alone,
+ *       none). Through the core: the write's sha256 is the dry run's; it appends rows in day order
+ *       after the old ones, which stay as they were; each learner's current rows are the pure
+ *       function's with each day's own versions (the override's on the recounted day) and the new
+ *       carry, and the check finds nothing; the record holds no learner value (cohortRecounts and
+ *       learnerHistory read it back); a dry run again changes nothing, a write with its sha256 is
+ *       unchanged, the first sha256 again plan_changed; the fingerprint's day ids and count are the
+ *       evidence read's (+1 after a signal stored in its window, in a stream already there). A close
+ *       of a day added to the cohort (UPDATE ends_on, as T3), held after its insert: the write
+ *       started LEAD_MS later tries until it ends, then answers plan_changed and writes nothing, and
+ *       the check finds nothing; the same when the close commits while the write's try is held after
+ *       its account lock, before its learner lock; control: the write without its learner lock does
+ *       not wait and recounts, and the check then finds that day's values. The write held after its
+ *       last insert: the deletion service waits, then marks the recount rows with the tombstone's
+ *       time, and the record stays; control: without the account lock, while a deletion is between
+ *       its marks and COMMIT, the recount rows of the deleted account stay live. Two writes with one
+ *       sha256 at once: one recounted, one plan_changed, one record. A migration altering the
+ *       signals' table once the write's first try took its first learner's locks, then the days'
+ *       table HOLD_MS later: no backend waits on a lock meanwhile, its second statement goes through
+ *       and the write recounts after it (its tries); control: without the 20 ms limit, the LOCKs and
+ *       the read of no rows, the write waits, and PostgreSQL cancels the migration as a deadlock (40P01)
  * The checks compare Japan-time days read at different moments: like db-checks.sh before all the
- * verify scripts, the script first waits past 00:00 JST when less than a minute is left.
+ * verify scripts, the script first waits past 00:00 JST when less than 90 s are left (its run takes
+ * less), and every recounted day is two days ago or earlier, final at once.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -130,7 +161,10 @@ import { TRAINING_SQL, addMember } from '../../tools/core/training.js';
 import {
     TRAINING_TIME_SQL, closeDays, evidenceDigest, learnerDays, loadCatalog, loadRules, readStudyTime, recordSignal, setCohortTime, signalOf,
 } from '../../tools/core/trainingTime.js';
-import { CHECK_SQL, SNAPSHOT_LOCKS, readCohort, readLearner, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
+import { CHECK_SQL, LOCK_RETRY, SNAPSHOT_LOCKS, readCohort, readLearner, rulesVersionOf, verifyCohort } from '../../tools/core/trainingTimeCheck.js';
+import {
+    RECOUNT_LOCKS, RECOUNT_SQL, cohortRecounts, learnerHistory, planRecount, readRecountHead, readRecountLearner, recountCohort,
+} from '../../tools/core/trainingTimeRecount.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MIGRATIONS = path.join(ROOT, 'server', 'migrations');
@@ -152,6 +186,9 @@ const RULES = /** @type {any} */ (parseTimeRules(RULES_IN)).rules;
 // Other rules: smaller pieces, and the evidence read from further back and ahead (gapMs, idleMs).
 const RULES_IN_2 = Object.freeze({ ...RULES_IN, counting: { ...RULES_IN.counting, gapMs: 29 * S, creditCapMs: 5 * S, idleMs: 151 * S } });
 const RULES_2 = /** @type {any} */ (parseTimeRules(RULES_IN_2)).rules;
+// The rules from the third day of T19's cohorts: other pieces again.
+const RULES_IN_3 = Object.freeze({ ...RULES_IN, counting: { ...RULES_IN.counting, creditCapMs: 6 * S } });
+const RULES_3 = /** @type {any} */ (parseTimeRules(RULES_IN_3)).rules;
 const unitsOf = (/** @type {number} */ u1, /** @type {number} */ u2) => ({
     schema: 'risepath.training-course/v1',
     courseKey: 'verify-course',
@@ -279,9 +316,9 @@ async function deletionUpToStub(c, id) {
  * lock); `send`, sent as another text (COMMIT as ROLLBACK, a begin as a plain BEGIN); `holdAfter`,
  * once it returned and before going on, sleep holdMs in the database or, with `until`, wait for the
  * promise it returns (called then: the script sees the hold begin); `after`, then `run` (another
- * connection's transaction between two statements of this one).
+ * connection's transaction between two statements of this one; it gets this connection's backend pid).
  * @typedef {{ skip?: string[], send?: Map<string, string>, holdAfter?: string, holdMs?: number, until?: () => Promise<unknown>,
- *   after?: string, run?: () => Promise<unknown> }} ConnectionChange
+ *   after?: string, run?: (pid: number) => Promise<unknown> }} ConnectionChange
  */
 
 /**
@@ -306,7 +343,7 @@ function changedConnections(pool, changes) {
                     const result = await client.query(send.get(sql) ?? sql, params);
                     if (sql === holdAfter && until) await until();
                     else if (sql === holdAfter && holdMs) await client.query('SELECT pg_sleep($1)', [holdMs / 1000]);
-                    if (sql === after && run) await run();
+                    if (sql === after && run) await run(client.processID);
                     return result;
                 },
                 release: (/** @type {any} */ error) => client.release(error),
@@ -331,6 +368,14 @@ function gate() {
     });
     return { shut, open: () => open() };
 }
+
+/**
+ * The changes for a recount through the core in a cohort of `learners` live learners: none on its
+ * dry run's connections (the cohort's snapshot, then each learner's, in the order it asks for them),
+ * `change` on each try of its write after them.
+ * @param {number} learners @param {ConnectionChange} change @returns {ConnectionChange[]}
+ */
+const writeOnly = (learners, change) => [...Array.from({ length: 1 + learners }, () => ({})), ...Array.from({ length: LOCK_RETRY.tries }, () => change)];
 
 /**
  * A cohort in session from today (to today + 30) with learners added now (the membership's default
@@ -1087,13 +1132,14 @@ async function t16(pool, { catalogId, ruleSetId }) {
 async function t15(pool, { catalogId, ruleSetId }) {
     // signalState's other columns on PostgreSQL (npm runs the signal on the in-memory fake, which
     // computes them in JavaScript): the clock guard's end of the last closed day's evidence window
-    // with the gapMs that day was counted with (not today's, not the first closed day's; a marked
-    // close row and a recompute row of a later day are not read), yesterday's gapMs (not today's),
-    // whether today's unit list has the unit, and each chain's last signal among the cohort's chains
-    // seen yesterday or today (a chain across 00:00 by its newer stream; one of two days ago is not
-    // a place).
+    // with the widest gapMs among that day's live rows (its close's alone; then with recount rows of
+    // that day: a wider one widens it, a later and narrower one does not narrow it, a marked one is
+    // not read; not today's gapMs, not the first closed day's; a marked close row and a recompute row
+    // of a later day are not read), yesterday's gapMs (not today's), whether today's unit list has
+    // the unit, and each chain's last signal among the cohort's chains seen yesterday or today (a
+    // chain across 00:00 by its newer stream; one of two days ago is not a place).
     const gapOf = async (/** @type {number} */ gapMs) => String((/** @type {any} */ (await loadRules({ input: { ...RULES_IN, counting: { ...RULES_IN.counting, gapMs } }, loadedBy: 'verify', note: 'T15', pool }))).id);
-    const [rules29, rules17] = [await gapOf(29 * S), await gapOf(17 * S)];
+    const [rules29, rules17, rules41, rules53] = [await gapOf(29 * S), await gapOf(17 * S), await gapOf(41 * S), await gapOf(53 * S)];
     const [d3, d2, yesterday, today] = [await dayFromToday(pool, -3), await dayFromToday(pool, -2), await dayFromToday(pool, -1), await dayFromToday(pool, 0)];
     const user = uid('t15u');
     // Settings: from three days ago gapMs 23 s (RULES), from today 17 s.
@@ -1128,6 +1174,15 @@ async function t15(pool, { catalogId, ruleSetId }) {
     const until = Number(state?.closed_until_ms) - jstDayRange(d2).end;
     check('T15', state?.last_closed === d2 && until === 29 * S,
         `the clock guard: the last closed day ${state?.last_closed} (${d2} expected) and its window's end ${until / S} s after its end (its own gapMs 29 s; today's 17 s)`);
+    // Recount rows of that day, in this order: one counted with a wider gapMs, one with a wider one
+    // still that an account deletion marked, and the day's current row, counted with a narrower one.
+    await dayRow(d2, rules41, 'recompute');
+    await dayRow(d2, rules53, 'recompute', true);
+    await dayRow(d2, rules17, 'recompute');
+    const widened = (await pool.query(TRAINING_TIME_SQL.signalState, [user, cohort, across, 'unit-b'])).rows[0];
+    const widenedBy = Number(widened?.closed_until_ms) - jstDayRange(d2).end;
+    check('T15', widened?.last_closed === d2 && widenedBy === 41 * S,
+        `with recount rows of that day: its window's end ${widenedBy / S} s after its end (the widest gapMs of its live rows, a recount's 41 s; a marked recount's 53 s not read; the current row, a later recount's 17 s, does not narrow it)`);
     check('T15', Number(state?.yesterday_gap_ms) === 23 * S && Number(state?.params?.counting?.gapMs) === 17 * S && state?.unit_known === true && unknown?.unit_known === false,
         `yesterday's gapMs ${Number(state?.yesterday_gap_ms) / S} s (23 s), today's ${Number(state?.params?.counting?.gapMs) / S} s (17 s); today's unit list has unit-b: ${state?.unit_known}, unit-zzz: ${unknown?.unit_known}`);
     const want = [{ chain_id: across, born: midnight - 10 * S, at: midnight + 4 * S, flags: 7 }, { chain_id: older, born: noon, at: noon + 7 * S, flags: 4 }]
@@ -1258,6 +1313,71 @@ async function t17(pool, { catalogId, ruleSetId }) {
     const afterDeletion = await verified();
     check('T17', Number(marks.marked) === 4 && Number(marks.live) === 0 && Number(marks.named) === 2 && kept === 1 && afterDeletion.length === 0,
         `an account deletion marks the close and recount rows (${marks.marked} marked, ${marks.live} live; ${marks.named} still name the recount); its record stays (${kept}); the check then reads ${afterDeletion.length} learners`);
+}
+
+/**
+ * On a connection of its own, in a transaction begun with `begin` (the check's snapshot unless
+ * given): `run`, then what `measure` finds, then a rollback.
+ * @template T @param {pg.Pool} pool @param {(c: pg.PoolClient) => Promise<unknown>} run @param {(c: pg.PoolClient) => Promise<T>} measure
+ * @param {string} [begin] @returns {Promise<T>}
+ */
+async function inSnapshot(pool, run, measure, begin = TRAINING_TIME_SQL.beginSnapshot) {
+    const c = await pool.connect();
+    try {
+        await c.query(begin);
+        await run(c);
+        return await measure(c);
+    } finally {
+        await c.query('ROLLBACK').catch(() => {});
+        c.release();
+    }
+}
+/** Sends the statements, in order. @param {readonly string[]} statements */
+const sending = (statements) => async (/** @type {pg.PoolClient} */ c) => {
+    for (const sql of statements) await c.query(sql);
+};
+/** The tables (relkind r or p) this backend holds a lock on, by name. @param {pg.PoolClient} c @returns {Promise<string[]>} */
+const tablesLocked = async (c) => (await c.query(`SELECT coalesce(array_agg(DISTINCT c.oid::regclass::text ORDER BY c.oid::regclass::text), '{}') AS t
+    FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+   WHERE l.locktype = 'relation' AND l.pid = pg_backend_pid() AND c.relkind IN ('r', 'p')
+     AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)`)).rows[0].t;
+/** Of the indexes of `tables`, how many this backend holds a lock on: 'held of all'. @param {string[]} tables */
+const indexesLocked = (tables) => async (/** @type {pg.PoolClient} */ c) => {
+    const n = (await c.query(`SELECT count(*) FILTER (WHERE EXISTS (SELECT 1 FROM pg_locks l
+        WHERE l.locktype = 'relation' AND l.relation = i.indexrelid AND l.pid = pg_backend_pid()))::int AS held, count(*)::int AS total
+      FROM pg_index i WHERE i.indrelid = ANY($1::regclass[])`, [tables])).rows[0];
+    return `${n.held} of ${n.total}`;
+};
+/** 'n of n' with n > 0: every one of them. @param {string} n */
+const every = (n) => /^([1-9]\d*) of \1$/.test(n);
+/** The same tables, in any order. @param {string[]} a @param {string[]} b */
+const sameTables = (a, b) => [...a].sort().join() === [...b].sort().join();
+/** @param {string[]} reads @param {string[]} locks */
+const same = (reads, locks) => (sameTables(reads, locks) ? 'are those its LOCK locks' : `${reads.join()}, its LOCK's ${locks.join()}`);
+
+/**
+ * PostgreSQL's table lock modes in its own order (lock.h), the weakest first. A recount takes only the
+ * first three, each of which conflicts with every mode the ones before it conflict with.
+ */
+const LOCK_MODES = Object.freeze(['AccessShareLock', 'RowShareLock', 'RowExclusiveLock', 'ShareUpdateExclusiveLock', 'ShareLock', 'ShareRowExclusiveLock', 'ExclusiveLock', 'AccessExclusiveLock']);
+/**
+ * The tables (relkind r or p) a backend holds a lock on, each with the strongest mode it holds, in
+ * code-unit order of their names: the backend with `pid`, or (null) this connection's.
+ * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} db @param {number | null} pid
+ * @returns {Promise<Map<string, string>>}
+ */
+async function modesHeld(db, pid) {
+    if (pid !== null && !Number.isInteger(pid)) throw new Error('modesHeld: the connection has no backend pid');
+    const { rows } = await db.query(`SELECT c.oid::regclass::text AS t, l.mode FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+        WHERE l.locktype = 'relation' AND l.granted AND l.pid = coalesce($1::int, pg_backend_pid()) AND c.relkind IN ('r', 'p')
+          AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)`, [pid]);
+    /** @type {Map<string, string>} */
+    const strongest = new Map();
+    for (const row of rows) {
+        const [table, mode] = [String(row.t), String(row.mode)];
+        if (LOCK_MODES.indexOf(mode) > LOCK_MODES.indexOf(strongest.get(table) ?? '')) strongest.set(table, mode);
+    }
+    return new Map([...strongest].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)));
 }
 
 /** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
@@ -1416,54 +1536,527 @@ async function t18(pool, { catalogId, ruleSetId }) {
     await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
         SELECT user_id, cohort_id, day, 'recompute', algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, 'verify', $3
           FROM training_time_days WHERE user_id = $1 AND day = $2::date AND kind = 'close'`, [p.user, d1, await recountRecord(pool, cohortId, d1, d1, ruleSetId)]);
-    /**
-     * In a snapshot on a connection of its own: `run`, then what `measure` finds, then a rollback.
-     * @template T @param {(c: pg.PoolClient) => Promise<unknown>} run @param {(c: pg.PoolClient) => Promise<T>} measure @returns {Promise<T>}
-     */
-    const inSnapshot = async (run, measure) => {
-        const c = await pool.connect();
-        try {
-            await c.query(TRAINING_TIME_SQL.beginSnapshot);
-            await run(c);
-            return await measure(c);
-        } finally {
-            await c.query('ROLLBACK').catch(() => {});
-            c.release();
-        }
-    };
-    const sending = (/** @type {readonly string[]} */ statements) => async (/** @type {pg.PoolClient} */ c) => {
-        for (const sql of statements) await c.query(sql);
-    };
-    /** The tables (relkind r or p) this backend holds a lock on, by name. @param {pg.PoolClient} c @returns {Promise<string[]>} */
-    const tablesLocked = async (c) => (await c.query(`SELECT coalesce(array_agg(DISTINCT c.oid::regclass::text ORDER BY c.oid::regclass::text), '{}') AS t
-        FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
-       WHERE l.locktype = 'relation' AND l.pid = pg_backend_pid() AND c.relkind IN ('r', 'p')
-         AND c.relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)`)).rows[0].t;
-    /** Of the indexes of `tables`, how many this backend holds a lock on: 'held of all'. @param {string[]} tables */
-    const indexesLocked = (tables) => async (/** @type {pg.PoolClient} */ c) => {
-        const n = (await c.query(`SELECT count(*) FILTER (WHERE EXISTS (SELECT 1 FROM pg_locks l
-            WHERE l.locktype = 'relation' AND l.relation = i.indexrelid AND l.pid = pg_backend_pid()))::int AS held, count(*)::int AS total
-          FROM pg_index i WHERE i.indrelid = ANY($1::regclass[])`, [tables])).rows[0];
-        return `${n.held} of ${n.total}`;
-    };
-    const lockOf = { cohort: await inSnapshot(sending([CHECK_SQL.lockCohort]), tablesLocked), learner: await inSnapshot(sending([CHECK_SQL.lockLearner]), tablesLocked) };
-    const cohortReads = await inSnapshot((c) => readCohort(c, p.slug), tablesLocked);
+    const lockOf = { cohort: await inSnapshot(pool, sending([CHECK_SQL.lockCohort]), tablesLocked), learner: await inSnapshot(pool, sending([CHECK_SQL.lockLearner]), tablesLocked) };
+    const cohortReads = await inSnapshot(pool, (c) => readCohort(c, p.slug), tablesLocked);
     let rows = 0;
-    const learnerReads = await inSnapshot(async (c) => {
+    const learnerReads = await inSnapshot(pool, async (c) => {
         await c.query(TRAINING_TIME_SQL.closeSettings, [cohortId]);
         rows = (await readLearner(c, p.user, cohortId)).rows.length;
     }, tablesLocked);
-    const same = (/** @type {string[]} */ reads, /** @type {string[]} */ locks) => (reads.join() === locks.join() ? 'are those its LOCK locks' : `${reads.join()}, its LOCK's ${locks.join()}`);
     check('T18', cohortReads.join() === lockOf.cohort.join() && learnerReads.join() === lockOf.learner.join() && rows === 3,
         `the tables the reads lock: the cohort's ${same(cohortReads, lockOf.cohort)}; a learner's with a recount row (${rows} rows) ${same(learnerReads, lockOf.learner)}`);
     const indexes = {
-        cohort: await inSnapshot(sending(SNAPSHOT_LOCKS.cohort), indexesLocked(lockOf.cohort)),
-        learner: await inSnapshot(sending(SNAPSHOT_LOCKS.learner), indexesLocked(lockOf.learner)),
-        lockAlone: await inSnapshot(sending([CHECK_SQL.lockLearner, CHECK_SQL.tryLockTimeout]), indexesLocked(lockOf.learner)),
+        cohort: await inSnapshot(pool, sending(SNAPSHOT_LOCKS.cohort), indexesLocked(lockOf.cohort)),
+        learner: await inSnapshot(pool, sending(SNAPSHOT_LOCKS.learner), indexesLocked(lockOf.learner)),
+        lockAlone: await inSnapshot(pool, sending([CHECK_SQL.lockLearner, CHECK_SQL.tryLockTimeout]), indexesLocked(lockOf.learner)),
     };
-    const every = (/** @type {string} */ n) => /^([1-9]\d*) of \1$/.test(n);
     check('T18', every(indexes.cohort) && every(indexes.learner) && /^0 of [1-9]\d*$/.test(indexes.lockAlone),
         `the indexes of those tables a try's opening statements lock (its read of no rows): the cohort's ${indexes.cohort}, a learner's ${indexes.learner}; control, the LOCK and the 20 ms limit alone: ${indexes.lockAlone}`);
+}
+
+/**
+ * A T19 learner's study, chains of [day (0: the cohort's first), unit, signals 7 s apart from 10:00
+ * JST]. FULL: unit-a's whole set time on the first day, a little more on the second, more on the
+ * third, so a recount of the first day with RULES_2 (smaller pieces, under the set time) changes the
+ * other two through the carry. UNIT_B: unit-b on the second day only, so that recount changes its
+ * first day's versions alone.
+ * @typedef {ReadonlyArray<readonly [number, string, number]>} Study
+ */
+/** @type {Study} */
+const FULL = [[0, 'unit-a', 20], [1, 'unit-a', 4], [2, 'unit-a', 12]];
+/** @type {Study} */
+const UNIT_B = [[1, 'unit-b', 12]];
+
+/** Code-unit order of [key, counted, over] rows (not a database collation's). @param {[string, number, number]} x @param {[string, number, number]} y */
+const byKey = (x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0);
+/** A day row's unit rows as [unit, counted, over], in code-unit order. @param {pg.Pool} pool @param {string} dayId */
+const unitRowsOf = async (pool, dayId) => (await pool.query('SELECT unit_key, counted_ms, over_cap_ms FROM training_time_unit_days WHERE day_id = $1', [dayId])).rows
+    .map((/** @type {any} */ r) => /** @type {[string, number, number]} */ ([String(r.unit_key), Number(r.counted_ms), Number(r.over_cap_ms)])).sort(byKey);
+/** A cohort's recount records. @param {pg.Pool} pool @param {string} cohort */
+const recordsOf = (pool, cohort) => count(pool, 'SELECT count(*) AS n FROM training_time_recomputes WHERE cohort_id = $1', [cohort]);
+/** @param {number} n */
+const tried = (n) => `${n} ${n === 1 ? 'try' : 'tries'}`;
+
+/**
+ * T19's days (four to two days ago: final once the 00:00 JST guard has run) and versions: T2's unit
+ * list and rules, the override of every recount here (RULES_2; its version, as the dry run reads it)
+ * and the rules from each cohort's third day (RULES_3).
+ * @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids
+ */
+async function t19Versions(pool, { catalogId, ruleSetId }) {
+    const days = [await dayFromToday(pool, -4), await dayFromToday(pool, -3), await dayFromToday(pool, -2)];
+    const catalog = /** @type {any} */ (await loadCatalog({ input: unitsOf(2, 30), loadedBy: 'verify', note: 'T19', pool }));
+    const rules2 = /** @type {any} */ (await loadRules({ input: RULES_IN_2, loadedBy: 'verify', note: 'T19', pool }));
+    const rules3 = /** @type {any} */ (await loadRules({ input: RULES_IN_3, loadedBy: 'verify', note: 'T19', pool }));
+    const override = rulesVersionOf((await pool.query(RECOUNT_SQL.rulesBySha, [rules2.sha256])).rows[0]);
+    if (String(catalog.id) !== catalogId || !override.rules || !rules3.id) throw new Error('T19: the versions could not be loaded');
+    return { days, catalogId, ruleSetId, catalogSha: String(catalog.sha256), rules2: String(rules2.id), rules2Sha: String(rules2.sha256), rules3: String(rules3.id), override };
+}
+/** @typedef {Awaited<ReturnType<typeof t19Versions>>} T19 */
+
+/**
+ * A T19 cohort from the first day to `endsOn` (the third unless given): a setting from the first day
+ * (T2's unit list and rules) and one from the third (RULES_3); each learner added on the first day,
+ * its study stored (storeChain), then closed through the core. args: a recount of the first day with
+ * RULES_2.
+ * @param {pg.Pool} pool @param {T19} t @param {Array<[string, Study]>} learners @param {string} [endsOn]
+ */
+async function t19Cohort(pool, t, learners, endsOn = t.days[2]) {
+    const [d1, , d3] = t.days;
+    const cohort = await cohortWith(pool, { startsOn: d1, endsOn, catalogId: t.catalogId, ruleSetId: t.ruleSetId, from: d1, learners: learners.map(([user]) => user) });
+    await pool.query("INSERT INTO training_cohort_time_settings (cohort_id, catalog_version_id, rule_set_id, effective_from, set_at, set_by, reason) VALUES ($1, $2, $3, $4::date, $5::timestamptz, 'verify', 'T19')",
+        [cohort, t.catalogId, t.rules3, d3, iso(jstDayRange(d1).start)]);
+    /** @type {Record<string, import('../../shared/training/studyTime.js').Signal[]>} */
+    const signals = {};
+    for (const [user, study] of learners) {
+        signals[user] = [];
+        for (const [i, unit, n] of study) signals[user].push(...await storeChain(pool, { user, cohort, unit, from: jstDayRange(t.days[i]).start + 10 * 3_600_000, n }));
+        const closed = /** @type {any} */ (await close(pool, user, cohort));
+        if (closed.status !== 'closed') throw new Error(`T19: a close answered ${closed.status ?? closed.error_type}`);
+    }
+    const slug = await slugOf(pool, cohort);
+    return {
+        cohort, slug, users: learners.map(([user]) => user).sort(), signals,
+        args: { cohortSlug: slug, fromDay: d1, toDay: d1, rulesSha256: t.rules2Sha, recomputedBy: 'verify', reason: 'T19: other rules for the first day' },
+    };
+}
+/** @typedef {Awaited<ReturnType<typeof t19Cohort>>} T19Cohort */
+/** The check's answer of a T19 cohort, one line per learner. @param {pg.Pool} pool @param {T19Cohort} s */
+const checkedT19 = async (pool, s) => checkedLines(await verifyCohort({ cohortSlug: s.slug, pool }));
+/** Whether the check found every learner's three days matching. @param {string[]} lines @param {T19Cohort} s */
+const nothingFound = (lines, s) => lines.join() === s.users.map((u) => `${u} 3`).join();
+/** @param {string[]} lines @param {T19Cohort} s */
+const findings = (lines, s) => (nothingFound(lines, s) ? 'finds nothing' : `finds ${lines.join(' | ')}`);
+
+/** @param {pg.Pool} pool @param {{ catalogId: string, ruleSetId: string }} ids */
+async function t19(pool, ids) {
+    const t = await t19Versions(pool, ids);
+    await t19Reads(pool, t);
+    // The cohort of the write's statements, then of the baseline: B studies unit-b on the second day
+    // only, A every day. B is made first, so its id comes first and A's unit rows are the write's
+    // last statement.
+    const [b, a] = [uid('t19b'), uid('t19a')];
+    const p = await t19Cohort(pool, t, [[b, UNIT_B], [a, FULL]]);
+    const planned = /** @type {any} */ (await planRecount({ ...p.args, pool }));
+    await t19WriteLocks(pool, p, planned);
+    await t19Baseline(pool, t, p, { a, b }, planned);
+    await t19Close(pool, t);
+    await t19Deletion(pool, t);
+    await t19Twice(pool, t);
+    await t19Migration(pool, t);
+}
+
+/**
+ * T19, the dry run's reads (as T18 measures the check's): readRecountHead (both overrides found) and
+ * readRecountLearner (a learner with a recount row: every read of readLearner), each in a snapshot
+ * without its LOCK, and learnerHistory through the core without its opening statements (read by its
+ * pid after its last read) lock exactly the tables their LOCK locks; the opening statements of each
+ * (the LOCK, the 20 ms limit, the read of no rows) lock every index of them.
+ * @param {pg.Pool} pool @param {T19} t
+ */
+async function t19Reads(pool, t) {
+    const [d1] = t.days;
+    const reader = uid('t19r');
+    const s = await t19Cohort(pool, t, [[reader, FULL]]);
+    // A recount row of the first day (its close copied, naming a record), so readLearner reads the
+    // recounts too (only the reads are measured here; nothing checks these rows).
+    await pool.query(`INSERT INTO training_time_days (user_id, cohort_id, day, kind, algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, computed_by, recompute_id)
+        SELECT user_id, cohort_id, day, 'recompute', algorithm, rule_set_id, catalog_version_id, counted_ms, over_cap_ms, signals, evidence_sha256, 'verify', $3
+          FROM training_time_days WHERE user_id = $1 AND day = $2::date AND kind = 'close'`, [reader, d1, await recountRecord(pool, s.cohort, d1, d1, t.ruleSetId)]);
+    const lockOf = {
+        head: await inSnapshot(pool, sending([RECOUNT_LOCKS.head[0]]), tablesLocked),
+        learner: await inSnapshot(pool, sending([RECOUNT_LOCKS.learner[0]]), tablesLocked),
+        history: await inSnapshot(pool, sending([RECOUNT_LOCKS.history[0]]), tablesLocked),
+    };
+    /** @type {any} */
+    let head = null;
+    const headReads = await inSnapshot(pool, async (c) => {
+        head = await readRecountHead(c, s.slug, { rules: t.rules2Sha, catalog: t.catalogSha });
+    }, tablesLocked);
+    /** @type {any} */
+    let read = null;
+    const learnerReads = await inSnapshot(pool, async (c) => {
+        read = await readRecountLearner(c, { userId: reader, cohort: { id: s.cohort, startsOn: d1 }, toDay: d1, rules: t.override });
+    }, tablesLocked);
+    /** @type {string[]} */
+    let historyReads = [];
+    const history = /** @type {any} */ (await learnerHistory({ userId: reader, cohortId: s.cohort, pool: changedConnections(pool, [{
+        skip: [...RECOUNT_LOCKS.history], after: TRAINING_TIME_SQL.unitTotals, run: async (pid) => { historyReads = [...(await modesHeld(pool, pid)).keys()]; },
+    }]) }));
+    const found = head?.rules?.sha256 === t.rules2Sha && head?.catalog?.sha256 === t.catalogSha && head?.learners?.join() === reader;
+    const records = read?.records;
+    check('T19', found && sameTables(headReads, lockOf.head) && records?.rows.length === 4 && records.recounts.size === 1 && records.signals.length > 0
+        && sameTables(learnerReads, lockOf.learner) && history?.rows?.length === 4 && sameTables(historyReads, lockOf.history),
+        `the tables the dry run's reads lock without their LOCK: its first snapshot's (both overrides ${found ? 'found' : 'not found'}) ${same(headReads, lockOf.head)}; a learner's with a recount row (${records?.rows.length ?? 0} rows, ${records?.signals.length ?? 0} signals) ${same(learnerReads, lockOf.learner)}; a learner's history (${history?.rows?.length ?? history?.error_type} rows), read by its pid after its last read, ${same(historyReads, lockOf.history)}`);
+    const indexes = {
+        head: await inSnapshot(pool, sending(RECOUNT_LOCKS.head), indexesLocked(lockOf.head)),
+        learner: await inSnapshot(pool, sending(RECOUNT_LOCKS.learner), indexesLocked(lockOf.learner)),
+        history: await inSnapshot(pool, sending(RECOUNT_LOCKS.history), indexesLocked(lockOf.history)),
+    };
+    check('T19', every(indexes.head) && every(indexes.learner) && every(indexes.history),
+        `the indexes of those tables their opening statements lock (the LOCK, the 20 ms limit, the read of no rows): the first snapshot's ${indexes.head}, a learner's ${indexes.learner}, a learner history's ${indexes.history}`);
+}
+
+/**
+ * T19, the write's statements: the write through the core, with days to write, its three LOCKs and
+ * its read of no rows not sent and its COMMIT sent as ROLLBACK (nothing kept); the tables its backend
+ * holds after its last statement (A's unit rows; pg_locks by its pid) are exactly those its LOCKs
+ * lock, none in a stronger mode than its LOCK's. Its read of no rows after the LOCKs locks every
+ * index of those tables; control: the 20 ms limit and the LOCKs alone, none.
+ * @param {pg.Pool} pool @param {T19Cohort} p @param {any} planned
+ */
+async function t19WriteLocks(pool, p, planned) {
+    const recorded = recordingPool(pool);
+    /** @type {Map<string, string>} */
+    let held = new Map();
+    let mark = -1;
+    // What the write sends after the learners' locks: its LOCKs, then its read of no rows.
+    const locks = RECOUNT_LOCKS.write.filter((sql) => sql.startsWith('LOCK TABLE '));
+    const unkept = /** @type {any} */ (await recountCohort({ ...p.args, expect: planned.sha256, pool: changedConnections(recorded.pool, writeOnly(p.users.length, {
+        skip: [...RECOUNT_LOCKS.write],
+        send: new Map([['COMMIT', 'ROLLBACK']]),
+        after: TRAINING_TIME_SQL.insertUnitDays,
+        run: async (pid) => {
+            held = await modesHeld(pool, pid);
+            mark = recorded.sent.length;
+        },
+    })) }));
+    const then = mark < 0 ? [] : recorded.sent.slice(mark);
+    const kept = await recordsOf(pool, p.cohort);
+    const alone = await inSnapshot(pool, sending(locks), (c) => modesHeld(c, null), 'BEGIN');
+    const tables = [...alone.keys()];
+    const stronger = [...held].filter(([table, mode]) => LOCK_MODES.indexOf(mode) > LOCK_MODES.indexOf(alone.get(table) ?? ''));
+    const modes = [...LOCK_MODES].reverse().map((mode) => [mode, [...held.values()].filter((m) => m === mode).length]).filter(([, n]) => n).map(([mode, n]) => `${n} in ${mode}`).join(', ');
+    check('T19', planned.status === 'plan' && planned.learners.length === 2 && unkept.error_type === 'unknown' && kept === 0 && then.join() === 'ROLLBACK'
+        && tables.length > 0 && [...held.keys()].join() === tables.join() && stronger.length === 0,
+        `the write without its LOCKs and its read of no rows, its COMMIT sent as ROLLBACK (it answered ${unkept.status ?? unkept.error_type}; ${kept} records kept), read by its pid after its last statement (then ${then.join() || 'nothing'}): it holds ${held.size} tables (${modes || 'none'}), ${sameTables([...held.keys()], tables) ? `the ${tables.length} its LOCKs lock` : `${[...held.keys()].join()} (its LOCKs: ${tables.join()})`}, ${stronger.length ? `in a stronger mode than its LOCK's: ${stronger.map(([x, m]) => `${x} ${m}`).join(', ')}` : 'none in a stronger mode than its LOCK\'s'}`);
+    // In the write's order: its 20 ms limit, (the learners' advisory locks,) its LOCKs, its read of no rows.
+    const opening = await inSnapshot(pool, sending([CHECK_SQL.tryLockTimeout, ...RECOUNT_LOCKS.write]), indexesLocked(tables), 'BEGIN');
+    const lockAlone = await inSnapshot(pool, sending([CHECK_SQL.tryLockTimeout, ...locks]), indexesLocked(tables), 'BEGIN');
+    check('T19', every(opening) && /^0 of [1-9]\d*$/.test(lockAlone),
+        `the indexes of those tables the write's opening statements lock (the 20 ms limit, the LOCKs, the read of no rows): ${opening}; control, the 20 ms limit and the LOCKs alone: ${lockAlone}`);
+}
+
+/**
+ * T19, the baseline through the core, on the cohort of the write's statements (nothing kept there):
+ * the write with the dry run's sha256 answers it; it appends rows after the old ones (which stay as
+ * they were), in day order, each naming the record; each learner's current rows are the pure
+ * function's with each day's own versions (the override's on the recounted day) and the new carry,
+ * and the check finds nothing; the record holds no learner value (its columns and values;
+ * cohortRecounts and learnerHistory read it back); a dry run again changes nothing, a write with its
+ * sha256 is unchanged and with the first one plan_changed; RECOUNT_SQL.fingerprint with the evidence
+ * read's days and instants gives the read's day ids and count, +1 after a signal stored in its
+ * window, in a stream already there.
+ * @param {pg.Pool} pool @param {T19} t @param {T19Cohort} p @param {{ a: string, b: string }} who @param {any} planned
+ */
+async function t19Baseline(pool, t, p, { a, b }, planned) {
+    const [d1, d2, d3] = t.days;
+    /** @type {Record<string, any[]>} */
+    const before = { [a]: await dayRows(pool, a, p.cohort), [b]: await dayRows(pool, b, p.cohort) };
+    const written = /** @type {any} */ (await recountCohort({ ...p.args, expect: planned.sha256, pool }));
+    /** A learner's rows after the write: the old ones, and the new ones after them. @param {string} user */
+    const appended = async (user) => {
+        const now = await dayRows(pool, user, p.cohort);
+        const old = new Set(before[user].map((r) => String(r.id)));
+        const kept = before[user].every((r) => JSON.stringify(now.find((x) => String(x.id) === String(r.id))) === JSON.stringify(r));
+        const added = (await pool.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, kind, recompute_id, computed_by FROM training_time_days
+            WHERE user_id = $1 AND cohort_id = $2 ORDER BY id`, [user, p.cohort])).rows.filter((r) => !old.has(String(r.id)));
+        const newest = Math.max(...before[user].map((r) => Number(r.id)));
+        const named = added.every((r) => r.kind === 'recompute' && String(r.recompute_id) === String(written.id) && r.computed_by === p.args.recomputedBy && Number(r.id) > newest);
+        const days = added.map((r) => String(r.day));
+        return { kept, ok: kept && named && days.every((day, i) => i === 0 || day > days[i - 1]), days };
+    };
+    const [rowsA, rowsB] = [await appended(a), await appended(b)];
+    const shown = (/** @type {string[]} */ days) => days.map((d) => d.slice(5)).join(' ') || 'none';
+    check('T19', written.status === 'recounted' && written.sha256 === planned.sha256 && written.learners === 2 && written.days === 4
+        && rowsA.ok && rowsA.days.join() === [d1, d2, d3].join() && rowsB.ok && rowsB.days.join() === d1,
+        `the write with the dry run's sha256: ${written.status ?? written.error_type} (${written.sha256 === planned.sha256 ? 'the same sha256' : 'another sha256'}), ${written.learners} learners, ${written.days} days; rows appended after the old ones, in day order, each naming the record: A ${shown(rowsA.days)}, B ${shown(rowsB.days)} (its versions only); the old rows ${rowsA.kept && rowsB.kept ? 'as they were' : 'changed'}`);
+
+    const rulesOf = (/** @type {string} */ day) => (day <= d1 ? RULES_2 : day >= d3 ? RULES_3 : RULES);
+    const ownRules = (/** @type {string} */ day) => (day <= d1 ? t.rules2 : day >= d3 ? t.rules3 : t.ruleSetId);
+    /** Whether each current row of the learner is the pure function's day, with its versions. @param {string} user */
+    const asPure = async (user) => {
+        const want = countDays({ fromDay: d1, toDay: d3, signals: p.signals[user], rulesOf, setMsOf: () => setMsOf(unitsOf(2, 30)), carriedMs: new Map(), cohort: cohortRange(d1, d3) }).days;
+        const current = [...new Map((await dayRows(pool, user, p.cohort)).map((r) => [r.day, r])).values()];
+        let alike = current.length === 3 && want.length === 3;
+        for (const [i, row] of current.entries()) {
+            const units = (want[i]?.units ?? []).filter((u) => u.countedMs > 0 || u.overCapMs > 0)
+                .map((u) => /** @type {[string, number, number]} */ ([u.unit, u.countedMs, u.overCapMs])).sort(byKey);
+            alike &&= row.day === want[i]?.day && row.counted_ms === want[i].countedMs && row.over_cap_ms === want[i].units.reduce((n, u) => n + u.overCapMs, 0)
+                && String(row.rule_set_id) === ownRules(row.day) && String(row.catalog_version_id) === t.catalogId
+                && JSON.stringify(await unitRowsOf(pool, row.id)) === JSON.stringify(units);
+        }
+        return alike;
+    };
+    const [pureA, pureB] = [await asPure(a), await asPure(b)];
+    const lines = await checkedT19(pool, p);
+    check('T19', pureA && pureB && nothingFound(lines, p),
+        `each learner's current rows as the pure function counts its signals, each day with its own versions (the override's on the recounted day) and the new carry: A ${pureA ? 'as' : 'unlike'} it, B ${pureB ? 'as' : 'unlike'} it; the check ${findings(lines, p)}`);
+
+    const record = (await pool.query(`SELECT to_jsonb(r) AS j, r.cohort_id, to_char(r.from_day, 'YYYY-MM-DD') AS from_day, to_char(r.to_day, 'YYYY-MM-DD') AS to_day,
+        r.rule_set_id, r.catalog_version_id, r.plan_sha256, r.recomputed_by, r.reason FROM training_time_recomputes r WHERE r.id = $1`, [written.id])).rows[0];
+    const columns = Object.keys(record?.j ?? {}).sort().join(' ');
+    const asInput = record?.cohort_id === p.cohort && record.from_day === d1 && record.to_day === d1 && String(record.rule_set_id) === t.rules2 && record.catalog_version_id === null
+        && record.plan_sha256 === planned.sha256 && record.recomputed_by === p.args.recomputedBy && record.reason === p.args.reason;
+    const text = JSON.stringify(record?.j ?? null).toLowerCase();
+    const noAccount = [a, b].every((u) => !text.includes(u.toLowerCase()));
+    const listed = /** @type {any} */ (await cohortRecounts({ cohortId: p.cohort, pool }));
+    const history = /** @type {any} */ (await learnerHistory({ userId: a, cohortId: p.cohort, pool }));
+    const recountRows = (history?.rows ?? []).filter((/** @type {any} */ r) => r.kind === 'recompute');
+    const readBack = listed?.length === 1 && listed[0].id === String(written.id) && listed[0].planSha256 === planned.sha256 && listed[0].rulesSha256 === t.rules2Sha && listed[0].catalogSha256 === null;
+    check('T19', columns === 'catalog_version_id cohort_id from_day id plan_sha256 reason recomputed_at recomputed_by rule_set_id to_day' && asInput && noAccount && readBack
+        && history?.rows?.length === 6 && recountRows.length === 3 && recountRows.every((/** @type {any} */ r) => r.recomputeId === String(written.id)),
+        `the record holds no learner value: its columns ${columns}; its values the recount's input and the plan's sha256 (${asInput}), no account id (${noAccount}); cohortRecounts reads it back (${readBack}); learnerHistory reads A's ${history?.rows?.length ?? history?.error_type} rows, the ${recountRows.length} recount rows naming it`);
+
+    const again = /** @type {any} */ (await planRecount({ ...p.args, pool }));
+    const rewrite = /** @type {any} */ (await recountCohort({ ...p.args, expect: again.sha256, pool }));
+    const replay = /** @type {any} */ (await recountCohort({ ...p.args, expect: planned.sha256, pool }));
+    const records = await recordsOf(pool, p.cohort);
+    check('T19', again.status === 'plan' && again.learners?.length === 0 && again.sha256 !== planned.sha256 && rewrite.status === 'unchanged' && rewrite.sha256 === again.sha256
+        && replay.status === 'plan_changed' && records === 1,
+        `again: the dry run ${again.status ?? again.error_type} with ${again.learners?.length} learners to change (${again.sha256 !== planned.sha256 ? 'another sha256' : 'the same sha256'}); the write with its sha256 ${rewrite.status ?? rewrite.error_type}, with the first one ${replay.status ?? replay.error_type}; records ${records}`);
+
+    /** @type {any} */
+    let read = null;
+    await inSnapshot(pool, async (c) => {
+        read = await readRecountLearner(c, { userId: a, cohort: { id: p.cohort, startsOn: d1 }, toDay: d1, rules: t.override });
+    }, async () => null);
+    const evidence = read?.records?.evidence;
+    const fingerprint = async () => (await pool.query(RECOUNT_SQL.fingerprint, [a, p.cohort, evidence?.first, evidence?.last, evidence?.from, evidence?.to])).rows[0];
+    const first = await fingerprint();
+    const ids = (read?.records?.rows ?? []).map((/** @type {any} */ r) => r.id);
+    // One more signal of A's first chain, 7 s after its last, in that day's stream (no new stream).
+    const chain = p.signals[a].filter((x) => x.chain === p.signals[a][0].chain);
+    const last = chain[chain.length - 1];
+    const streams = await streamsOf(pool, a, true);
+    await pool.query(TRAINING_TIME_SQL.insertStream, [a, p.cohort, last.unit, last.chain, iso(last.born), iso(last.at + 7 * S)]);
+    const stored = (await pool.query(TRAINING_TIME_SQL.insertSignal, [a, last.chain, iso(last.at + 7 * S), last.seq + 1, 6])).rowCount;
+    const second = await fingerprint();
+    const streamsNow = await streamsOf(pool, a, true);
+    check('T19', Boolean(evidence) && ids.length === 6 && JSON.stringify(first?.day_ids) === JSON.stringify(ids) && Number(first?.evidence) === read.records.signals.length
+        && stored === 1 && JSON.stringify(second?.day_ids) === JSON.stringify(ids) && Number(second?.evidence) === Number(first?.evidence) + 1 && streamsNow === streams,
+        `RECOUNT_SQL.fingerprint with the evidence read's days and instants: its day ids ${JSON.stringify(first?.day_ids) === JSON.stringify(ids) ? `the read's (${ids.length} rows)` : 'not the read\'s'}, its count ${first?.evidence} (the read's ${read?.records?.signals?.length} signals); a signal stored in its window, in a stream already there (streams ${streams}, then ${streamsNow}): its count then ${second?.evidence}`);
+}
+
+/**
+ * T19, a close in progress: a cohort closed up to its second day, then given a third (UPDATE ends_on,
+ * as T3 does), on which A studies the unit whose time the recount of the first day carries otherwise.
+ * The close of that day held HOLD_MS after its insert: the write started LEAD_MS later tries until
+ * the close ends, then answers plan_changed and writes nothing; the check finds nothing. The same
+ * when the close commits while the write's try is held after its account lock, before its learner
+ * lock. Control: the write without its learner lock, the close held until the write ends: it does not
+ * wait and recounts, and the check then finds that day's values (counted with the old carry).
+ * @param {pg.Pool} pool @param {T19} t
+ */
+async function t19Close(pool, t) {
+    const [, d2, d3] = t.days;
+    const extended = async (/** @type {string} */ tag) => {
+        const user = uid(tag);
+        const s = await t19Cohort(pool, t, [[user, FULL]], d2);
+        await pool.query('UPDATE training_cohorts SET ends_on = $2::date WHERE id = $1', [s.cohort, d3]);
+        return { ...s, user, plan: /** @type {any} */ (await planRecount({ ...s.args, pool })) };
+    };
+    const w = await extended('t19c');
+    const held = gate();
+    const closing = close(changedConnections(pool, [{ holdAfter: TRAINING_TIME_SQL.insertDays, until: () => { held.open(); return sleep(HOLD_MS); } }]), w.user, w.cohort)
+        .then((r) => /** @type {any} */ (r));
+    const reached = await Promise.race([held.shut.then(() => true), closing.then(() => false)]);
+    await sleep(LEAD_MS);
+    const recorded = recordingPool(pool);
+    const t0 = Date.now();
+    const r = /** @type {any} */ (await recountCohort({ ...w.args, expect: w.plan.sha256, pool: recorded.pool }));
+    const waited = Date.now() - t0;
+    const closed = await closing;
+    const tries = recorded.sent.filter((sql) => sql === 'BEGIN').length;
+    const records = await recordsOf(pool, w.cohort);
+    const lines = await checkedT19(pool, w);
+    check('T19', w.plan.learners?.length === 1 && reached && closed.status === 'closed' && closed.fromDay === d3 && r.status === 'plan_changed' && waited >= BLOCKED_MS && tries >= 2
+        && records === 0 && nothingFound(lines, w),
+        `a close of a day added to the cohort, held ${HOLD_MS} ms after its insert (then ${closed.status ?? closed.error_type} from ${closed.fromDay?.slice(5)}): the write started ${LEAD_MS} ms later waited ${waited} ms (${tried(tries)}), then ${r.status ?? r.error_type}; records ${records}; the check ${findings(lines, w)}`);
+
+    // The same close, committed while the write's try is held after its account lock (its first
+    // SELECT), before its learner lock: what the try reads after the learner lock includes the
+    // close's rows (each statement of a READ COMMITTED transaction reads what committed before it).
+    const j = await extended('t19j');
+    const heldJ = gate();
+    const go = gate();
+    const closingJ = close(changedConnections(pool, [{ holdAfter: TRAINING_TIME_SQL.insertDays, until: () => { heldJ.open(); return go.shut; } }]), j.user, j.cohort)
+        .then((x) => /** @type {any} */ (x));
+    const reachedJ = await Promise.race([heldJ.shut.then(() => true), closingJ.then(() => false)]);
+    /** @type {any} */
+    let between;
+    try {
+        between = await recountCohort({ ...j.args, expect: j.plan.sha256, pool: changedConnections(pool, writeOnly(1, {
+            holdAfter: TRAINING_SQL.lock,
+            until: async () => {
+                go.open();
+                await closingJ;
+            },
+        })) });
+    } finally {
+        go.open();
+    }
+    const closedJ = await closingJ;
+    const recordsJ = await recordsOf(pool, j.cohort);
+    const linesJ = await checkedT19(pool, j);
+    check('T19', reachedJ && closedJ.status === 'closed' && closedJ.fromDay === d3 && between.status === 'plan_changed' && recordsJ === 0 && nothingFound(linesJ, j),
+        `that close committed while the write's try was held after its account lock, before its learner lock: the write then ${between.status ?? between.error_type}; records ${recordsJ}; the check ${findings(linesJ, j)}`);
+
+    const k = await extended('t19k');
+    const heldK = gate();
+    const ended = gate();
+    const closingK = close(changedConnections(pool, [{ holdAfter: TRAINING_TIME_SQL.insertDays, until: () => { heldK.open(); return ended.shut; } }]), k.user, k.cohort)
+        .then((x) => /** @type {any} */ (x));
+    const reachedK = await Promise.race([heldK.shut.then(() => true), closingK.then(() => false)]);
+    const t1 = Date.now();
+    /** @type {any} */
+    let free;
+    try {
+        free = await recountCohort({ ...k.args, expect: k.plan.sha256, pool: changedConnections(pool, writeOnly(1, { skip: [TRAINING_SQL.learnerLock] })) });
+    } finally {
+        ended.open();
+    }
+    const freeMs = Date.now() - t1;
+    const closedK = await closingK;
+    const linesK = await checkedT19(pool, k);
+    check('T19', reachedK && free.status === 'recounted' && freeMs < BLOCKED_MS && closedK.status === 'closed' && linesK.join() === `${k.user} 3 ${d3}:values`,
+        `control, the write without its learner lock: ${free.status ?? free.error_type} in ${freeMs} ms while the close was held after its insert (then ${closedK.status ?? closedK.error_type}); the check finds ${foundIn(linesK)}`);
+}
+
+/**
+ * T19, an account deletion: the write held HOLD_MS after its last insert (the learner's unit rows);
+ * the deletion service started LEAD_MS later waits for it, then marks the recount rows with the
+ * tombstone's time; the record stays. Control: the write without the account lock while a deletion is
+ * between its marks and its COMMIT: the recount rows of the deleted account stay live.
+ * @param {pg.Pool} pool @param {T19} t
+ */
+async function t19Deletion(pool, t) {
+    const user = uid('t19d');
+    const s = await t19Cohort(pool, t, [[user, FULL]]);
+    const plan = /** @type {any} */ (await planRecount({ ...s.args, pool }));
+    const held = gate();
+    const writing = recountCohort({ ...s.args, expect: plan.sha256, pool: changedConnections(pool, writeOnly(1, {
+        holdAfter: TRAINING_TIME_SQL.insertUnitDays, until: () => { held.open(); return sleep(HOLD_MS); },
+    })) }).then((r) => /** @type {any} */ (r));
+    const reached = await Promise.race([held.shut.then(() => true), writing.then(() => false)]);
+    await sleep(LEAD_MS);
+    const uploadRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rp-verify-training-'));
+    try {
+        const t0 = Date.now();
+        const deleted = await deleteAccountData({
+            pool, userId: user, requestedBy: 'staff', authTime: null, billing: { config: null, stripe: null },
+            logger: { log: () => {}, warn: () => {} }, uploadRoot, memory: { enabled: () => false, purge: async () => ({ ok: true }) }, invalidateCaches: () => {},
+        });
+        const waited = Date.now() - t0;
+        const written = await writing;
+        const rows = (await pool.query(`SELECT count(*) FILTER (WHERE d.kind = 'recompute' AND d.account_deleted_at = x.deleted_at)::int AS marked,
+            count(*) FILTER (WHERE d.account_deleted_at IS NULL)::int AS live
+            FROM training_time_days d JOIN account_deletions x USING (user_id) WHERE d.user_id = $1 AND d.cohort_id = $2`, [user, s.cohort])).rows[0];
+        const kept = await recordsOf(pool, s.cohort);
+        check('T19', reached && written.status === 'recounted' && deleted?.status === 'deleted' && waited >= BLOCKED_MS && rows?.marked === written.days && rows.live === 0 && kept === 1,
+            `the write held ${HOLD_MS} ms after its last insert (then ${written.status ?? written.error_type}): the deletion service started ${LEAD_MS} ms later (${deleted?.status}) waited ${waited} ms, then marked the ${rows?.marked} recount rows with the tombstone's time (live rows ${rows?.live}); the record stays (${kept})`);
+    } finally {
+        await fs.rm(uploadRoot, { recursive: true, force: true }).catch(() => {});
+    }
+
+    const ctrl = uid('t19e');
+    const c = await t19Cohort(pool, t, [[ctrl, FULL]]);
+    const planC = /** @type {any} */ (await planRecount({ ...c.args, pool }));
+    const deletion = await pool.connect();
+    try {
+        await deletionUpToStub(deletion, ctrl);
+        const r = /** @type {any} */ (await recountCohort({ ...c.args, expect: planC.sha256, pool: changedConnections(pool, writeOnly(1, { skip: [TRAINING_SQL.lock] })) }));
+        await deletion.query('COMMIT');
+        const live = await count(pool, "SELECT count(*) AS n FROM training_time_days WHERE user_id = $1 AND kind = 'recompute' AND account_deleted_at IS NULL", [ctrl]);
+        check('T19', r.status === 'recounted' && live > 0 && live === r.days,
+            `control, the write without the account lock while a deletion is between its marks and its COMMIT: ${r.status ?? r.error_type}; live recount rows of the deleted account ${live}`);
+    } catch (error) {
+        await deletion.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        deletion.release();
+    }
+}
+
+/**
+ * T19, two writes with one sha256 at once (a staff member's double run): one recounted, one
+ * plan_changed, one record; the check finds nothing.
+ * @param {pg.Pool} pool @param {T19} t
+ */
+async function t19Twice(pool, t) {
+    const s = await t19Cohort(pool, t, [[uid('t19x'), FULL], [uid('t19y'), FULL]]);
+    const plan = /** @type {any} */ (await planRecount({ ...s.args, pool }));
+    const both = await Promise.all([0, 1].map(() => recountCohort({ ...s.args, expect: plan.sha256, pool })));
+    const statuses = both.map((r) => /** @type {any} */ (r).status ?? /** @type {any} */ (r).error_type).sort();
+    const records = await recordsOf(pool, s.cohort);
+    const lines = await checkedT19(pool, s);
+    check('T19', plan.learners?.length === 2 && statuses.join() === 'plan_changed,recounted' && records === 1 && nothingFound(lines, s),
+        `two writes with one sha256 at once: ${statuses.join(', ')}; records ${records}; the check ${findings(lines, s)}`);
+}
+
+/**
+ * T19, a migration during the write: once the write's first try took its first learner's locks, a
+ * migration alters the signals' table, HOLD_MS later the days' table, then rolls back. No backend
+ * waits on a lock during the hold (sampled every 10 ms), its second statement goes through and the
+ * write recounts after it (a try whose LOCK … NOWAIT found a table held rolled back, holding nothing,
+ * and the next one started); the check finds nothing. Control: the write without its 20 ms limit, its
+ * LOCKs and its read of no rows waits in its first read for the signals' table while it holds the
+ * days': PostgreSQL cancels the migration as a deadlock (40P01).
+ * @param {pg.Pool} pool @param {T19} t
+ */
+async function t19Migration(pool, t) {
+    const addColumn = (/** @type {string} */ table) => `ALTER TABLE ${table} ADD COLUMN t19_probe integer`;
+    const waitingCount = `SELECT count(*) AS n FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend' AND wait_event_type = 'Lock'`;
+    /** @param {string} tag @param {ConnectionChange} change on the write's tries */
+    const during = async (tag, change) => {
+        const s = await t19Cohort(pool, t, [[uid(`${tag}a`), FULL], [uid(`${tag}b`), FULL]]);
+        const plan = /** @type {any} */ (await planRecount({ ...s.args, pool }));
+        const ddl = await pool.connect();
+        const started = gate();
+        /** @type {Promise<void> | null} */
+        let first = null;
+        let firstFailed = '';
+        // Started once, after the first learner lock the write takes; the write goes on once the
+        // statement has its lock, or after HOLD_MS (a write holding the signals' table goes on then).
+        const migrate = () => {
+            first ??= ddl.query('BEGIN').then(() => ddl.query(addColumn('training_time_signals'))).then(() => started.open(), (error) => {
+                firstFailed = String(error.code ?? error);
+                started.open();
+            });
+            return Promise.race([first, sleep(HOLD_MS)]);
+        };
+        const recorded = recordingPool(pool);
+        try {
+            const writing = recountCohort({ ...s.args, expect: plan.sha256, pool: changedConnections(recorded.pool, writeOnly(s.users.length, { ...change, after: TRAINING_SQL.learnerLock, run: migrate })) })
+                .then((r) => /** @type {any} */ (r));
+            const reached = await Promise.race([started.shut.then(() => true), writing.then(() => false)]);
+            // During the hold, every 10 ms: how many other backends wait on a lock.
+            /** @type {number[]} */
+            const samples = [];
+            for (const end = Date.now() + HOLD_MS; Date.now() < end; await sleep(10)) samples.push(await count(pool, waitingCount));
+            const migrated = !reached ? 'not started' : firstFailed ? `its first statement ${firstFailed}`
+                : await ddl.query(addColumn('training_time_days')).then(() => 'ok', (error) => String(error.code));
+            await ddl.query('ROLLBACK');
+            const r = await writing;
+            await first;
+            return {
+                s, r, migrated, tries: recorded.sent.filter((sql) => sql === 'BEGIN').length, lines: await checkedT19(pool, s),
+                waits: `${samples.filter((n) => n > 0).length} of ${samples.length}`,
+            };
+        } catch (error) {
+            await ddl.query('ROLLBACK').catch(() => {});
+            throw error;
+        } finally {
+            ddl.release();
+        }
+    };
+    const locked = await during('t19f', {});
+    check('T19', locked.migrated === 'ok' && locked.r.status === 'recounted' && locked.tries >= 2 && /^0 of [1-9]\d*$/.test(locked.waits) && nothingFound(locked.lines, locked.s),
+        `a migration altering the signals' table once the write's first try took its first learner's locks, then the days' table ${HOLD_MS} ms later: a backend waiting on a lock during the hold in ${locked.waits} samples; its second statement ${locked.migrated}; the write then ${locked.r.status ?? locked.r.error_type} (${tried(locked.tries)}); the check ${findings(locked.lines, locked.s)}`);
+    const waiting = await during('t19w', { skip: [CHECK_SQL.tryLockTimeout, ...RECOUNT_LOCKS.write] });
+    check('T19', waiting.migrated === '40P01' && !waiting.waits.startsWith('0 ') && waiting.r.status === 'recounted' && nothingFound(waiting.lines, waiting.s),
+        `control, the write without its 20 ms limit, its LOCKs and its read of no rows: it waits on a lock during the hold (${waiting.waits} samples); the migration's second statement ${waiting.migrated === '40P01' ? 'is cancelled as a deadlock (40P01)' : waiting.migrated}; the write then ${waiting.r.status ?? waiting.r.error_type} (${tried(waiting.tries)}); the check ${findings(waiting.lines, waiting.s)}`);
 }
 
 /**
@@ -1474,7 +2067,7 @@ const matchesTwo = (lines, user) => (lines.join() === `${user} 2` ? 'reads both 
 
 /**
  * A pool for the core that records the statements its connections send (after changedConnections'
- * changes, when it wraps this one).
+ * changes, when it wraps this one). Its connections keep their backend's pid (processID).
  * @param {pg.Pool} pool @returns {{ pool: any, sent: string[] }}
  */
 function recordingPool(pool) {
@@ -1490,6 +2083,7 @@ function recordingPool(pool) {
             connect: async () => {
                 const client = await pool.connect();
                 return {
+                    processID: client.processID,
                     query: (/** @type {string} */ sql, /** @type {unknown[]} */ params) => {
                         sent.push(sql);
                         return client.query(sql, params);
@@ -1521,7 +2115,7 @@ export async function main(argv = process.argv.slice(2)) {
             return 2;
         }
         console.log(`# verify-training: database ${target.db}, PostgreSQL ${target.version}`);
-        await waitPastJstMidnight({ query: (sql) => pool.query(sql), budgetS: 60 });
+        await waitPastJstMidnight({ query: (sql) => pool.query(sql), budgetS: 90 });
         const files = (await fs.readdir(MIGRATIONS)).filter((name) => /^\d+_.+\.sql$/i.test(name)).sort((a, b) => a.localeCompare(b));
         for (const run of [1, 2]) {
             for (const file of files) await applyMigration(pool, file);
@@ -1544,6 +2138,7 @@ export async function main(argv = process.argv.slice(2)) {
         await t16(pool, ids);
         await t17(pool, ids);
         await t18(pool, ids);
+        await t19(pool, ids);
     } catch (error) {
         check('ERR', false, /** @type {Error} */ (error).stack ?? String(error));
     } finally {

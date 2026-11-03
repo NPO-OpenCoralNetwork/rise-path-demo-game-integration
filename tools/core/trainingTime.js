@@ -1,9 +1,10 @@
 // @ts-check
 /**
  * Shared Business Logic — job training, study time records (doc/brushup-2026/training-plan.ja.md
- * §4.9; D2, D3, D9–D13). Tables of server/migrations/022_training_study_time.sql. The counting is
- * the pure shared/training/studyTime.js (study-time/v1), with the school's private rules
- * (shared/training/timeRules.js) and unit list (shared/training/courseManifest.js).
+ * §4.9; D2, D3, D9–D13). Tables of server/migrations/022_training_study_time.sql and 023 (a staff
+ * recount, tools/core/trainingTimeRecount.js). The counting is the pure shared/training/studyTime.js
+ * (study-time/v1), with the school's private rules (shared/training/timeRules.js) and unit list
+ * (shared/training/courseManifest.js).
  *
  * Configuration (staff, scripts/training-time.mjs): a unit list or a rules file is loaded once, as
  * an immutable version named by the sha256 of its canonical JSON (the same content again changes
@@ -23,7 +24,8 @@
  * (shared/training/studyTime.js) decides with. An accepted signal is stored with that clock, only
  * while the stub exists, in the stream row of its Japan-time day (a chain across 00:00 gets one row
  * per day: closing reads a day's evidence from the streams of the days around it); a clock that
- * went back into a closed day's evidence window stores nothing. Unless it is a stop, the same
+ * went back into the last closed day's evidence window (its end + the widest gapMs among that day's
+ * live rows, a recount's included) stores nothing. Unless it is a stop, the same
  * transaction then reads the live values as of the signal's clock (behind a savepoint: a statement
  * that fails there keeps the signal; a lost connection stores nothing). Then, when a day became
  * final, closeDays in its own transaction (if it fails, the signal stays stored).
@@ -32,8 +34,9 @@
  * transaction that holds the three locks (no signal or close of the learner commits meanwhile): the
  * closed days' current rows, and the days not closed yet counted from the evidence with the function
  * a close uses, never stored, up to the instant no other open page's next signal can change
- * (settledUntil): no number goes down while the database clock does not go back (a signal stored at
- * an earlier clock can fall inside a counted span; only a closed day's evidence window is guarded).
+ * (settledUntil): no number goes down, a staff recount aside (D12), while the database clock does not
+ * go back (a signal stored at an earlier clock can fall inside a counted span; only a closed day's
+ * evidence window is guarded).
  *
  * Closing (closeDays): a learner's days, from the first one not closed yet up to the last final one
  * (the database clock passed its end + gapMs) and at most the cohort's last day, counted from the
@@ -133,8 +136,9 @@ SELECT to_char(d.today, 'YYYY-MM-DD') AS today, ins.id, ins.effective_from FROM 
     // find yesterday final); the chain's last signal over every live stream of the account (a chain
     // of another cohort or unit is refused); the last signal of each chain of the cohort seen today
     // or yesterday (an open chain's last signal is at most gapMs old, and timeRules.js caps gapMs at
-    // 6 hours); the last closed day and the end of its evidence window (its end + the gapMs it was
-    // counted with).
+    // 6 hours); the last closed day and the end of its evidence window (its end + the widest gapMs its
+    // live rows were counted with: a recount with a wider gapMs widens it, a narrower one does not
+    // narrow it).
     signalState: `WITH t AS (SELECT date_trunc('milliseconds', clock_timestamp()) AS at),
 d AS (SELECT at, (at AT TIME ZONE 'Asia/Tokyo')::date AS today FROM t)
 SELECT ${ms('d.at')} AS now_ms,
@@ -172,8 +176,11 @@ SELECT ${ms('d.at')} AS now_ms,
                       WHERE s.user_id = $1::uuid AND s.chain_id = $3::uuid AND s.account_deleted_at IS NULL
                       ORDER BY l.seq DESC LIMIT 1) ch ON true
   LEFT JOIN LATERAL (SELECT to_char(x.day, 'YYYY-MM-DD') AS last_closed,
-                            ${ms("((x.day + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')")} + (r.params #>> '{counting,gapMs}')::bigint AS closed_until_ms
-                       FROM training_time_days x JOIN training_time_rule_sets r ON r.id = x.rule_set_id
+                            ${ms("((x.day + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')")}
+                              + (SELECT max((r.params #>> '{counting,gapMs}')::bigint)
+                                   FROM training_time_days y JOIN training_time_rule_sets r ON r.id = y.rule_set_id
+                                  WHERE y.user_id = $1::uuid AND y.cohort_id = c.id AND y.day = x.day AND y.account_deleted_at IS NULL) AS closed_until_ms
+                       FROM training_time_days x
                       WHERE x.user_id = $1::uuid AND x.cohort_id = c.id AND x.kind = 'close' AND x.account_deleted_at IS NULL
                       ORDER BY x.day DESC LIMIT 1) lc ON true`,
     // Only while the stub exists. The stream of the signal's Japan-time day, from the same clock
@@ -254,10 +261,10 @@ RETURNING id, to_char(day, 'YYYY-MM-DD') AS day`,
 });
 
 /** @param {string} text */
-const sha256 = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+export const sha256 = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-/** Trimmed text of 1 to `max` characters, else null (the migration's CHECKs). @param {unknown} value @param {number} max */
-const textOf = (value, max) => {
+/** Trimmed text of 1 to `max` characters (code points), else null (the migrations' CHECKs). @param {unknown} value @param {number} max */
+export const textOf = (value, max) => {
     const text = String(value ?? '').trim();
     return text && Array.from(text).length <= max ? text : null;
 };
@@ -295,7 +302,8 @@ export const flagsOf = (signal) => (signal.stop ? SIGNAL_FLAGS.stop : 0) | (sign
 
 /**
  * The sha256 of a day's evidence: its signals in chain and sequence order, each as
- * [chain, seq, unit, born, at, flags], in canonical JSON. A recount compares it (PR 4/4).
+ * [chain, seq, unit, born, at, flags], in canonical JSON. --verify and a recount compare it
+ * (tools/core/trainingTimeCheck.js, trainingTimeRecount.js).
  * @param {Signal[]} signals
  */
 export function evidenceDigest(signals) {
@@ -368,7 +376,7 @@ export function parseSettings(rows) {
  * setting's day and the cohort's first day), and the first day not closed yet.
  * @param {{ addedOn: string, firstSetting: string, startsOn: string, lastClosed: string | null }} input
  */
-function openFrom({ addedOn, firstSetting, startsOn, lastClosed }) {
+export function openFrom({ addedOn, firstSetting, startsOn, lastClosed }) {
     const first = [addedOn, firstSetting, startsOn].sort().at(-1) ?? startsOn;
     return { first, fromDay: lastClosed && nextDay(lastClosed) > first ? nextDay(lastClosed) : first };
 }
@@ -656,7 +664,7 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
  * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'. PostgreSQL ends the COMMIT of a transaction that
  * a failed statement aborted as a rollback, without an error: that is an error here, never the
  * work's result. snapshot: one REPEATABLE READ READ ONLY snapshot (a staff read with no advisory
- * lock, tools/core/trainingTimeCheck.js), else READ COMMITTED.
+ * lock: --verify and a recount's reads, tools/core/trainingTimeCheck.js), else READ COMMITTED.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {string} operation
  * @param {(client: Queryable) => Promise<{ commit: boolean, value: T }>} work
@@ -745,7 +753,8 @@ export async function loadRules({ input, loadedBy, note, pool = getPool() }) {
     }
 }
 
-const SHA256 = /^[0-9a-f]{64}$/;
+/** A version or a plan named by its sha256: 64 lower-case hex digits. */
+export const SHA256 = /^[0-9a-f]{64}$/;
 
 /**
  * Staff: a cohort uses a unit list and rules (by sha256) from a Japan-time day. Refused: a cohort

@@ -3,8 +3,8 @@
  * Job training: study time (doc/brushup-2026/training-plan.ja.md §4.9; D10–D13). Used by
  * createTrainingRouter (server/routes/training.js) after its switch, sign-in and per-learner limit and
  * before its 404 for any other path, so server.js does not change. It only calls the core
- * (tools/core/trainingTime.js; tables of server/migrations/022_training_study_time.sql) and turns
- * its results into answers.
+ * (tools/core/trainingTime.js; tables of server/migrations/022_training_study_time.sql and
+ * 023_training_study_time_recounts.sql) and turns its results into answers.
  *
  * GET /cohorts/:cohortId/time → 200 { ok, learnerId, cohortId, today, timeZone: 'Asia/Tokyo',
  *   status: 'ready' | 'not_configured' | 'not_in_session', beatMs (ready only), units: [{ unitKey,
@@ -19,8 +19,8 @@
  *   chain_ended, not_open, restart, too_soon, other_place). nextInMs is beatMs while the page keeps
  *   its chain (a stored signal, a duplicate or too_soon, none of them a stop or after one, before the
  *   cohort's end), else null (the page sends no more signals of that chain, not even a stop). The
- *   numbers never go down from one answer to the next while the database clock does not go back
- *   (tools/core/trainingTime.js liveTime).
+ *   numbers never go down from one answer to the next unless the database clock goes back or a staff
+ *   recount (D12) lowers a closed day (tools/core/trainingTime.js liveTime).
  * beatMs is the only rule value an answer carries (as beatMs or nextInMs).
  *
  * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
