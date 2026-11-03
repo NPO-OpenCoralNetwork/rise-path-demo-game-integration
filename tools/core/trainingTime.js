@@ -99,6 +99,8 @@ export const TRAINING_TIME_SQL = Object.freeze({
     settingsLock: "SELECT pg_advisory_xact_lock(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     settingsLockShared: "SELECT pg_advisory_xact_lock_shared(hashtextextended('rp:training-settings:' || $1::uuid::text, 0))",
     jstToday: "SELECT to_char((clock_timestamp() AT TIME ZONE 'Asia/Tokyo')::date, 'YYYY-MM-DD') AS today",
+    // A staff read in one snapshot that takes no lock (transaction's snapshot option).
+    beginSnapshot: 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
     settingCourses: `SELECT to_char(s.effective_from, 'YYYY-MM-DD') AS effective_from, k.course_key
   FROM training_cohort_time_settings s JOIN training_catalog_versions k ON k.id = s.catalog_version_id
  WHERE s.cohort_id = $1::uuid ORDER BY s.effective_from, s.id`,
@@ -129,8 +131,8 @@ SELECT to_char(d.today, 'YYYY-MM-DD') AS today, ins.id, ins.effective_from FROM 
     // find yesterday final); the chain's last signal over every live stream of the account (a chain
     // of another cohort or unit is refused); the last signal of each chain of the cohort seen today
     // or yesterday (an open chain's last signal is at most gapMs old, and timeRules.js caps gapMs at
-    // 6 hours); the last closed day and the end of its evidence window (its end + the gapMs it was
-    // counted with).
+    // 6 hours); the last closed day and the end of its evidence window (its end + the widest gapMs its
+    // live rows were counted with: a recount with a wider gapMs widens it).
     signalState: `WITH t AS (SELECT date_trunc('milliseconds', clock_timestamp()) AS at),
 d AS (SELECT at, (at AT TIME ZONE 'Asia/Tokyo')::date AS today FROM t)
 SELECT ${ms('d.at')} AS now_ms,
@@ -168,8 +170,11 @@ SELECT ${ms('d.at')} AS now_ms,
                       WHERE s.user_id = $1::uuid AND s.chain_id = $3::uuid AND s.account_deleted_at IS NULL
                       ORDER BY l.seq DESC LIMIT 1) ch ON true
   LEFT JOIN LATERAL (SELECT to_char(x.day, 'YYYY-MM-DD') AS last_closed,
-                            ${ms("((x.day + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')")} + (r.params #>> '{counting,gapMs}')::bigint AS closed_until_ms
-                       FROM training_time_days x JOIN training_time_rule_sets r ON r.id = x.rule_set_id
+                            ${ms("((x.day + 1)::timestamp AT TIME ZONE 'Asia/Tokyo')")}
+                              + (SELECT max((r.params #>> '{counting,gapMs}')::bigint)
+                                   FROM training_time_days y JOIN training_time_rule_sets r ON r.id = y.rule_set_id
+                                  WHERE y.user_id = $1::uuid AND y.cohort_id = c.id AND y.day = x.day AND y.account_deleted_at IS NULL) AS closed_until_ms
+                       FROM training_time_days x
                       WHERE x.user_id = $1::uuid AND x.cohort_id = c.id AND x.kind = 'close' AND x.account_deleted_at IS NULL
                       ORDER BY x.day DESC LIMIT 1) lc ON true`,
     // Only while the stub exists. The stream of the signal's Japan-time day, from the same clock
@@ -651,13 +656,15 @@ export function stateAfterSignal({ nowMs, signal, prevAt, time, signals, setting
  * One transaction on its own connection. `work` decides whether to commit. A lock wait over
  * TRAINING_LOCK_TIMEOUT (55P03) is 'account_busy'. PostgreSQL ends the COMMIT of a transaction that
  * a failed statement aborted as a rollback, without an error: that is an error here, never the
- * work's result.
+ * work's result. snapshot: one REPEATABLE READ READ ONLY snapshot (staff reads that take no lock;
+ * tools/core/trainingTimeRecount.js), else READ COMMITTED.
  * @template T
  * @param {TrainingPool | null | undefined} pool @param {string} operation
  * @param {(client: Queryable) => Promise<{ commit: boolean, value: T }>} work
+ * @param {{ snapshot?: boolean }} [options]
  * @returns {Promise<T | CoreError>}
  */
-async function transaction(pool, operation, work) {
+export async function transaction(pool, operation, work, { snapshot = false } = {}) {
     if (!pool?.connect) return noDatabase();
     /** @type {any} */
     let client;
@@ -668,7 +675,7 @@ async function transaction(pool, operation, work) {
     }
     let broken = false;
     try {
-        await client.query('BEGIN');
+        await client.query(snapshot ? TRAINING_TIME_SQL.beginSnapshot : 'BEGIN');
         await client.query(TRAINING_SQL.lockTimeout);
         const { commit, value } = await work(client);
         const ended = await client.query(commit ? 'COMMIT' : 'ROLLBACK');

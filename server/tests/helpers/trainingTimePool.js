@@ -1,18 +1,22 @@
 // @ts-check
 /**
- * An in-memory stand-in for the study time tables (server/migrations/022_training_study_time.sql)
- * and what tools/core/trainingTime.js reads of 018 and 021 (auth.users stubs, tombstones, cohorts,
- * memberships). It answers the module's own statements (TRAINING_TIME_SQL, and TRAINING_SQL's
+ * An in-memory stand-in for the study time tables (server/migrations/022_training_study_time.sql
+ * and 023_training_study_time_recounts.sql) and what tools/core/trainingTime.js and
+ * trainingTimeRecount.js read of 018 and 021 (auth.users stubs, tombstones, cohorts, memberships).
+ * It answers the modules' own statements (TRAINING_TIME_SQL, RECOUNT_SQL, and TRAINING_SQL's
  * locks, cohort and membership reads and tombstone read) and the two requireAuth sends for a session
  * (AUTH_SQL: the tombstone read, and the stub insert with migration 018's rule: no stub for a deleted
  * id until it is re-opened), the way PostgreSQL would, with a clock the test sets (now() and
- * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN snapshots,
- * ROLLBACK restores; the state's savepoint too; each answered with node-pg's command tag). Any other
+ * clock_timestamp() alike), the CHECKs the core relies on, and transactions (BEGIN, and the
+ * snapshot BEGIN of a staff read, snapshot the state, ROLLBACK restores; the state's savepoint too;
+ * each answered with node-pg's command tag; a read-only snapshot refuses a write). Any other
  * statement throws, so a changed query fails loudly; the SQL itself runs on PostgreSQL 16 in
  * scripts/db/verify-training.mjs. Not a test file (npm test runs *.test.js).
  */
 import { TRAINING_SQL } from '../../../tools/core/training.js';
 import { TRAINING_TIME_SQL } from '../../../tools/core/trainingTime.js';
+import { CHECK_SQL } from '../../../tools/core/trainingTimeCheck.js';
+import { RECOUNT_SQL } from '../../../tools/core/trainingTimeRecount.js';
 import { jstDayOf, jstDayRange, nextDay } from '../../../shared/training/studyTime.js';
 
 const DAY_MAX_MS = 86_400_000;
@@ -57,8 +61,11 @@ export function createTrainingTimePool(seed = {}) {
         /** @type {any[]} */ signals: [],
         /** @type {any[]} */ days: [],
         /** @type {any[]} */ unitDays: [],
+        /** @type {any[]} */ recounts: [],
         next: 1,
     };
+    /** Inside a REPEATABLE READ READ ONLY transaction (TRAINING_TIME_SQL.beginSnapshot): writes refuse. */
+    let readOnly = false;
     /** @type {typeof state | null} */
     let snapshot = null;
     /** The state at TRAINING_TIME_SQL.savepointState (ROLLBACK TO keeps the savepoint). @type {typeof state | null} */
@@ -94,17 +101,21 @@ export function createTrainingTimePool(seed = {}) {
         const [p1, p2] = params;
         switch (sql) {
             case 'BEGIN':
+            case TRAINING_TIME_SQL.beginSnapshot:
                 snapshot = structuredClone(state);
                 savepoint = null;
+                readOnly = sql === TRAINING_TIME_SQL.beginSnapshot;
                 return ended('BEGIN');
             case 'COMMIT':
                 snapshot = null;
                 savepoint = null;
+                readOnly = false;
                 return ended('COMMIT');
             case 'ROLLBACK':
                 if (snapshot) state = snapshot;
                 snapshot = null;
                 savepoint = null;
+                readOnly = false;
                 return ended('ROLLBACK');
             case TRAINING_TIME_SQL.savepointState:
                 if (!snapshot) throw pgError('25P01', 'SAVEPOINT can only be used in transaction blocks');
@@ -267,7 +278,7 @@ export function createTrainingTimePool(seed = {}) {
                         id: id(), user_id: user, cohort_id: cohort, day, kind: 'close', algorithm: /** @type {string[]} */ (algorithms)[i],
                         rule_set_id: /** @type {string[]} */ (ruleSetIds)[i], catalog_version_id: /** @type {string[]} */ (catalogIds)[i],
                         counted_ms: c, over_cap_ms: o, signals: /** @type {number[]} */ (signals)[i], evidence_sha256: /** @type {string[]} */ (digests)[i],
-                        computed_at: state.clock, computed_by: by, account_deleted_at: null,
+                        computed_at: state.clock, computed_by: by, account_deleted_at: null, recompute_id: null,
                     };
                     state.days.push(row);
                     rows.push({ id: row.id, day: row.day });
@@ -304,6 +315,85 @@ export function createTrainingTimePool(seed = {}) {
                     last_closed: closed.at(-1) ?? null,
                 }]);
             }
+            case RECOUNT_SQL.clock:
+                return result([{ now_ms: String(Math.floor(state.clock)) }]);
+            case CHECK_SQL.learnerRows:
+                return result(state.days
+                    .filter((d) => d.user_id === p1 && d.cohort_id === p2 && d.account_deleted_at === null)
+                    .sort((x, y) => x.day.localeCompare(y.day) || Number(x.id) - Number(y.id))
+                    .map((d) => ({
+                        id: d.id, day: d.day, kind: d.kind, algorithm: d.algorithm, rule_set_id: d.rule_set_id, catalog_version_id: d.catalog_version_id,
+                        counted_ms: d.counted_ms, over_cap_ms: d.over_cap_ms, signals: d.signals, evidence_sha256: d.evidence_sha256,
+                        recompute_id: d.recompute_id ?? null, computed_at: new Date(d.computed_at), computed_by: d.computed_by,
+                    })));
+            case CHECK_SQL.unitRows: {
+                const ids = /** @type {string[]} */ (p1).map(String);
+                return result(state.unitDays
+                    .filter((u) => ids.includes(u.day_id))
+                    .sort((x, y) => Number(x.day_id) - Number(y.day_id) || x.unit_key.localeCompare(y.unit_key))
+                    .map((u) => ({ day_id: u.day_id, unit_key: u.unit_key, counted_ms: u.counted_ms, over_cap_ms: u.over_cap_ms })));
+            }
+            case CHECK_SQL.rulesByIds:
+            case RECOUNT_SQL.rulesBySha: {
+                const match = sql === RECOUNT_SQL.rulesBySha ? (/** @type {any} */ r) => r.sha256 === p1 : (/** @type {any} */ r) => /** @type {string[]} */ (p1).map(String).includes(r.id);
+                return result(state.rules.filter(match).sort((x, y) => Number(x.id) - Number(y.id))
+                    .map((r) => ({ id: r.id, sha256: r.sha256, algorithm: r.algorithm, params: structuredClone(r.params) })));
+            }
+            case CHECK_SQL.catalogsByIds:
+            case RECOUNT_SQL.catalogBySha: {
+                const match = sql === RECOUNT_SQL.catalogBySha ? (/** @type {any} */ c) => c.sha256 === p1 : (/** @type {any} */ c) => /** @type {string[]} */ (p1).map(String).includes(c.id);
+                return result(state.catalogs.filter(match).sort((x, y) => Number(x.id) - Number(y.id))
+                    .map((c) => ({ id: c.id, sha256: c.sha256, course_key: c.course_key, manifest: structuredClone(c.manifest) })));
+            }
+            case CHECK_SQL.recountsByIds: {
+                const ids = /** @type {string[]} */ (p1).map(String);
+                return result(state.recounts.filter((r) => ids.includes(r.id)).sort((x, y) => Number(x.id) - Number(y.id))
+                    .map((r) => ({ id: r.id, cohort_id: r.cohort_id, from_day: r.from_day, to_day: r.to_day, rule_set_id: r.rule_set_id, catalog_version_id: r.catalog_version_id })));
+            }
+            case RECOUNT_SQL.insertRecount: {
+                if (readOnly) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
+                const [cohort, fromDay, toDay, ruleSetId, catalogId, planSha, by, reason] = params;
+                if (!(String(fromDay) <= String(toDay)) || (ruleSetId === null && catalogId === null) || !/^[0-9a-f]{64}$/.test(String(planSha))
+                    || !(String(by).length >= 1 && String(by).length <= 100) || !(String(reason).length >= 1 && String(reason).length <= 500)) {
+                    throw pgError('23514', 'new row for relation "training_time_recomputes" violates check constraint');
+                }
+                if (!state.cohorts.some((c) => c.id === cohort)) throw pgError('23503', 'training_time_recomputes_cohort_id_fkey');
+                const row = {
+                    id: id(), cohort_id: cohort, from_day: String(fromDay), to_day: String(toDay), rule_set_id: ruleSetId === null ? null : String(ruleSetId),
+                    catalog_version_id: catalogId === null ? null : String(catalogId), plan_sha256: planSha, recomputed_at: state.clock, recomputed_by: by, reason,
+                };
+                state.recounts.push(row);
+                return result([{ id: row.id }]);
+            }
+            case RECOUNT_SQL.insertRecountDays: {
+                if (readOnly) throw pgError('25006', 'cannot execute INSERT in a read-only transaction');
+                const [user, cohort, by, recountId, days, algorithms, ruleSetIds, catalogIds, counted, over, signals, digests] = params;
+                if (!state.stubs.includes(String(user))) return result([]);
+                // The composite foreign key: a recount of the same cohort.
+                if (!state.recounts.some((r) => r.id === String(recountId) && r.cohort_id === cohort)) throw pgError('23503', 'training_time_days_recompute_fkey');
+                const rows = [];
+                for (const [i, day] of /** @type {string[]} */ (days).entries()) {
+                    const c = /** @type {number[]} */ (counted)[i];
+                    const o = /** @type {number[]} */ (over)[i];
+                    if (!(c >= 0 && o >= 0 && c + o <= DAY_MAX_MS) || !/^[0-9a-f]{64}$/.test(/** @type {string[]} */ (digests)[i])) throw pgError('23514', 'new row for relation "training_time_days" violates check constraint');
+                    const row = {
+                        id: id(), user_id: user, cohort_id: cohort, day, kind: 'recompute', algorithm: /** @type {string[]} */ (algorithms)[i],
+                        rule_set_id: String(/** @type {string[]} */ (ruleSetIds)[i]), catalog_version_id: String(/** @type {string[]} */ (catalogIds)[i]),
+                        counted_ms: c, over_cap_ms: o, signals: /** @type {number[]} */ (signals)[i], evidence_sha256: /** @type {string[]} */ (digests)[i],
+                        computed_at: state.clock, computed_by: by, account_deleted_at: null, recompute_id: String(recountId),
+                    };
+                    state.days.push(row);
+                    rows.push({ id: row.id, day: row.day });
+                }
+                return result(rows);
+            }
+            case RECOUNT_SQL.cohortRecounts:
+                return result(state.recounts.filter((r) => r.cohort_id === p1).sort((x, y) => Number(x.id) - Number(y.id)).map((r) => ({
+                    id: r.id, recomputed_at: new Date(r.recomputed_at), recomputed_by: r.recomputed_by, reason: r.reason, from_day: r.from_day, to_day: r.to_day,
+                    rules_sha256: r.rule_set_id === null ? null : state.rules.find((x) => x.id === r.rule_set_id)?.sha256 ?? null,
+                    catalog_sha256: r.catalog_version_id === null ? null : state.catalogs.find((x) => x.id === r.catalog_version_id)?.sha256 ?? null,
+                    plan_sha256: r.plan_sha256,
+                })));
             default:
                 throw new Error(`trainingTimePool: unexpected statement: ${sql.slice(0, 120)}`);
         }
@@ -350,7 +440,10 @@ export function createTrainingTimePool(seed = {}) {
         const closed = cohort && state.days
             .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.kind === 'close' && d.account_deleted_at === null)
             .sort((x, y) => y.day.localeCompare(x.day))[0];
-        const closedGap = closed ? state.rules.find((r) => r.id === closed.rule_set_id).params.counting.gapMs : null;
+        // The widest gapMs among the last closed day's live rows of any kind (a recount may widen it).
+        const closedGap = closed ? Math.max(...state.days
+            .filter((d) => d.user_id === user && d.cohort_id === cohortId && d.day === closed.day && d.account_deleted_at === null)
+            .map((d) => state.rules.find((r) => r.id === d.rule_set_id).params.counting.gapMs)) : null;
         return {
             now_ms: String(now),
             stub: state.stubs.includes(user),
