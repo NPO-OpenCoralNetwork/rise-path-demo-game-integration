@@ -15,9 +15,9 @@
  * run one after the other, so a learner is never in two cohorts whose dates overlap (one moment
  * would count in both).
  *
- * Callers: GET /api/v2/training/me (server/routes/training.js) and the staff script
- * scripts/training-admin.mjs. Failures return { error, error_type } (tools/core/dbErrors.js), never
- * the driver's text.
+ * Callers: GET /api/v2/training/me (server/routes/training.js), the staff script
+ * scripts/training-admin.mjs, and study time (tools/core/trainingTime.js: these locks and membership
+ * reads). Failures return { error, error_type } (tools/core/dbErrors.js), never the driver's text.
  */
 import { getPool, PHASE1_USER_ID } from '../../server/db.js';
 import { accountLockKey, canonicalUserId } from './accountDeletions.js';
@@ -35,7 +35,11 @@ export const TRAINING_ROLES = Object.freeze(['learner', 'instructor', 'examiner'
 /** A cohort's slug: the same rule as a course slug (migration 021 checks it too). */
 export const COHORT_SLUG = /^[a-z0-9][a-z0-9-]{0,79}$/;
 
-/** How long adding a member waits for the account lock (a deletion in progress) before giving up. */
+/**
+ * How long a training transaction (a membership add; study time: a setting, a close, a signal) waits
+ * for a lock (a deletion in progress, another request of the same learner) before giving up
+ * (account_busy).
+ */
 export const TRAINING_LOCK_TIMEOUT = '10s';
 
 /**

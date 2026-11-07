@@ -224,7 +224,7 @@ describe('/api/v2/training on the server.js stack', () => {
         });
     });
 
-    it('GET /me only: other paths and methods answer 404 here, never the AI limiter of the /api/v2 catch-all, and run no training statement', async () => {
+    it('other paths and methods (beside GET /me and the study time routes) answer 404 here, never the AI limiter of the /api/v2 catch-all, and run no training statement', async () => {
         await withServer(async (base) => {
             for (let i = 0; i < 12; i += 1) {
                 const res = await call(`${base}/api/v2/training/nope`, { headers: as(BOB) });

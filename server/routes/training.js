@@ -16,10 +16,14 @@
  *   4. the routes, then 404 not_found for any other path or method (nothing falls through).
  *
  * GET /me → 200 { ok, learnerId, cohorts: [{ cohortId, name, role }] } (live memberships only).
- * Refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
- * 503 training_unavailable (no database, down, migration 021 not applied, a missing grant; with
- * Retry-After: 60, as server/routes/legal.js), 500 training_failed. 401, 404 training_off and 429 come from the middleware, in their own shape.
- * Logic and SQL: tools/core/training.js. Tables: server/migrations/021_training_cohorts.sql.
+ * Its refusals are { ok: false, error, error_type } with fixed English text, never the driver's:
+ * 503 training_unavailable (no database, down, a migration not applied, a missing grant; with
+ * Retry-After: 60, as server/routes/legal.js), 500 training_failed (answerCoreError).
+ * Study time: GET /cohorts/:cohortId/time and POST /cohorts/:cohortId/time/signals
+ * (server/routes/trainingTime.js, used here before the 404; its header lists its answers).
+ * 401, 404 training_off and 429 come from the middleware, in their own shape.
+ * Logic and SQL: tools/core/training.js and tools/core/trainingTime.js. Tables:
+ * server/migrations/021_training_cohorts.sql and 022_training_study_time.sql.
  */
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -27,14 +31,12 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireSignedIn } from '../middleware/signedIn.js';
 import { canonicalUserId } from '../../tools/core/accountDeletions.js';
 import { TRAINING_REQUESTS_PER_MINUTE, getTrainingMe } from '../../tools/core/training.js';
+import { answerCoreError, createTrainingTimeRouter } from './trainingTime.js';
 
-/** Largest body (the first routes take none). */
+/** Largest body (a study time signal: six short fields). */
 export const TRAINING_BODY_LIMIT = '4kb';
 /** Requests per learner per minute, every training route together (defined with the core, which checks a rules file against it). */
 export { TRAINING_REQUESTS_PER_MINUTE };
-
-/** Core error types that mean "the database cannot serve this now" (503, try again later). */
-const UNAVAILABLE = new Set(['db_connection', 'table_not_found', 'permission_denied']);
 
 /**
  * Whether the training API is on: exactly "true" (off by default). Read on every request.
@@ -69,15 +71,11 @@ export function createTrainingRouter({ env = process.env } = {}) {
 
     router.get('/me', async (req, res) => {
         const result = await getTrainingMe({ userId: userIdOf(req) });
-        if ('error_type' in result) {
-            if (UNAVAILABLE.has(result.error_type)) {
-                res.set('Retry-After', '60');
-                return res.status(503).json({ ok: false, error: 'Training is unavailable right now. Please try again later.', error_type: 'training_unavailable' });
-            }
-            return res.status(500).json({ ok: false, error: 'Training could not be read.', error_type: 'training_failed' });
-        }
+        if ('error_type' in result) return answerCoreError(res, result.error_type, 'Training could not be read.');
         return res.json({ ok: true, ...result });
     });
+
+    router.use(createTrainingTimeRouter());
 
     // Nothing under /api/v2/training falls through to the later mounts (and their AI limiter).
     router.use((req, res) => res.status(404).json({ ok: false, error: 'Not found.', error_type: 'not_found' }));

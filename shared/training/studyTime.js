@@ -9,7 +9,8 @@
  * timer, or is told to start over. A signal: { chain, seq, unit, born, at, stop, focus, input }.
  *   born:  server time of the chain's first stored signal (seq 0), the same on every signal of it;
  *   at:    server time the signal was received (strictly increasing within a chain, see admitSignal);
- *   stop:  the page hid or left (nothing of the chain counts after it);
+ *   stop:  the page ended the chain: it hid, left, changed unit or started over (nothing of the
+ *          chain counts after it);
  *   focus: the page had the window focus since its previous signal;
  *   input: the learner acted on the page since its previous signal (key, pointer, scroll, touch;
  *          the page also reports one on the first signal of a chain it starts because the learner
@@ -48,6 +49,10 @@ const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
  * @typedef {{ algorithm: string, collection: CollectionRules, counting: CountingRules }} TimeRules
  * @typedef {{ from: number, to: number }} Range
  * @typedef {{ unit: string, countedMs: number, overCapMs: number }} UnitTime
+ * @typedef {{ beatMs: number, minSpacingMs: number, maxPlaces: number, gapMs: number, unitKnown: (unit: string) => boolean }} AdmitRules
+ *   what admitSignal decides a signal on a day with (pendingSignals): the collection's beatMs (the
+ *   nextInMs a signal stored that day answers), minSpacingMs and maxPlaces, the counting's gapMs (its
+ *   open places) and whether the day's unit list has a unit
  */
 
 /** The Japan-time day (YYYY-MM-DD) of an instant. @param {number} ms */
@@ -273,8 +278,8 @@ export function countWhole({ signals, rules, setMs, cohort = NO_COHORT }) {
 /**
  * Whether the server stores a signal, decided under the learner's lock with the database clock.
  *   refuse (409, nothing stored): no rules or units for today ('time_not_configured'); outside
- *     the cohort's dates, or a date missing ('not_in_session'; a signal of a chain already open is
- *     still stored up to gapMs after the last day so its last pair can count, a new chain is not);
+ *     the cohort's dates, or a date missing ('not_in_session'; a signal of a chain the server knows
+ *     is still stored up to gapMs after the last day so its last pair can count, a new chain is not);
  *     a unit not in today's units
  *     ('unit_unknown'); a chain id already used for another cohort or unit ('chain_mismatch').
  *   ignore (200, accepted: false, nothing stored; the page reacts to the reason):
@@ -318,4 +323,198 @@ export function admitSignal({ now, cohortId, signal, configured, session, unitKn
     if (newer >= rules.collection.maxPlaces) return { verdict: 'ignore', reason: 'other_place' };
   }
   return { verdict: 'accept', bornAt };
+}
+
+/**
+ * The other open pages' next signals: open pages go on, so the time since a page's last signal is
+ * not stored yet but will be. Each page sends its chain's next beat nextInMs after its last signal
+ * (the beatMs of that signal's day), and admitSignal decides it as it comes, with the setting of
+ * the day it comes on (admitOf), in time order: accepted, it is pending (its last signal again, with
+ * its last flags and no input); refused (no setting, a unit that day's list does not have) or
+ * ignored other_place, the page sends no more signals of that chain (nextInMs null, not even a
+ * stop); ignored too_soon (a setting from 00:00 with a larger minSpacingMs), the page sends it again
+ * nextInMs (that day's beatMs) later. A beat due by now and not stored was decided as it came: one
+ * admitSignal would have stored is late, and comes now. A page whose beat is stored goes on beating
+ * nextInMs (that day's beatMs) after it. A beat's places are the chains' last signals at its
+ * instant: the stored ones, and, for an instant after now, the beats this look-ahead stores before
+ * it (a late beat renews only a place still open now). Not foreseen: pages opened or stopped after
+ * now, a pushed-out page's stop before its beat (the learner hid or closed it; a stop passes, and
+ * closes its last pair), beats later than their nextInMs, pages closed without a stop, and the
+ * order of signals in the same millisecond. Whether a day credits a pending pair is the counting's
+ * (that day's gapMs and creditCapMs).
+ * @param {{ now: number, signals: Signal[], admitOf: (day: string) => AdmitRules | null, except?: string | null }} input
+ *   signals: the stored evidence up to now; admitOf: a day's rules (null: no setting that day;
+ *   beatMs 0: the next beat is now); except: a chain left out (the page asking; it still goes on)
+ * @returns {Signal[]} each other chain's pending signal (last signal before now), in the order of the evidence
+ */
+export function pendingSignals({ now, signals, admitOf, except = null }) {
+  /** @type {Map<string, Signal[]>} each chain's signals in order */
+  const chains = new Map();
+  for (const s of signals) {
+    const list = chains.get(s.chain);
+    if (list) list.push(s);
+    else chains.set(s.chain, [s]);
+  }
+  for (const list of chains.values()) list.sort((x, y) => x.seq - y.seq);
+  /** The beats this look-ahead stores at or after now, by chain. @type {Map<string, number>} */
+  const stored = new Map();
+  /** Every chain's place at t: its last signal at or before t; after now, a beat stored here up to t. @param {number} t */
+  const placesAt = (t) => {
+    const places = [];
+    for (const [chain, list] of chains) {
+      let q = null;
+      for (const g of list) {
+        if (g.at > t) break;
+        q = g;
+      }
+      if (!q) continue;
+      const beat = t > now ? stored.get(chain) : undefined;
+      places.push(beat !== undefined && beat <= t
+        ? { chainId: chain, bornAt: q.born, lastAt: beat, lastStop: false }
+        : { chainId: chain, bornAt: q.born, lastAt: q.at, lastStop: q.stop });
+    }
+    return places;
+  };
+  /**
+   * A page's beat: its chain l, seq, at t, after its last accepted signal at `from`; first: the
+   * beat whose pending pair is wanted (the other pages' next beat after their last stored signal),
+   * else one that only keeps its page's place (the asking page's, and each page's later beats).
+   * @typedef {{ l: Signal, seq: number, from: number, t: number, resent: number, first: boolean }} Beat
+   */
+  /** admitSignal on a beat, with the setting of its day. @param {Beat} beat */
+  const decide = ({ l, seq, from, t }) => {
+    const rules = admitOf(jstDayOf(t));
+    const verdict = admitSignal({
+      now: t, cohortId: '', signal: { chainId: l.chain, seq, unitKey: l.unit, stop: false },
+      configured: rules !== null, session: { from: -Infinity, to: Infinity }, unitKnown: rules !== null && rules.unitKnown(l.unit),
+      chain: { cohortId: '', unitKey: l.unit, bornAt: l.born, lastSeq: seq - 1, lastAt: from, lastStop: false },
+      places: placesAt(t),
+      rules: { collection: { minSpacingMs: rules?.minSpacingMs ?? 0, maxPlaces: rules?.maxPlaces ?? 0 }, counting: { gapMs: rules?.gapMs ?? 0 } },
+    });
+    return { verdict, rules };
+  };
+  /** @type {Beat[]} each open page's next beat */
+  const beats = [];
+  for (const list of chains.values()) {
+    const l = list[list.length - 1];
+    if (l.stop) continue;
+    const own = admitOf(jstDayOf(l.at));
+    const due = l.at + (own ? own.beatMs : 0);
+    beats.push({ l, seq: l.seq + 1, from: l.at, t: due > l.at ? due : Math.max(now, l.at + 1), resent: 0, first: l.chain !== except && l.at < now });
+  }
+  /** @type {Map<string, number>} */
+  const pending = new Map();
+  // In time order, while a wanted beat is undecided: each page goes on beating nextInMs after each
+  // beat stored here, which keeps its place for the later ones. A few beats per page in practice;
+  // past a budget (a beatMs of hours one day and of seconds the next) only the wanted ones go on.
+  let budget = 1000 + 8 * chains.size;
+  while (beats.some((b) => b.first)) {
+    if (--budget < 0) for (let i = beats.length - 1; i >= 0; i -= 1) if (!beats[i].first) beats.splice(i, 1);
+    beats.sort((x, y) => x.t - y.t || x.l.born - y.l.born || (x.l.chain < y.l.chain ? -1 : x.l.chain > y.l.chain ? 1 : 0));
+    const beat = /** @type {Beat} */ (beats.shift());
+    const { verdict, rules } = decide(beat);
+    if (verdict.verdict === 'accept') {
+      if (beat.t < now) {
+        beats.push({ ...beat, t: now }); // due by now and not stored: late, it comes now
+        continue;
+      }
+      if (beat.first) pending.set(beat.l.chain, beat.t);
+      // A late beat keeps the place only of a page still open now (one silent for longer has gone).
+      if (rules && (beat.t > now || now - beat.from <= rules.gapMs)) {
+        stored.set(beat.l.chain, beat.t);
+        if (rules.beatMs > 0) beats.push({ l: beat.l, seq: beat.seq + 1, from: beat.t, t: beat.t + rules.beatMs, resent: 0, first: false });
+      }
+    } else if (verdict.reason === 'too_soon' && rules && beat.resent < 3) {
+      beats.push({ ...beat, t: beat.t + rules.beatMs, resent: beat.resent + 1 });
+    }
+  }
+  /** @type {Signal[]} */
+  const out = [];
+  for (const list of chains.values()) {
+    const l = list[list.length - 1];
+    const at = pending.get(l.chain);
+    if (at === undefined || l.chain === except || l.at >= now) continue;
+    out.push({ ...l, seq: l.seq + 1, at, stop: false, input: false });
+  }
+  return out;
+}
+
+/**
+ * @typedef {'not_in_session' | 'cap_reached' | 'starting' | 'gap' | 'focus' | 'idle' | 'other_tab'} StudyReason
+ */
+
+/**
+ * Why a page's time is not counting, judged right after its signal at `now` was stored (the answer
+ * to that signal; the counting above is unchanged and decides the numbers). It judges x, the last
+ * counted millisecond of the page's last pair as the days count it (each day with its own rules:
+ * the pair is credited from prevAt for min(now - prevAt, creditCapMs) when the day's gapMs allows
+ * it), as countSpan counts x with the rules of x's day, with the other open pages' pending signals
+ * (pendingSignals: their next beats as admitSignal will decide them, with admitOf). A page that
+ * replaced its chain without a stop still looks open until gapMs passes, so the page sends a stop
+ * for a chain it ends while it keeps it (its last answer's nextInMs not null). First match:
+ *   'not_in_session' now is outside the cohort's dates (a known chain's signal after the last day):
+ *                    nothing counts from now on (the part of its last pair before the end still does);
+ *   'cap_reached'    the unit's time through now (unitMs, with the same pending signals) reached its
+ *                    set time: nothing more of it counts;
+ *   'starting'       the chain's first signal: no pair yet;
+ *   'gap'            the last pair is a break: no day credits it (longer than its gapMs);
+ *   null             counting: the unit gets x (from this page, or another page of the same unit);
+ *   'focus'          requireFocus, and the page had no focus;
+ *   'starting'       no input of this page covers x, and this signal brings one (it counts from now);
+ *   'idle'           no input of this page covers x (the learner did not act within idleMs);
+ *   'other_tab'      another page of another unit wins x (overlap), or both lose (drop_conflicts).
+ * @param {{
+ *   now: number,
+ *   chain: { id: string, unit: string, prevAt: number | null },
+ *   signal: { focus: boolean, input: boolean },
+ *   signals: Signal[],
+ *   counting: CountingRules,
+ *   countingOf?: (day: string) => CountingRules | null,
+ *   admitOf?: (day: string) => AdmitRules | null,
+ *   setMs: number,
+ *   unitMs: number,
+ *   cohort: Range | null,
+ * }} input chain: this page's chain, prevAt its previous stored signal (null for seq 0); signals: the
+ *   learner's stored evidence in the cohort up to now (this signal included); counting: today's
+ *   rules, and countingOf a day's (null: none that day; default: today's for every day); admitOf:
+ *   a day's rules for the other pages' next beats (pendingSignals; default: every beat now, today's
+ *   gapMs, no page pushed out, every unit listed); setMs: the unit's set time today; unitMs: its
+ *   counted time through now (closed days and the live ones, with the same pending signals:
+ *   tools/core/trainingTime.js liveTime's unitNowMs)
+ * @returns {StudyReason | null}
+ */
+export function studyReason({
+  now, chain, signal, signals, counting, countingOf = () => counting,
+  admitOf = () => ({ beatMs: 0, minSpacingMs: 0, maxPlaces: Infinity, gapMs: counting.gapMs, unitKnown: () => true }), setMs, unitMs, cohort,
+}) {
+  if (!cohort || now < cohort.from || now >= cohort.to) return 'not_in_session';
+  if (unitMs >= setMs) return 'cap_reached';
+  if (chain.prevAt === null) return 'starting';
+  const prevAt = chain.prevAt;
+  const delta = now - prevAt;
+  // x: the last millisecond of the pair a day credits, the latest such day (a pair lasts at most 6 hours).
+  let x = -1;
+  /** @type {CountingRules | null} */
+  let rules = null;
+  for (let day = jstDayOf(prevAt); jstDayRange(day).start < now; day = nextDay(day)) {
+    const c = countingOf(day);
+    const { start, end } = jstDayRange(day);
+    const credited = c && delta <= c.gapMs ? Math.min(prevAt + Math.min(delta, c.creditCapMs), end) : start;
+    if (credited > Math.max(prevAt, start)) {
+      x = credited - 1;
+      rules = c;
+    }
+  }
+  if (!rules) return 'gap';
+  // The other pages' next beats as admitSignal will decide them (each with its day's rules). A
+  // pending pair longer than x's day's gapMs is a break there, so it counts nothing at x.
+  const pending = pendingSignals({ now, signals, admitOf, except: chain.id });
+  const at = countSpan({ a: x, b: x + 1, signals: [...signals, ...pending], rules: { counting: rules }, setMs: new Map(), carriedMs: new Map(), cohort });
+  const mine = at.units.find((u) => u.unit === chain.unit);
+  if (mine && mine.countedMs + mine.overCapMs === 1) return null;
+  if (rules.requireFocus && !signal.focus) return 'focus';
+  const idleMs = rules.idleMs;
+  const present = signals.some((s) => s.chain === chain.id && s.input && s.at <= x && x < s.at + idleMs);
+  if (!present) return signal.input ? 'starting' : 'idle';
+  return 'other_tab';
 }

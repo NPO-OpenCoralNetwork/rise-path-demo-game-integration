@@ -444,7 +444,7 @@ describe('scripts/ci/db-checks.sh', () => {
             "FAIL the role logs in with its password: got '0', want 'risepath_mcp_remote'",
             "FAIL limits: got '0', want '20 idle_in_transaction_session_timeout=30s,statement_timeout=10s'",
             "FAIL never granted: got '0', want 'learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false training_cohorts=false training_memberships=false xp_awards=false'",
-            "FAIL no training_ table for the role: got '0', want '0 of 9'",
+            "FAIL no training_ table for the role: got '0', want '0 of 10'",
             'FAIL a wrong password logged in',
             'FAIL the role read xp_awards',
             'FAIL the role read legal_acceptances.id',

@@ -4,15 +4,16 @@
 # the VM starts it (log_error_verbosity=terse, deploy/risepath-vm/docker-compose.yml) plus the logging
 # collector that R11 of verify-account-deletion.mjs reads through pg_current_logfile():
 #   1. verify-account-deletion.mjs, verify-phase5.mjs, verify-phase6.mjs, verify-training.mjs (018, 019,
-#      020, 022: the order of server/migrations/README.md), each on its own empty database, never with
+#      020, 022 and 023: the order of server/migrations/README.md), each on its own empty database, never with
 #      --allow-skip (a skipped check is not a pass). They refuse while the role risepath_mcp_remote
 #      exists: before the role SQL;
 #   2. scripts/db-migrate.mjs twice on a fourth database, its status, pgvector and vector(768);
 #   3. deploy/risepath-vm/sql/mcp_remote_role.sql: refused without a password of 24 or more characters,
 #      then twice with one, and what the role can log in to and read (no training_ table at all).
-# Time limits: each verify script 180 s (they take about 20 s), the 00:00 JST guard 185 s, the pulls
-# 240 s in all, the first boot 120 s. The workflow step allows 23 min: all of them together plus a minute
-# for the rest (server/tests/ciScripts.test.js), so a hang ends with this script's message.
+# Time limits: each verify script 180 s (verify-training.mjs takes about 60 s, after its own 00:00 JST
+# guard, which waits 95 s at most; the others 15 to 25 s), the 00:00 JST guard 185 s, the pulls 240 s in
+# all, the first boot 120 s. The workflow step allows 23 min: all of them together plus a minute for the
+# rest (server/tests/ciScripts.test.js), so a hang ends with this script's message.
 # Needs Docker, psql 16+, timeout (coreutils) and node_modules (npm ci). Dummy values only. Removes only
 # the container it created (RISEPATH_CI_KEEP=1 keeps it). Outputs: $RISEPATH_CI_OUT (default .artifacts/ci/db).
 # Without Docker: --existing-url postgresql://user[:password]@host:port (exactly these two arguments): the
@@ -226,9 +227,9 @@ expect_eq "never granted" "$(psql "${REMOTE}" -X -At -c "SELECT string_agg(t || 
   "learning_days=false lesson_progress_lesson_resets=false lesson_progress_resets=false review_log=false training_cohorts=false training_memberships=false xp_awards=false"
 expect_eq "reads lesson_progress" "$(psql "${REMOTE}" -X -At -c 'SELECT count(*) FROM lesson_progress')" 0
 if psql "${REMOTE}" -X -At -c 'SELECT count(*) FROM xp_awards' > /dev/null 2>&1; then bad "the role read xp_awards"; else ok "the role cannot read xp_awards"; fi
-# Job training (021, 022): no privilege of any kind on any training_ table, whatever its name.
+# Job training (021, 022, 023): no privilege of any kind on any training_ table, whatever its name.
 expect_eq "no training_ table for the role" "$(psql "${REMOTE}" -X -At -c "SELECT count(*) FILTER (WHERE has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') OR has_table_privilege(c.oid, 'DELETE, TRUNCATE')) || ' of ' || count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname LIKE 'training\_%'")" \
-  "0 of 9"
+  "0 of 10"
 # Phase 8: the terms check (LEGAL_TERMS_REQUIRED) reads the newest acceptance with the statement of
 # tools/core/legalAcceptance.js LATEST_ACCEPTANCE_SQL (its columns only, never id).
 expect_eq "reads the newest acceptance (terms check, Phase 8)" "$(psql "${REMOTE}" -X -At -c "SELECT count(*) FROM (SELECT terms_version, privacy_version, accepted_at FROM legal_acceptances WHERE user_id = '00000000-0000-4000-8000-000000000000'::uuid AND account_deleted_at IS NULL ORDER BY accepted_at DESC LIMIT 1) a")" 0
