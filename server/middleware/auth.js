@@ -32,6 +32,10 @@
  *       /upload and /rag, and optionalAuth after requireAuth on the TTS routes) check the session
  *       once: getUser, the account state and the stub write are shared (oncePerRequest below).
  *       Each guard still decides on its own; nothing is kept across requests.
+ *     - with PILOT_ACCOUNT_IDS set (Phase 9, D1; server/middleware/pilotGate.js), a Supabase session
+ *       whose user is not on the list (an anonymous user included) answers 403 pilot_only from
+ *       requireAuth and optionalAuth alike, before the account check: nothing is read or written for
+ *       it (no re-open, no stub). Unset: off.
  *     - with LEGAL_TERMS_REQUIRED on, a real learner's session then passes the terms check
  *       (server/middleware/termsGate.js: 403 terms_required until they accept, except on its
  *       TERMS_EXEMPT routes); the dev fallbacks and anonymous callers never meet it.
@@ -42,9 +46,10 @@
 import { getPool, PHASE1_USER_ID, syncAuthUserStub } from '../db.js';
 import { allowDevAuthFallback } from './authPolicy.js';
 import { decodeTokenClaims, isOAuthClientToken, sessionAuthTime } from '../../tools/core/oauthToken.js';
-import { readAccountState } from '../../tools/core/accountDeletions.js';
+import { readAccountState, sessionPredatesDeletion } from '../../tools/core/accountDeletions.js';
 import { isAuthUnavailable } from '../../tools/core/authUnavailable.js';
 import { termsGateStep } from './termsGate.js';
+import { PILOT_ONLY_REFUSAL, pilotRefuses } from './pilotGate.js';
 
 // ─── Supabase Client (lazy singleton) ───────────────────────
 
@@ -156,6 +161,28 @@ const readSessionAccountState = (token, userId) => readAccountState(
     { mayReopen: true },
 );
 
+/**
+ * Phase 9 (D1): the answer to a Supabase session the pilot list refuses (server/middleware/pilotGate.js),
+ * in requireAuth and requireBridgeOrAuth. 403 pilot_only, except a session that signed in before its
+ * account's deletion: 401 account_deleted, as without the list, so the device forgets the deleted
+ * account and signs out (Phase 4 §5.11; a former tester whose data staff deleted after taking them off
+ * the list, runbook 10.4 step 6; final review, finding 19). One read-only lookup
+ * (sessionPredatesDeletion): no re-open, no stub, no transaction. A database error answers 403 (fail
+ * closed, nothing written). optionalAuth keeps the plain 403.
+ * @param {any} res
+ * @param {string} token
+ * @param {string} userId
+ */
+export const refusePilotSession = async (res, token, userId) => {
+    let predates = false;
+    try {
+        predates = await sessionPredatesDeletion(getPool(), userId, sessionAuthTime(decodeTokenClaims(token)));
+    } catch (err) {
+        console.warn('[Auth] pilot refusal: account state check failed:', err?.message || err);
+    }
+    return predates ? res.status(401).json(ACCOUNT_DELETED_REFUSAL) : res.status(403).json(PILOT_ONLY_REFUSAL);
+};
+
 // ─── One check per request ──────────────────────────────────
 
 const CHECKS = Symbol('rise-path.authChecks');
@@ -244,6 +271,9 @@ export const requireAuth = async (req, res, next) => {
             if (error) console.warn('[Auth] token rejected:', error?.message || error);
             return res.status(401).json({ error: 'Invalid or expired token' });
         }
+        // Phase 9 (D1): the pilot list, before anything is written for this account (a session older than
+        // its account's deletion still hears 401 account_deleted: refusePilotSession).
+        if (pilotRefuses({ id: data.user.id, isAnonymous: data.user.is_anonymous === true })) return refusePilotSession(res, token, data.user.id);
         // A session of a deleted account is refused before anything is written (no stub). Its own
         // try: a database error is 503 auth_unavailable, not the generic 500 below.
         let account;
@@ -314,6 +344,8 @@ export const optionalAuth = async (req, res, next) => {
             req.authMethod = 'anonymous';
             return next();
         }
+        // Phase 9 (D1): the pilot list, as requireAuth (the same 403, not the guest path).
+        if (pilotRefuses({ id: data.user.id, isAnonymous: data.user.is_anonymous === true })) return res.status(403).json(PILOT_ONLY_REFUSAL);
         // A deleted account's session, or a check that cannot run, is anonymous (no stub). A check
         // that could not run is flagged: the AI gate answers 503 ai_access_unavailable to it (try
         // again), never 401 sign_in_required or the guest path to a signed-in learner.

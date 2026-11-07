@@ -1,3 +1,5 @@
+> 古い計画です（Phase 9 より前）。公開の手順は doc/guides/first-launch.ja.md です（[手順書](./first-launch.ja.md)）。
+
 # ポータブルデプロイ（Docker + GCS + env 引っ越し）
 
 > 更新日: 2026-10-21  

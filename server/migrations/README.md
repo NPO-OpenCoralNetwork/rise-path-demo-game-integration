@@ -1,6 +1,7 @@
 # Rise Path DB migrations
 
-> 適用先: **専用 VM `risepath-vm`** の PostgreSQL **`risepath`**（Docker Compose）  
+> 本番の適用先: **専用 VM `risepath-vm`** の PostgreSQL **`risepath`**（Docker Compose。`deploy/risepath-vm/scripts/deploy-stack.sh` が当てます）\
+> 開発の適用先: Mac の中だけの開発用の DB（[`doc/guides/first-launch.ja.md`](../../doc/guides/first-launch.ja.md) の 18 章）\
 > 移行期間の暫定: `nexloom-gce` / `risepath`（新規環境では使わない）  
 > 認証: **Supabase Auth**（JWT）。`auth.users` は VM 側の ID スタブ（`000_extensions_and_auth.sql`）。  
 > デプロイ正本: [`doc/guides/risepath_vm_deployment.md`](../../doc/guides/risepath_vm_deployment.md)
@@ -12,8 +13,12 @@ Supabase Auth は外部、データは `risepath-vm`（または移行期間の 
 
 ## 実行
 
+`npm run db:migrate` は、`.env.local` の `DATABASE_URL_PHASE1` に当たります。開発に使う Mac では、これは開発用の DB（`127.0.0.1:5433`。[手順書の 18 章](../../doc/guides/first-launch.ja.md)）です。Mac から本番には流しません（D8）。
+
+本番（`risepath-vm`）は、下の段落のとおり `deploy-stack.sh` が当てます。
+
 ```bash
-# .env.local に DATABASE_URL_PHASE1 が必要
+# .env.local の DATABASE_URL_PHASE1 が開発用の DB であることを確かめてから
 npm run db:migrate
 npm run db:migrate:status
 ```

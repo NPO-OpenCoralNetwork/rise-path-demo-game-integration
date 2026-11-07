@@ -34,6 +34,7 @@ import { TRAINING_BODY_LIMIT, createTrainingRouter } from './server/routes/train
 import safetyRoutes from './server/routes/safety.js';
 import { pruneSafetyEvents } from './server/safety/events.js';
 import { readRetentionConfig, retentionStartupLine, runRetention, RETENTION_INTERVAL_MS } from './server/services/retention.js';
+import { maybePruneTtsCache, TTS_CACHE_SWEEP_INTERVAL_MS } from './tools/core/kokoroTts.js';
 import { describeError, redactUrl } from './server/utils/redactUrl.js';
 import { isDbUnavailable } from './tools/core/dbErrors.js';
 import { blockLegacyUploads } from './server/uploads.js';
@@ -53,6 +54,7 @@ import { requireSignedIn } from './server/middleware/signedIn.js';
 import { smallBodyErrors } from './server/middleware/smallBody.js';
 import { aiAccessGate, aiAccessStartupWarnings } from './server/middleware/aiAccessGate.js';
 import { legalStartupWarnings } from './server/middleware/termsGate.js';
+import { pilotStartupLines } from './server/middleware/pilotGate.js';
 import { requireAdmin } from './server/middleware/requireAdmin.js';
 import { createOriginGate, readOriginSecrets, tunnelProfileWithoutSecret } from './server/middleware/originGate.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
@@ -444,6 +446,8 @@ async function main() {
     for (const warning of aiAccessStartupWarnings(process.env)) console.warn(warning);
     // The terms check (Phase 8, LEGAL_TERMS_REQUIRED): one line only when the switch is set.
     for (const warning of legalStartupWarnings(process.env)) console.warn(warning);
+    // The pilot list (Phase 9, D1; PILOT_ACCOUNT_IDS): '[Pilot] off' or the count, never an id.
+    for (const line of pilotStartupLines(process.env)) console.log(line);
     // One line, names only; an owner alert when subscribers exist but billing cannot serve them.
     const billingConfig = readBillingConfig(process.env, { nodeEnv: process.env.NODE_ENV });
     console.log(billingStartupLine(billingConfig));
@@ -475,6 +479,10 @@ async function main() {
         void runRetention({ config: retention });
         setInterval(() => void runRetention({ config: retention }), RETENTION_INTERVAL_MS).unref();
     }
+    // The TTS audio cache (tools/core/kokoroTts.js, Phase 9 D3) also prunes on a timer, so audio older
+    // than 30 days goes within about an hour even when no new audio is written. Local files only.
+    void maybePruneTtsCache();
+    setInterval(() => void maybePruneTtsCache(), TTS_CACHE_SWEEP_INTERVAL_MS).unref();
 
     app.listen(PORT, () => {
         console.log(`Rise Path Server running on http://localhost:${PORT}`);

@@ -5,7 +5,7 @@ import { ArrowRight, Fingerprint, Lock, Mail, ShieldCheck, Terminal, User, UserC
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { allowGuestLogin } from '../../services/authPolicy';
-import { mapSignupErrorMessage, validateSignupForm, type SignupFormError } from '../../services/authFormValidation.ts';
+import { SIGNUP_CLOSED, mapSignupErrorMessage, validateSignupForm, type SignupFormError } from '../../services/authFormValidation.ts';
 import { forgetSignupAcceptance } from '../../services/legalConsentApi';
 import { features } from '../../config/features';
 import { LegalNewTabLink } from '../legal/LegalLinks';
@@ -22,10 +22,12 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
     const { language } = useLanguage();
     const navigate = useNavigate();
     const { login, loginAsGuest, signUp } = useAuth();
-    const [mode, setMode] = useState<AuthMode>(initialMode);
+    // Phase 9 (D1): with the sign-up closed (VITE_FEATURE_LEGAL_PAGES not "true") the view is always
+    // the sign-in form, whatever mode the caller asked for (App.tsx openAuth, the consent page).
+    const [mode, setMode] = useState<AuthMode>(features.legalPages ? initialMode : 'login');
 
     useEffect(() => {
-        setMode(initialMode);
+        setMode(features.legalPages ? initialMode : 'login');
     }, [initialMode]);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -88,6 +90,8 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             newTab: '(opens in a new tab)',
             footerTerms: 'Terms of Use',
             footerPrivacy: 'Privacy Policy',
+            // Phase 9 (D1): the closed sign-up (VITE_FEATURE_LEGAL_PAGES not "true").
+            signupClosed: 'New accounts are not open yet. If you are taking part in the trial, sign in with the account the Rise Path team told you to use.',
         },
         jp: {
             title: 'システム認証',
@@ -128,13 +132,17 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             newTab: '（新しいタブで開きます）',
             footerTerms: '利用規約',
             footerPrivacy: 'プライバシーポリシー',
+            signupClosed: 'まだ新しいアカウントの登録は受け付けていません。試験運用に参加している方は、担当者から案内されたアカウントでログインしてください。',
         },
     } as const;
 
     const t = copy[language];
     const isSignup = mode === 'signup';
 
+    // Phase 9 (D1): while the sign-up is closed there is no sign-up tab, no "Create one" link and no way
+    // into the sign-up form (the footer shows t.signupClosed instead).
     const switchMode = (next: AuthMode) => {
+        if (next === 'signup' && !features.legalPages) return;
         setMode(next);
         setError(null);
         setErrorField(null);
@@ -164,6 +172,10 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!features.legalPages) {
+            setError(t.signupClosed);
+            return;
+        }
         setError(null);
         setErrorField(null);
         setNotice(null);
@@ -198,7 +210,10 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
             // No account was made: the sign-up marker must not answer for a later sign-in.
             forgetSignupAcceptance();
             const message = err instanceof Error ? err.message : t.error;
-            if (mapSignupErrorMessage(message) === 'already_registered') {
+            const mapped = mapSignupErrorMessage(message);
+            if (mapped === SIGNUP_CLOSED) {
+                setError(t.signupClosed);
+            } else if (mapped === 'already_registered') {
                 setError(t.errorAlreadyRegistered);
             } else {
                 setError(message);
@@ -252,26 +267,28 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                         {/* Phase 5: lesson records a learner left on this device unsaved (who saves them, who deletes them). */}
                         <LeftRecordsNotice />
 
-                        <div className="flex rounded-full bg-white/5 border border-white/10 p-1 mb-8">
-                            <button
-                                type="button"
-                                onClick={() => switchMode('login')}
-                                className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                                    !isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
-                                }`}
-                            >
-                                {t.tabLogin}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => switchMode('signup')}
-                                className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                                    isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
-                                }`}
-                            >
-                                {t.tabSignup}
-                            </button>
-                        </div>
+                        {features.legalPages && (
+                            <div className="flex rounded-full bg-white/5 border border-white/10 p-1 mb-8">
+                                <button
+                                    type="button"
+                                    onClick={() => switchMode('login')}
+                                    className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                                        !isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
+                                    }`}
+                                >
+                                    {t.tabLogin}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => switchMode('signup')}
+                                    className={`flex-1 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                                        isSignup ? 'bg-white text-black' : 'text-white/50 hover:text-white'
+                                    }`}
+                                >
+                                    {t.tabSignup}
+                                </button>
+                            </div>
+                        )}
 
                         {!isSignup && (
                             <>
@@ -453,16 +470,20 @@ const ExperienceLoginView: React.FC<LoginViewProps> = ({ initialMode = 'login', 
                                 )}
                             </button>
 
-                            <p className="text-center text-[11px] text-white/40 font-mono">
-                                {isSignup ? t.hasAccount : t.needAccount}{' '}
-                                <button
-                                    type="button"
-                                    onClick={() => switchMode(isSignup ? 'login' : 'signup')}
-                                    className="text-rose-300 hover:text-rose-200 underline underline-offset-2"
-                                >
-                                    {isSignup ? t.switchLogin : t.switchSignup}
-                                </button>
-                            </p>
+                            {features.legalPages ? (
+                                <p className="text-center text-[11px] text-white/40 font-mono">
+                                    {isSignup ? t.hasAccount : t.needAccount}{' '}
+                                    <button
+                                        type="button"
+                                        onClick={() => switchMode(isSignup ? 'login' : 'signup')}
+                                        className="text-rose-300 hover:text-rose-200 underline underline-offset-2"
+                                    >
+                                        {isSignup ? t.switchLogin : t.switchSignup}
+                                    </button>
+                                </p>
+                            ) : (
+                                <p className="text-center text-sm text-white/70">{t.signupClosed}</p>
+                            )}
                         </form>
 
                         {!isSignup && guestEnabled && (

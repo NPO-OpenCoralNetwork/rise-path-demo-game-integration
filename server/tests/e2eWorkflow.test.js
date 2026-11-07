@@ -377,6 +377,8 @@ describe('e2e.yml: the runbooks name its checks (P5)', () => {
             'doc/guides/risepath_vm_deployment.md §4.5': section(read('doc/guides/risepath_vm_deployment.md'), '### 4.5 '),
             'deploy/risepath-vm/README.md「CI での予行（Phase 7）」': section(read('deploy/risepath-vm/README.md'), '## CI での予行（Phase 7）'),
             'deploy/vercel/README.md step 0': vercel,
+            // Phase 9: the first-launch runbook's own check step (design §8.3).
+            'doc/guides/first-launch.ja.md 2.8': section(read('doc/guides/first-launch.ja.md'), '### 2.8 '),
             AGENTS: agents,
         };
         for (const [where, body] of Object.entries(runbooks)) {

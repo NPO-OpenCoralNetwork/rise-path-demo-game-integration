@@ -19,9 +19,9 @@
 
 | 用途 | 置き場所 |
 |------|----------|
-| 開発 Mac | `.env.local`（`chmod 600`）、テンプレは `env.local.template` |
+| 開発 Mac | `.env.local`（`chmod 600`）、テンプレは `.env.example`（`cp .env.example .env.local`） |
 | Rise Path 本番 VM / Compose | `/opt/risepath/deploy/risepath-vm/stack.env`（`chmod 600`）— 正本: [`risepath_vm_deployment.md`](./risepath_vm_deployment.md) §4.2 |
-| Nexloom レガシー VM / Compose | `/home/nexloom/stack/stack.env`（`chmod 600`、所有者 `nexloom`） |
+| Nexloom レガシー VM / Compose | `nexloom` ユーザーのホームの `stack/stack.env`（`chmod 600`、所有者 `nexloom`） |
 | 長期保管 | パスワードマネージャ + 任意で **GCP Secret Manager** |
 | 持ち運び | **GPG 暗号化** `secrets.prod.env.gpg`（リポジトリ外） |
 
@@ -64,7 +64,7 @@ npm run env:inventory -- --scope all       # 全キー（通常は不要）
 2. 新 **GCS HMAC** キー（バケット: `nexloom-assets-*`, `risepath-assets-*`）
 3. Supabase Dashboard で service key **再生成**（移行完了後に旧キー無効化）
 4. `stack.env` を **新規作成**（旧 `.env` を scp 丸ごとコピーしない運用を推奨）
-5. Mac: `DATABASE_URL_PHASE1` は `scripts/sync-db-url-from-vm.py` または手入力（チャットに貼らない）
+5. Mac: `DATABASE_URL_PHASE1` は、Mac の中だけの開発用の DB にする（本番の DB の URL は Mac に写さない。`doc/guides/first-launch.ja.md` の 18 章）
 
 ### Phase C — データと切替
 
@@ -137,6 +137,6 @@ rm -f secrets.prod.env.gpg
 ## 関連
 
 - [`portable_deployment.md`](./portable_deployment.md)
-- [`database_topology.md`](./database_topology.md)
+- [`database_topology.md`](../system_design/database_topology.md)
 - `secrets.inventory.template`
 - `scripts/verify-env-inventory.mjs`

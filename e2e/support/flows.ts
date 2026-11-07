@@ -6,10 +6,16 @@ import { E2E } from './env.ts';
 import { UI } from './ui.mjs';
 import type { Db, Learner } from '../fixtures.ts';
 
-/** Signs in through the landing page's login form (the sequence of the Phase 5 and 6 in-app checks). */
+/**
+ * Signs in through the landing page's login form (the sequence of the Phase 5 and 6 in-app checks).
+ * Phase 9 (D1): every flow also proves the app's sign-up is closed (the e2e front is built without
+ * VITE_FEATURE_LEGAL_PAGES): the closed notice shows and there is no sign-up button.
+ */
 export async function signIn(page: Page, learner: Learner) {
   await page.goto('/');
   await page.getByRole('button', { name: UI.login, exact: true }).first().click();
+  await expect(page.getByText(UI.signupClosed)).toBeVisible();
+  await expect(page.getByRole('button', { name: UI.signupTab, exact: true })).toHaveCount(0);
   await page.locator('input[type="email"]').fill(learner.email);
   await page.locator('input[type="password"]').first().fill(learner.password);
   await page.locator('input[type="password"]').first().press('Enter');

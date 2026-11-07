@@ -1,0 +1,11 @@
+# Every hour, up to 5 minutes later; no catch-up after a pause (the next run exports the same 40 days).
+[Unit]
+Description=Rise Path hourly deletion journal timer
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=300
+Persistent=false
+
+[Install]
+WantedBy=timers.target

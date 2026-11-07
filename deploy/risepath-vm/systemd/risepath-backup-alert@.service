@@ -1,0 +1,10 @@
+# One fixed Slack line when risepath-backup.service or risepath-backup-journal.service fails (OnFailure=), the same
+# webhook as the safety alerts (stack.env AI_CAP_ALERT_WEBHOOK_URL, or backup.env BACKUP_ALERT_WEBHOOK_URL).
+# Phase 9, owner decision D4; design §5.6.
+[Unit]
+Description=Rise Path backup failure alert for %i
+
+[Service]
+Type=oneshot
+ExecStart=/opt/risepath/deploy/risepath-vm/scripts/backup.sh alert %i
+TimeoutStartSec=60

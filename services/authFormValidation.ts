@@ -19,6 +19,12 @@ export type SignupFormOptions = {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Phase 9 (D1): the app's sign-up is closed until VITE_FEATURE_LEGAL_PAGES=true (config/features.ts).
+ * AuthContext.signUp throws this message before it calls Supabase; the login view maps it.
+ */
+export const SIGNUP_CLOSED = 'signup_closed';
+
 export function normalizeAuthEmail(email: string): string {
     return email.trim().toLowerCase();
 }
@@ -65,6 +71,7 @@ export function validateSignupForm(
 }
 
 export function mapSignupErrorMessage(message: string): string {
+    if (message === SIGNUP_CLOSED) return SIGNUP_CLOSED;
     const lower = message.toLowerCase();
     if (lower.includes('already registered') || lower.includes('already been registered')) {
         return 'already_registered';

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
  * Verify Rise Path local environment for Issue #15.
- * Does not print secret values — only SET / MISSING / PLACEHOLDER.
+ * Prints no value — only SET / MISSING / PLACEHOLDER, and the database host, name and user.
+ * A development .env.local uses the local development database (doc/guides/first-launch.ja.md 18 章);
+ * a production host (risepath-vm, nexloom-gce, also as risepath-vm.<tailnet>.ts.net) or a Tailscale address
+ * gets a warning (Phase 9, owner decision D8).
  *
  * Usage:
  *   node scripts/verify-env.mjs
@@ -13,6 +16,7 @@
  */
 
 import fs from 'fs/promises';
+import { realpathSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
@@ -56,7 +60,8 @@ const OPTIONAL = [
   'GEMINI_API_KEY',
 ];
 
-const PLACEHOLDER_PATTERNS = [
+// change-me (the templates' hyphen), change_me and CHANGE_ME all count as placeholders.
+export const PLACEHOLDER_PATTERNS = [
   /^YOUR_/i,
   /your-project/i,
   /your-anon-key/i,
@@ -64,15 +69,36 @@ const PLACEHOLDER_PATTERNS = [
   /your-gemini-api-key/i,
   /YOUR_PROJECT_REF/i,
   /YOUR_DB_PASSWORD/i,
-  /CHANGE_ME/i,
+  /change[-_]me/i,
 ];
+
+/** Production database hosts: a development .env.local never points at them (D8). */
+export const PRODUCTION_DB_HOSTS = new Set(['risepath-vm', 'nexloom-gce']);
+
+/**
+ * Whether a database host is (or may be) production (D8): 'production' for risepath-vm and nexloom-gce,
+ * bare or as the first label of a longer name (the Tailscale MagicDNS name risepath-vm.<tailnet>.ts.net, a
+ * GCE internal name); 'tailscale' for a Tailscale address (100.64.0.0/10 or fd7a:115c:a1e0::/48), which the
+ * old local setup guide told developers to use for the VM; null otherwise.
+ * @param {string} host
+ * @returns {'production' | 'tailscale' | null}
+ */
+export function productionDbHostKind(host) {
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (PRODUCTION_DB_HOSTS.has(h.split('.')[0])) return 'production';
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4 && Number(v4[1]) === 100 && Number(v4[2]) >= 64 && Number(v4[2]) <= 127) return 'tailscale';
+  if (/^fd7a:115c:a1e0:/.test(h)) return 'tailscale';
+  return null;
+}
+const DEV_DB_HINT = 'use the local development database (doc/guides/first-launch.ja.md 18 章)';
 
 /** DB names that must never be used for Rise Path app data */
 const FORBIDDEN_DB_NAMES = new Set(['autogrants']);
 
 const EXPECTED_DB = process.env.RISEPATH_EXPECTED_DB || 'risepath';
 
-function parsePgUrl(connectionString) {
+export function parsePgUrl(connectionString) {
   try {
     const normalized = connectionString.replace(/^postgresql:/i, 'http:').replace(/^postgres:/i, 'http:');
     const u = new URL(normalized);
@@ -87,7 +113,12 @@ function parsePgUrl(connectionString) {
   }
 }
 
-function checkDatabaseTarget(env) {
+/**
+ * Where DATABASE_URL_PHASE1 points: host, database and user (never the password).
+ * @param {Record<string, string>} env
+ * @param {(line: string) => void} [log]
+ */
+export function checkDatabaseTarget(env, log = console.log) {
   const cs = env.DATABASE_URL_PHASE1;
   if (!cs || classify('DATABASE_URL_PHASE1', cs) !== 'SET') return { ok: true, skipped: true };
 
@@ -96,33 +127,40 @@ function checkDatabaseTarget(env) {
     return { ok: false, message: 'DATABASE_URL_PHASE1 could not be parsed (check URI format)' };
   }
 
-  console.log('\n## Database target (no secrets)');
-  console.log(`   host: ${parsed.host}`);
-  console.log(`   database: ${parsed.database}`);
-  console.log(`   user: ${parsed.user}`);
+  log('\n## Database target (no secrets)');
+  log(`   host: ${parsed.host}`);
+  log(`   database: ${parsed.database}`);
+  log(`   user: ${parsed.user}`);
 
   if (FORBIDDEN_DB_NAMES.has(parsed.database)) {
     return {
       ok: false,
-      message: `database "${parsed.database}" is blocked for Rise Path — use "${EXPECTED_DB}" on risepath-vm (legacy: nexloom-gce; see doc/database_topology.md)`,
+      message: `database "${parsed.database}" is blocked for Rise Path — ${DEV_DB_HINT}, database "${EXPECTED_DB}" (see doc/system_design/database_topology.md)`,
     };
   }
 
+  const hostKind = productionDbHostKind(parsed.host);
+  if (hostKind === 'production') {
+    log(`⚠️  ${parsed.host}: this is the production database. A development .env.local does not point at it — ${DEV_DB_HINT}.`);
+  } else if (hostKind === 'tailscale') {
+    log(`⚠️  ${parsed.host}: a Tailscale address. If it is risepath-vm or nexloom-gce, this is the production database. A development .env.local does not point at it — ${DEV_DB_HINT}.`);
+  }
+
   if (/supabase\.co/i.test(parsed.host) && !env.RISEPATH_ALLOW_SUPABASE_DB) {
-    console.log('⚠️  Host looks like Supabase Postgres. Data DB should be risepath-vm/risepath (legacy: nexloom-gce) unless intentional.');
-    console.log('   Set RISEPATH_ALLOW_SUPABASE_DB=1 in .env.local to silence this warning.');
+    log(`⚠️  Host looks like Supabase Postgres. The data DB is not Supabase — ${DEV_DB_HINT}, unless intentional.`);
+    log('   Set RISEPATH_ALLOW_SUPABASE_DB=1 in .env.local to silence this warning.');
   }
 
   if (parsed.database !== EXPECTED_DB) {
-    console.log(`⚠️  Expected database name "${EXPECTED_DB}", got "${parsed.database}".`);
+    log(`⚠️  Expected database name "${EXPECTED_DB}", got "${parsed.database}".`);
   } else {
-    console.log(`✅ Database name matches expected (${EXPECTED_DB}).`);
+    log(`✅ Database name matches expected (${EXPECTED_DB}).`);
   }
 
   return { ok: true };
 }
 
-function parseEnvFile(raw) {
+export function parseEnvFile(raw) {
   const env = {};
   const keyOrder = [];
   for (const line of raw.split(/\r?\n/)) {
@@ -151,7 +189,7 @@ function findDuplicateKeys(raw) {
   return Object.entries(counts).filter(([, c]) => c > 1).map(([k]) => k);
 }
 
-function classify(key, value) {
+export function classify(key, value) {
   if (value === undefined || value === '') return 'MISSING';
   if (PLACEHOLDER_PATTERNS.some((re) => re.test(value))) return 'PLACEHOLDER';
   return 'SET';
@@ -178,8 +216,8 @@ async function loadEnvLocal() {
   } catch (err) {
     if (err?.code === 'ENOENT') {
       console.error('❌ .env.local not found.');
-      console.error('   Run: cp env.local.template .env.local');
-      console.error('   Then fill in Supabase + DATABASE_URL_PHASE1 (see doc/env_local_setup_issue15.md)');
+      console.error('   Run: cp .env.example .env.local');
+      console.error('   Then fill in Supabase + DATABASE_URL_PHASE1 (see doc/guides/env_local_setup_issue15.md)');
       process.exit(1);
     }
     throw err;
@@ -338,6 +376,60 @@ async function checkApi(env) {
   }
 }
 
+/**
+ * The variable report of `npm run env:check`: names and SET / MISSING / PLACEHOLDER only, never a value
+ * (Phase 9, D19). Returns the number of required variables that block.
+ * @param {Record<string, string>} env
+ * @param {string} raw the .env.local text (duplicate names)
+ * @param {(line: string) => void} [log]
+ */
+export function printReport(env, raw, log = console.log) {
+  const dupes = findDuplicateKeys(raw);
+  if (dupes.length) {
+    log('## Warnings');
+    log(`⚠️  Duplicate keys in .env.local (last value wins): ${dupes.join(', ')}`);
+    log('   Remove placeholder duplicates — see doc/guides/env_local_setup_issue15.md\n');
+  }
+
+  log('## Required (Issue #15)');
+  let blockers = 0;
+  for (const key of REQUIRED) {
+    const status = classify(key, env[key]);
+    if (status !== 'SET') blockers += 1;
+    log(`${statusIcon(status)} ${key}: ${status}`);
+  }
+
+  for (const [title, keys] of /** @type {[string, string[]][]} */ ([
+    ['Recommended (v3 Hermes + local dev)', RECOMMENDED],
+    ['Recommended (Kokoro TTS — Issue #3)', TTS_RECOMMENDED],
+    ['Recommended (in-app AI on Claude — tutor, writing feedback, /ai/generate)', LLM_RECOMMENDED],
+    ['Optional (Gemini — used only with GEMINI_ALLOWED=true, for deployments people under 18 cannot reach)', OPTIONAL],
+  ])) {
+    log(`\n## ${title}`);
+    for (const key of keys) {
+      const status = classify(key, env[key]);
+      log(`${statusIcon(status)} ${key}: ${status}`);
+    }
+  }
+
+  if (env.VITE_DEMO_MODE === 'false') {
+    log('\nℹ️  VITE_DEMO_MODE=false → frontend will call /api/v2 (not bundled demo JSON).');
+  } else {
+    log('\nℹ️  VITE_DEMO_MODE is not false → app may still use demo course data on the frontend.');
+  }
+
+  if (classify('HERMES_API_KEY', env.HERMES_API_KEY) !== 'SET') {
+    log('ℹ️  Hermes not configured → Life Journal chat / agent proxy will return 503 until gateway is running.');
+  }
+
+  const dbTarget = checkDatabaseTarget(env, log);
+  if (!dbTarget.ok) {
+    log(`\n❌ ${dbTarget.message}`);
+    blockers += 1;
+  }
+  return blockers;
+}
+
 async function main() {
   const args = new Set(process.argv.slice(2));
   const { raw, env: rawEnv } = await loadEnvLocal();
@@ -350,64 +442,11 @@ async function main() {
   console.log('# Rise Path env check (.env.local)');
   console.log(`path: ${ENV_PATH}\n`);
 
-  const dupes = findDuplicateKeys(raw);
-  if (dupes.length) {
-    console.log('## Warnings');
-    console.log(`⚠️  Duplicate keys in .env.local (last value wins): ${dupes.join(', ')}`);
-    console.log('   Remove placeholder duplicates — see doc/env_local_setup_issue15.md\n');
-  }
-
-  console.log('## Required (Issue #15)');
-  let blockers = 0;
-  for (const key of REQUIRED) {
-    const status = classify(key, env[key]);
-    if (status !== 'SET') blockers += 1;
-    console.log(`${statusIcon(status)} ${key}: ${status}`);
-  }
-
-  console.log('\n## Recommended (v3 Hermes + local dev)');
-  for (const key of RECOMMENDED) {
-    const status = classify(key, env[key]);
-    console.log(`${statusIcon(status)} ${key}: ${status}${env[key] !== undefined ? ` (value=${env[key]})` : ''}`);
-  }
-
-  console.log('\n## Recommended (Kokoro TTS — Issue #3)');
-  for (const key of TTS_RECOMMENDED) {
-    const status = classify(key, env[key]);
-    console.log(`${statusIcon(status)} ${key}: ${status}`);
-  }
-
-  console.log('\n## Recommended (in-app AI on Claude — tutor, writing feedback, /ai/generate)');
-  for (const key of LLM_RECOMMENDED) {
-    const status = classify(key, env[key]);
-    console.log(`${statusIcon(status)} ${key}: ${status}`);
-  }
-
-  console.log('\n## Optional (Gemini — used only with GEMINI_ALLOWED=true, for deployments people under 18 cannot reach)');
-  for (const key of OPTIONAL) {
-    const status = classify(key, env[key]);
-    console.log(`${statusIcon(status)} ${key}: ${status}`);
-  }
-
-  if (env.VITE_DEMO_MODE === 'false') {
-    console.log('\nℹ️  VITE_DEMO_MODE=false → frontend will call /api/v2 (not bundled demo JSON).');
-  } else {
-    console.log('\nℹ️  VITE_DEMO_MODE is not false → app may still use demo course data on the frontend.');
-  }
-
-  if (classify('HERMES_API_KEY', env.HERMES_API_KEY) !== 'SET') {
-    console.log('ℹ️  Hermes not configured → Life Journal chat / agent proxy will return 503 until gateway is running.');
-  }
-
-  const dbTarget = checkDatabaseTarget(env);
-  if (!dbTarget.ok) {
-    console.log(`\n❌ ${dbTarget.message}`);
-    blockers += 1;
-  }
+  const blockers = printReport(env, raw);
 
   if (blockers > 0) {
     console.log(`\n❌ ${blockers} required variable(s) still missing or placeholder.`);
-    console.log('   See doc/env_local_setup_issue15.md');
+    console.log('   See doc/guides/env_local_setup_issue15.md');
     if (!args.has('--db') && !args.has('--api') && !args.has('--auth') && !args.has('--health') && !args.has('--tts')) process.exit(1);
   } else {
     console.log('\n✅ All required variables look set (format not validated).');
@@ -424,7 +463,17 @@ async function main() {
   process.exit(ok ? 0 : 1);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isMainModule = (() => {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

@@ -11,8 +11,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { entryMap, parseEnvText } from '../../scripts/deploy/env-parse.mjs';
+import { effectiveProfiles } from '../../scripts/deploy/preflight-rules.mjs';
+import { DEPLOY_CODES, POSTDEPLOY_CODES } from '../../scripts/deploy/postdeploy-probe.mjs';
+import { buildFiles } from './helpers/preflightFixtures.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const STACK = path.join(ROOT, 'deploy/risepath-vm');
@@ -700,6 +705,9 @@ describe('deploy-stack.sh', () => {
     assert.ok(!/compose up -d --wait\s*$/m.test(script), 'no wait on every service');
     const byoaWait = script.search(/if \[\[ ",\$\{COMPOSE_PROFILES\/\/ \/\}," == \*",byoa,"\* \]\]; then\n\s*WAIT\+=\(mcp-public\)\n/);
     assert.ok(byoaWait > 0 && byoaWait < wait, 'with byoa, an mcp-public that never gets healthy fails the deploy');
+    // Phase 9 (P5): cloudflared has a healthcheck; with tunnel listed, a tunnel that never connects fails the deploy.
+    const tunnelWait = script.search(/if \[\[ ",\$\{COMPOSE_PROFILES\/\/ \/\}," == \*",tunnel,"\* \]\]; then\n\s*WAIT\+=\(cloudflared\)\n/);
+    assert.ok(tunnelWait > 0 && tunnelWait < wait, 'with tunnel, cloudflared is waited for');
   });
 });
 
@@ -1069,43 +1077,91 @@ describe('docker-compose: log limits, db error verbosity and the Phase 4 setting
 // only for exactly 1 from the caller's environment; on the VM the variable is unset and every deploy
 // pulls and re-runs a moved script, as before. CI never runs the pull or the re-run, so these tests are
 // their only check: the whole script runs from a temporary copy with recording git and docker stubs.
-describe('deploy-stack.sh: the CI pull opt-out (Phase 7, owner decision P3)', () => {
+// Phase 9 (owner decision D2; design §2.8, T5b, T11, T12): the caller's values are read once, before
+// stack.env is sourced, and the re-run takes only the copies the first run forwarded; the 事前チェック
+// (preflight.sh) runs before bash reads stack.env and before the pull; the commit line, DB1 before the
+// migration, cloudflared in the wait list and the 事後の確かめ (postdeploy-check.sh) after the smoke.
+describe('deploy-stack.sh: the caller values, the 事前チェック, the pull, DB1 and the 事後の確かめ (Phase 7 P3, Phase 9 D2)', () => {
   const script = read(path.join(STACK, 'scripts/deploy-stack.sh'));
+  const code = script.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
   // deploy-stack.sh uses ${var,,} (bash 4); stock macOS bash 3.2 stops with "bad substitution".
   const bash4 = spawnSync('bash', ['-c', 'x=A; : "${x,,}"']).status === 0;
   const skip = bash4 ? false : 'needs bash ≥ 4 (deploy-stack.sh uses ${var,,}); on a Mac: brew install bash';
   const COMPOSE = 'compose --env-file stack.env -f docker-compose.yml ';
-  const VM_SEQUENCE = [
+  const TEMPLATE = read(path.join(STACK, 'ci/stack.ci.env'));
+  const DB1 = 'exec -T db sh -c psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SHOW server_encoding"';
+  const PROBE = (mode) => `exec -T api node scripts/deploy/postdeploy-probe.mjs --mode ${mode}`;
+  const sequence = (mode) => [
     'build',
     'up -d --wait db',
+    DB1,
     'run --rm --no-deps -T api npm run db:migrate',
     'up -d --no-deps --force-recreate --wait api',
     '--profile full ps -aq hermes',
     'up -d',
     'up -d --wait mcp',
     'exec -T api env PORT=3006 MCP_SSE_PORT=3100 API_SERVER_PORT=8642 MEMANTO_API_PORT=8100 node scripts/smoke-vm-stack.mjs --target container --require-mcp',
+    'logs --no-log-prefix api',
+    PROBE(mode),
     'ps',
   ];
+  const VM_SEQUENCE = sequence('prod');
+  const CI_SEQUENCE = sequence('ci');
+  const CI_CALLER = { COMPOSE_PROJECT_NAME: 'risepath-ci' };
+  const SHA_A = 'a'.repeat(40);
+  const SHA_B = 'b'.repeat(40);
 
   /**
-   * Runs a copy of deploy-stack.sh in <tmp>/repo (with a .git directory, so it would pull) and
-   * stack.env = ci/stack.ci.env unless `stackEnv` is given. git and docker are recording stubs: git
-   * `rev-parse HEAD` prints one sha, or with `moving` sha A on its first call and sha B afterwards (the
-   * pull moved HEAD); `pull` exits 1 like a detached checkout with `pullFails`. docker prints nothing
-   * and logs the compose project and profiles it was given.
+   * Runs a copy of deploy-stack.sh in <tmp>/repo (with a .git directory, so it would pull) next to copies
+   * of preflight.sh, check-mode.sh, postdeploy-check.sh, the Dockerfile, ci/stack.ci.env and
+   * scripts/deploy/*.mjs, with stack.env = ci/stack.ci.env unless `stackEnv` is given. preflight.sh and
+   * postdeploy-check.sh are the real scripts behind a wrapper that records their arguments. git, docker,
+   * id (uid 1000, so the harness also runs where npm test runs as root) and systemctl are stubs. git
+   * `rev-parse HEAD` prints one sha, or with `moving` sha A on its first call and sha B afterwards (the pull
+   * moved HEAD); `pull` exits 1 like a detached checkout with `pullFails`. docker logs every call with the
+   * compose project and profiles it was given, and the argv of each `run` (the 事前チェック's container):
+   * `preflight` 'pass' exits 0, 'fail' exits `preflightStatus` (1: errors; 2, 3: could not check), 'real' runs
+   * the real check with this node, mapping the read-only mounts (the T8 shim). `id -u` answers `uid`. DB1's
+   * query answers `dbEncoding` (null: the exec fails, no answer); the probe exec records its stdin and exits
+   * `probeStatus`; `logs` prints the retention start-up line. `files` are more files in the stack folder
+   * (tunnel.env, launch-record.env). `editOn`: the compose call (a substring) during which stack.env gets one more
+   * line, as an edit from a second SSH session would. `waitFails`: the wait before the smoke fails with Compose's
+   * English line; `ps --format {{.Health}} cloudflared` answers `cloudflaredHealth`.
+   * @param {{ skipPull?: string, stackEnv?: string, moving?: boolean, pullFails?: boolean, env?: Record<string, string>,
+   *   preflight?: 'pass' | 'fail' | 'real', preflightStatus?: number, uid?: number, dbEncoding?: string | null, probeStatus?: number,
+   *   files?: Record<string, string>, editOn?: string, waitFails?: boolean, cloudflaredHealth?: string }} [opts]
    */
-  const runDeploy = ({ skipPull, stackEnv, moving = false, pullFails = false } = {}) => {
+  const runDeploy = ({ skipPull, stackEnv, moving = false, pullFails = false, env: callerEnv = {}, preflight = 'pass', preflightStatus = 1, uid = 1000, dbEncoding = 'UTF8', probeStatus = 0, files = {}, editOn = '', waitFails = false, cloudflaredHealth = '' } = {}) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-stack-'));
     try {
-      const stackDir = path.join(dir, 'repo/deploy/risepath-vm');
+      const repo = path.join(dir, 'repo');
+      const stackDir = path.join(repo, 'deploy/risepath-vm');
       fs.mkdirSync(path.join(stackDir, 'scripts'), { recursive: true });
-      fs.mkdirSync(path.join(dir, 'repo/.git'));
-      fs.copyFileSync(path.join(STACK, 'scripts/deploy-stack.sh'), path.join(stackDir, 'scripts/deploy-stack.sh'));
-      fs.writeFileSync(path.join(stackDir, 'stack.env'), stackEnv ?? read(path.join(STACK, 'ci/stack.ci.env')));
+      fs.mkdirSync(path.join(stackDir, 'ci'), { recursive: true });
+      fs.mkdirSync(path.join(repo, '.git'));
+      fs.mkdirSync(path.join(repo, 'scripts/deploy'), { recursive: true });
+      for (const f of fs.readdirSync(path.join(ROOT, 'scripts/deploy'))) fs.copyFileSync(path.join(ROOT, 'scripts/deploy', f), path.join(repo, 'scripts/deploy', f));
+      for (const f of ['deploy-stack.sh', 'check-mode.sh']) fs.copyFileSync(path.join(STACK, 'scripts', f), path.join(stackDir, 'scripts', f));
+      const argvLog = path.join(dir, 'argv.log');
+      for (const name of ['preflight', 'postdeploy-check']) {
+        fs.copyFileSync(path.join(STACK, `scripts/${name}.sh`), path.join(stackDir, `scripts/${name}.real.sh`));
+        fs.writeFileSync(path.join(stackDir, `scripts/${name}.sh`), [
+          '#!/usr/bin/env bash',
+          `"${process.execPath}" -e 'require("node:fs").appendFileSync(process.env.STUB_ARGV, JSON.stringify(process.argv.slice(1)) + "\\n")' -- ${name} "$@"`,
+          `exec bash "$(dirname "\${BASH_SOURCE[0]}")/${name}.real.sh" "$@"`,
+        ].join('\n'), { mode: 0o755 });
+      }
+      fs.copyFileSync(path.join(STACK, 'Dockerfile'), path.join(stackDir, 'Dockerfile'));
+      fs.writeFileSync(path.join(stackDir, 'ci/stack.ci.env'), TEMPLATE);
+      fs.writeFileSync(path.join(stackDir, 'stack.env'), stackEnv ?? TEMPLATE, { mode: 0o600 });
+      for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(stackDir, name), text, { mode: 0o600 });
       const bin = path.join(dir, 'bin');
       fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(bin, 'package.json'), '{"type":"commonjs"}\n');
       const log = path.join(dir, 'calls.log');
-      fs.writeFileSync(log, '');
+      const runs = path.join(dir, 'runs.log');
+      const probeIn = path.join(dir, 'probe.log');
+      for (const f of [log, runs, probeIn, argvLog]) fs.writeFileSync(f, '');
       const stub = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
       stub('git', [
         'echo "git $*" >> "$STUB_LOG"',
@@ -1113,82 +1169,301 @@ describe('deploy-stack.sh: the CI pull opt-out (Phase 7, owner decision P3)', ()
         'case "$1" in',
         '  rev-parse)',
         '    n=$(cat "$STUB_COUNT" 2> /dev/null || echo 0); echo $((n + 1)) > "$STUB_COUNT"',
-        '    if [[ "$STUB_MOVING" == 1 && "$n" -gt 0 ]]; then echo bbbbbbbb; else echo aaaaaaaa; fi ;;',
+        `    if [[ "$STUB_MOVING" == 1 && "$n" -gt 0 ]]; then echo ${SHA_B}; else echo ${SHA_A}; fi ;;`,
         '  pull) if [[ "$STUB_PULL_FAILS" == 1 ]]; then echo "You are not currently on a branch." >&2; exit 1; fi ;;',
+        '  log) echo "bbbbbbb（2026-10-30・the pulled commit）" ;;',
         'esac',
       ].join('\n'));
-      stub('docker', 'echo "docker [${COMPOSE_PROJECT_NAME-<unset>}|${COMPOSE_PROFILES-<unset>}] $*" >> "$STUB_LOG"');
+      stub('id', `echo ${uid}`);
+      stub('systemctl', 'case "$2" in risepath-stack.service) echo enabled ;; *) exit 1 ;; esac');
+      // 100 GB free wherever the 事前チェック looks (F6 stays quiet on any machine that runs the tests).
+      stub('df', 'printf "Filesystem 1024-blocks Used Available Capacity Mounted on\\nstub 200000000 1 100000000 1%% /\\n"');
+      fs.writeFileSync(path.join(bin, 'docker'), `#!${process.execPath}
+const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
+const args = process.argv.slice(2);
+const env = process.env;
+const shown = (v) => (v === undefined ? '<unset>' : v);
+fs.appendFileSync(env.STUB_LOG, 'docker [' + shown(env.COMPOSE_PROJECT_NAME) + '|' + shown(env.COMPOSE_PROFILES) + '] ' + args.join(' ') + '\\n');
+const stdin = () => { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } };
+if (args[0] === 'run') {
+  fs.appendFileSync(env.STUB_RUNS, JSON.stringify(args) + '\\n');
+  const input = stdin();
+  if (env.STUB_PREFLIGHT === 'fail') process.exit(Number(env.STUB_PREFLIGHT_STATUS));
+  if (env.STUB_PREFLIGHT === 'real') {
+    const mounts = args.filter((a, i) => args[i - 1] === '--mount').map((m) => Object.fromEntries(m.split(',').map((kv) => kv.split('='))));
+    const at = args.indexOf('node');
+    const mapped = args.slice(at + 1).map((a) => { for (const m of mounts) if (a === m.dst || a.startsWith(m.dst + '/')) return m.src + a.slice(m.dst.length); return a; });
+    const r = spawnSync(process.execPath, mapped, { input, stdio: ['pipe', 'inherit', 'inherit'] });
+    process.exit(r.status ?? 1);
+  }
+  process.exit(0);
+}
+if (args[0] === 'compose') {
+  const line = args.join(' ');
+  if (env.STUB_EDIT_ON && line.includes(env.STUB_EDIT_ON)) fs.appendFileSync(env.STUB_STACK_ENV, '# edited during the deploy\\n');
+  if (line.includes('SHOW server_encoding')) {
+    if (env.STUB_DB_EXEC_FAILS === '1') { process.stderr.write('service "db" is not running\\n'); process.exit(1); }
+    process.stdout.write(env.STUB_DB_ENCODING + '\\n'); process.exit(0);
+  }
+  if (env.STUB_WAIT_FAILS === '1' && line.includes('up -d --wait mcp')) { process.stderr.write('dependency failed to start: container risepath-cloudflared-1 is unhealthy\\n'); process.exit(1); }
+  if (args.includes('ps') && args.includes('{{.Health}}')) { process.stdout.write(env.STUB_CF_HEALTH ? env.STUB_CF_HEALTH + '\\n' : ''); process.exit(0); }
+  if (line.includes('postdeploy-probe.mjs')) { fs.appendFileSync(env.STUB_PROBE, stdin() + '\\n'); process.exit(Number(env.STUB_PROBE_STATUS)); }
+  if (args.includes('logs')) { process.stdout.write('[Retention] on, hourly: stub\\n'); process.exit(0); }
+}
+process.exit(0);
+`, { mode: 0o755 });
       const env = {
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
         HOME: dir,
         STUB_LOG: log,
+        STUB_RUNS: runs,
+        STUB_PROBE: probeIn,
+        STUB_ARGV: argvLog,
         STUB_COUNT: path.join(dir, 'count'),
         STUB_MOVING: moving ? '1' : '0',
         STUB_PULL_FAILS: pullFails ? '1' : '0',
+        STUB_PREFLIGHT: preflight,
+        STUB_PREFLIGHT_STATUS: String(preflightStatus),
+        STUB_DB_ENCODING: dbEncoding ?? '',
+        STUB_DB_EXEC_FAILS: dbEncoding === null ? '1' : '0',
+        STUB_PROBE_STATUS: String(probeStatus),
+        STUB_EDIT_ON: editOn,
+        STUB_STACK_ENV: path.join(stackDir, 'stack.env'),
+        STUB_WAIT_FAILS: waitFails ? '1' : '0',
+        STUB_CF_HEALTH: cloudflaredHealth,
         ...(skipPull === undefined ? {} : { RISEPATH_DEPLOY_SKIP_PULL: skipPull }),
+        ...callerEnv,
       };
-      const result = spawnSync('bash', [path.join(stackDir, 'scripts/deploy-stack.sh')], { env, encoding: 'utf8', timeout: 30_000 });
+      const result = spawnSync('bash', [path.join(stackDir, 'scripts/deploy-stack.sh')], { env, encoding: 'utf8', timeout: 60_000 });
       const calls = lines(read(log));
       const docker = calls.filter((line) => line.startsWith('docker '));
+      const composeLines = docker.filter((line) => line.replace(/^docker \[[^\]]*\] /, '').startsWith('compose '));
+      const argv = lines(read(argvLog)).map((line) => JSON.parse(line));
+      const recordFile = path.join(stackDir, '.deploy/last-green.json');
       return {
         status: result.status,
         out: `${result.stdout}${result.stderr}`,
         calls,
         git: calls.filter((line) => line.startsWith('git ')),
         docker,
-        compose: docker.map((line) => line.replace(/^docker \[[^\]]*\] /, '')).map((line) => (line.startsWith(COMPOSE) ? line.slice(COMPOSE.length) : `(not compose) ${line}`)),
+        // Every compose call, in order (a compose call with other files shows as such); the 事前チェック's
+        // docker calls (image, info, ps, volume, run) are not compose calls.
+        compose: composeLines.map((line) => line.replace(/^docker \[[^\]]*\] /, '')).map((line) => (line.startsWith(COMPOSE) ? line.slice(COMPOSE.length) : `(other files) ${line}`)),
+        composeRaw: composeLines,
+        runs: lines(read(runs)).map((line) => JSON.parse(line)),
+        preflightArgv: argv.filter((a) => a[0] === 'preflight').map((a) => a.slice(1)),
+        postdeployArgv: argv.filter((a) => a[0] === 'postdeploy-check').map((a) => a.slice(1)),
+        probeFacts: lines(read(probeIn)).map((line) => JSON.parse(line)),
+        record: fs.existsSync(recordFile) ? { text: read(recordFile), mode: fs.statSync(recordFile).mode & 0o777, dirMode: fs.statSync(path.dirname(recordFile)).mode & 0o777 } : null,
+        stackSha: crypto.createHash('sha256').update(fs.readFileSync(path.join(stackDir, 'stack.env'))).digest('hex'),
       };
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   };
+  /** The value of a flag in a recorded argv. @param {string[]} argv @param {string} flag */
+  const flagOf = (argv, flag) => argv[argv.indexOf(flag) + 1];
+  /** The --mode of a recorded docker run (the 事前チェック's container). @param {string[]} run */
+  const modeOf = (run) => run[run.indexOf('--mode') + 1];
 
-  it('reads RISEPATH_DEPLOY_SKIP_PULL once, before stack.env is sourced, into a read-only variable', () => {
-    const readAt = script.search(/^readonly RISEPATH_CALLER_SKIP_PULL="\$\{RISEPATH_DEPLOY_SKIP_PULL:-\}"$/m);
-    assert.ok(readAt > 0, 'readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"');
-    assert.ok(readAt < script.search(/^source stack\.env$/m), 'before stack.env is sourced');
-    const code = script.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+  // --- T11: static pins (the pin at the Phase 7 lines moved, not weakened) -------------------------------
+
+  it('T11: the caller values are read once, before the stack.env check, from the caller or (on the re-run) only from the forwarded copies', () => {
+    const block = [
+      'if [[ "${RISEPATH_DEPLOY_REEXEC:-}" == 1 ]]; then',
+      '  readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_REEXEC_SKIP_PULL:-}"',
+      '  readonly RISEPATH_CALLER_PROJECT="${RISEPATH_REEXEC_PROJECT:-}"',
+      '  readonly RISEPATH_CALLER_PROFILES="${RISEPATH_REEXEC_PROFILES:-}"',
+      '  readonly RISEPATH_CALLER_EXPORTS="${RISEPATH_REEXEC_EXPORTS:-}"',
+      'else',
+      '  readonly RISEPATH_CALLER_SKIP_PULL="${RISEPATH_DEPLOY_SKIP_PULL:-}"',
+      '  readonly RISEPATH_CALLER_PROJECT="${COMPOSE_PROJECT_NAME:-}"',
+      '  readonly RISEPATH_CALLER_PROFILES="${COMPOSE_PROFILES:-}"',
+      '  RISEPATH_CALLER_EXPORTS="$(compgen -e | tr \'\\n\' \' \' || true)"',
+      '  readonly RISEPATH_CALLER_EXPORTS',
+      'fi',
+    ].join('\n');
+    const at = code.indexOf(block);
+    assert.ok(at > 0, 'the caller block');
+    assert.ok(at < code.indexOf('if [[ ! -f stack.env ]]; then'), 'before the stack.env check');
+    assert.ok(at < code.search(/^source stack\.env$/m), 'before stack.env is sourced');
+    // RISEPATH_DEPLOY_SKIP_PULL: read in the else branch only, and named in the message.
     assert.equal(code.match(/RISEPATH_DEPLOY_SKIP_PULL/g)?.length, 2, 'read once, and named in the message');
     assert.match(code, /^ {2}echo "==> git pull skipped \(RISEPATH_DEPLOY_SKIP_PULL=1\): deploying the checked-out commit"$/m);
-    assert.equal(code.match(/RISEPATH_CALLER_SKIP_PULL/g)?.length, 2, 'set once, read once');
+    for (const name of ['SKIP_PULL', 'PROJECT', 'PROFILES', 'EXPORTS']) {
+      assert.equal(code.match(new RegExp(`^ {2}(?:readonly )?RISEPATH_CALLER_${name}=`, 'gm'))?.length, 2, `${name}: set once in each branch`);
+      assert.equal(code.match(new RegExp(`RISEPATH_REEXEC_${name}=`, 'g'))?.length, 1, `${name}: forwarded once, on the exec line`);
+    }
+    // Compared once (the pull branch); forwarded to the two checks and the re-run, nowhere else.
+    assert.equal(code.match(/RISEPATH_CALLER_SKIP_PULL/g)?.length, 2 + 1 + 2 + 1, 'set (2), compared (1), passed to both checks (2), forwarded (1)');
+    assert.equal(code.match(/"\$\{RISEPATH_CALLER_SKIP_PULL\}" == "1"/g)?.length, 1, 'compared once');
     assert.match(code, /^if \[\[ "\$\{RISEPATH_CALLER_SKIP_PULL\}" == "1" \]\]; then\n {2}echo "==> git pull skipped[^\n]*\nelif \[\[ -d "\$\{REPO_ROOT\}\/\.git" \]\]; then\n {2}echo "==> git pull"\n/m,
       'a branch in front of the old pull block, which is unchanged');
   });
 
-  it('unset (the VM): git pull --ff-only runs before any docker call; a detached checkout stops the deploy there', { skip }, () => {
+  it('T11: the 事前チェック runs before bash reads stack.env and before the pull, with the four caller values; a failure stops the deploy', () => {
+    const call = [
+      'if ! "${BASH}" "${SCRIPT_DIR}/preflight.sh" --from-deploy \\',
+      '    --caller-skip-pull "${RISEPATH_CALLER_SKIP_PULL}" --caller-project "${RISEPATH_CALLER_PROJECT}" \\',
+      '    --caller-profiles "${RISEPATH_CALLER_PROFILES}" --caller-exports "${RISEPATH_CALLER_EXPORTS}"; then',
+      '  echo "❌ 事前チェックで止めました。上の直し方を見てください（何も変えていません）。"',
+      '  exit 1',
+      'fi',
+    ].join('\n');
+    const at = code.indexOf(call);
+    assert.ok(at > 0, 'the call');
+    assert.ok(at > code.indexOf('if [[ ! -f stack.env ]]; then'), 'after the stack.env check');
+    assert.ok(at < code.search(/^source stack\.env$/m), 'before stack.env is sourced');
+    assert.ok(at < code.indexOf('git -C "${REPO_ROOT}" pull --ff-only'), 'before the pull');
+    assert.equal(code.match(/preflight\.sh/g)?.length, 1, 'one call');
+  });
+
+  // Review round 1 of Stage 2, finding 3: the record vouches only for the stack.env the 事前チェック read.
+  it('stack.env\'s SHA-256 is taken once, read-only, right before the 事前チェック, and passed to the 事後の確かめ (P13, P16)', () => {
+    const hash = code.indexOf([
+      'RISEPATH_STACK_ENV_SHA="$({ sha256sum stack.env 2> /dev/null || shasum -a 256 stack.env 2> /dev/null; } | awk \'{print $1}\' || true)"',
+      'readonly RISEPATH_STACK_ENV_SHA',
+    ].join('\n'));
+    assert.ok(hash > code.indexOf('if [[ ! -f stack.env ]]; then'), 'after the stack.env check');
+    assert.ok(hash < code.indexOf('"${BASH}" "${SCRIPT_DIR}/preflight.sh"'), 'before the 事前チェック reads the file');
+    assert.equal(code.match(/RISEPATH_STACK_ENV_SHA/g)?.length, 3, 'set, made read-only, passed once');
+    assert.ok(code.includes('--stack-sha "${RISEPATH_STACK_ENV_SHA}" --profiles "${COMPOSE_PROFILES}"; then'));
+  });
+
+  it('T11: the re-run forwards the four caller values under re-run-only names; the commit line is in the pull branch, after it', () => {
+    assert.ok(code.includes([
+      '    RISEPATH_DEPLOY_REEXEC=1 RISEPATH_REEXEC_SKIP_PULL="${RISEPATH_CALLER_SKIP_PULL}" \\',
+      '      RISEPATH_REEXEC_PROJECT="${RISEPATH_CALLER_PROJECT}" RISEPATH_REEXEC_PROFILES="${RISEPATH_CALLER_PROFILES}" \\',
+      '      RISEPATH_REEXEC_EXPORTS="${RISEPATH_CALLER_EXPORTS}" exec "${BASH}" "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$@"',
+    ].join('\n')), 'the exec line');
+    const commit = code.indexOf('  echo "==> デプロイするコミット: $(git -C "${REPO_ROOT}" log -1 --abbrev=7 --format=\'%h（%cs・%s）\')"');
+    assert.ok(commit > 0, 'the commit line');
+    assert.ok(commit > code.indexOf('exec "${BASH}"'), 'after the re-run');
+    const branchEnd = code.indexOf('\nfi\n', code.indexOf('elif [[ -d "${REPO_ROOT}/.git" ]]; then'));
+    assert.ok(commit > code.indexOf('elif [[ -d "${REPO_ROOT}/.git" ]]; then') && commit < branchEnd, 'inside the pull branch (CI makes no git call)');
+  });
+
+  // The runbook's はじめに asks the owner to compare the 7 characters GitHub shows with this line; git's own
+  // length grows with the clone (8 from about 16,000 objects), which core.abbrev=12 stands in for here.
+  const hasGit = spawnSync('git', ['--version']).status === 0;
+  it('the commit line prints the 7 characters GitHub shows, also where git would print more (real git, core.abbrev=12)', { skip: hasGit ? false : 'git is not installed' }, () => {
+    const line = /^ {2}(echo "==> デプロイするコミット: .*)$/m.exec(code)?.[1];
+    assert.ok(line, 'the commit line');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-commit-'));
+    try {
+      const when = '2026-10-30T12:00:00+0000';
+      const env = {
+        PATH: process.env.PATH, HOME: dir, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: path.join(dir, 'gitconfig'),
+        GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_AUTHOR_DATE: when,
+        GIT_COMMITTER_NAME: 'test', GIT_COMMITTER_EMAIL: 'test@example.invalid', GIT_COMMITTER_DATE: when,
+      };
+      const git = (/** @type {string[]} */ ...args) => spawnSync('git', ['-C', dir, ...args], { env, encoding: 'utf8' });
+      assert.equal(git('init', '-q').status, 0);
+      assert.equal(git('config', 'core.abbrev', '12').status, 0);
+      assert.equal(git('commit', '-q', '--allow-empty', '-m', 'Phase 9 test commit').status, 0);
+      const full = git('rev-parse', 'HEAD').stdout.trim();
+      assert.equal(git('log', '-1', '--format=%h').stdout.trim().length, 12, 'git alone prints 12 characters in this clone');
+      const r = spawnSync('bash', ['-c', line], { env: { ...env, REPO_ROOT: dir }, encoding: 'utf8' });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, `==> デプロイするコミット: ${full.slice(0, 7)}（2026-10-30・Phase 9 test commit）\n`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('DB0, DB1: after db is healthy and before the migration; no answer (DB0) and another encoding (DB1) stop the deploy with the catalog\'s lines', () => {
+    const at = code.indexOf('DB_ENCODING="$(compose exec -T db sh -c \'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SHOW server_encoding"\' 2> /dev/null | tr -d \'[:space:]\' || true)"');
+    assert.ok(at > code.indexOf('compose up -d --wait db') && at < code.indexOf('npm run db:migrate'), 'between db up and db:migrate');
+    const guard = code.slice(at, code.indexOf('npm run db:migrate'));
+    // The shell escapes the fix's backquotes; the printed line is the catalog's text.
+    const lines = (/** @type {string} */ name) => {
+      const db = /** @type {{ title: string, fix: string }} */ (DEPLOY_CODES.find((c) => c.code === name));
+      return `  echo "❌ [${name}] ${db.title}"\n  echo "   直し方: ${db.fix.replace(/`/g, '\\`')}"\n  echo "   くわしく: 手順書 13 章の「${name}」"\n  exit 1`;
+    };
+    const empty = guard.indexOf('if [[ -z "${DB_ENCODING}" ]]; then');
+    const other = guard.indexOf('if [[ "${DB_ENCODING}" != UTF8 ]]; then');
+    assert.ok(empty > 0 && other > empty, 'the empty answer first');
+    assert.ok(guard.slice(empty, other).includes(lines('DB0')), 'DB0: the catalog\'s title and fix');
+    assert.ok(guard.slice(other).includes(lines('DB1')), 'DB1: the catalog\'s title and fix');
+  });
+
+  // Review round 1 of Stage 2, finding 5: a tunnel that never connects stops the wait before the 事後の確かめ.
+  it('the wait before the smoke: a failure prints P5\'s catalog lines when tunnel is listed and cloudflared is not healthy, then the stop line', () => {
+    const at = code.indexOf('if ! compose up -d --wait "${WAIT[@]}"; then');
+    assert.ok(at > 0 && at < code.indexOf('node scripts/smoke-vm-stack.mjs'));
+    const handler = code.slice(at, code.indexOf('\nfi\n', at));
+    const p5 = /** @type {{ title: string, fix: string }} */ (POSTDEPLOY_CODES.find((c) => c.code === 'P5'));
+    assert.ok(handler.includes(`    echo "❌ [P5] ${p5.title}"\n    echo "   直し方: ${p5.fix.replace(/`/g, '\\`')}"\n    echo "   くわしく: 手順書 13 章の「P5」"`), 'P5: the catalog\'s text');
+    assert.ok(handler.includes('"$(compose ps --format \'{{.Health}}\' cloudflared 2> /dev/null | head -n 1 || true)" != healthy'));
+    assert.match(handler, /echo "❌ 待っていた部品が healthy になりませんでした（Rise Path は、もう新しい版に入れ替わっています）。"\n.*\n\s*exit 1$/);
+  });
+
+  it('T11: the 事後の確かめ runs after the smoke and before Done, with the caller values and the deploy\'s profiles', () => {
+    const call = [
+      'if ! "${BASH}" "${SCRIPT_DIR}/postdeploy-check.sh" --from-deploy \\',
+      '    --caller-skip-pull "${RISEPATH_CALLER_SKIP_PULL}" --caller-project "${RISEPATH_CALLER_PROJECT}" \\',
+      '    --stack-sha "${RISEPATH_STACK_ENV_SHA}" --profiles "${COMPOSE_PROFILES}"; then',
+      '  echo "❌ デプロイは終わりましたが、確かめで問題が見つかりました。上のコードを手順書 13 章で見てください。"',
+      '  exit 1',
+      'fi',
+    ].join('\n');
+    const at = code.indexOf(call);
+    assert.ok(at > code.indexOf('node scripts/smoke-vm-stack.mjs'), 'after the smoke');
+    assert.ok(at < code.indexOf('echo "==> Done"'), 'before Done');
+  });
+
+  // --- T12: the whole script with stubs ---------------------------------------------------------------
+
+  it('unset (the VM): the 事前チェック (prod), then git pull --ff-only before any compose call; a detached checkout stops the deploy there', { skip }, () => {
     const vm = runDeploy();
     assert.equal(vm.status, 0, vm.out);
     assert.deepEqual(vm.git.filter((line) => line.endsWith(' pull --ff-only')).length, 1);
     const pullAt = vm.calls.findIndex((line) => line.endsWith(' pull --ff-only'));
-    assert.ok(pullAt >= 0 && pullAt < vm.calls.findIndex((line) => line.startsWith('docker ')), 'the pull comes first');
+    const runAt = vm.calls.findIndex((line) => / run --rm -i --network none /.test(line));
+    assert.ok(runAt >= 0 && runAt < pullAt, 'the 事前チェック comes first');
+    assert.ok(pullAt < vm.calls.findIndex((line) => / compose /.test(line)), 'the pull comes before any compose call');
     assert.deepEqual(vm.compose, VM_SEQUENCE);
+    assert.deepEqual(vm.runs.map(modeOf), ['prod'], 'T12d: one check, production rules');
     assert.match(vm.out, /==> git pull\n/);
+    assert.match(vm.out, /==> デプロイするコミット: bbbbbbb（2026-10-30・the pulled commit）\n/);
     assert.doesNotMatch(vm.out, /git pull skipped/);
 
     const detached = runDeploy({ pullFails: true });
     assert.equal(detached.status, 1, detached.out);
     assert.match(detached.out, /You are not currently on a branch/);
-    assert.deepEqual(detached.docker, [], 'nothing built or started');
+    assert.deepEqual(detached.compose, [], 'nothing built or started');
   });
 
-  it('unset (the VM), HEAD moved by the pull: one re-run of the pulled script, which pulls again and deploys once', { skip }, () => {
+  it('unset (the VM), HEAD moved by the pull: one re-run of the pulled script, which checks, pulls again and deploys once', { skip }, () => {
     const moved = runDeploy({ moving: true });
     assert.equal(moved.status, 0, moved.out);
     assert.equal(moved.out.match(/==> HEAD moved — re-running the pulled deploy-stack\.sh/g)?.length, 1, 'one re-run');
     assert.equal(moved.git.filter((line) => line.endsWith(' pull --ff-only')).length, 2, 'the re-run pulls again (HEAD no longer moves)');
-    assert.equal(moved.git.length, 6, moved.git.join('\n'));
+    // T12e: 6 before Phase 9, plus the commit line (the re-run only) and the deploy record's commit (P13).
+    assert.equal(moved.git.length, 8, moved.git.join('\n'));
+    assert.equal(moved.out.match(/==> デプロイするコミット: /g)?.length, 1, 'only the run that deploys names the commit');
     assert.deepEqual(moved.compose, VM_SEQUENCE, 'built and deployed once, by the re-run');
+    assert.deepEqual(moved.runs.map(modeOf), ['prod', 'prod'], 'the first run and the pulled re-run each check before sourcing');
+    assert.equal(JSON.parse(/** @type {{ text: string }} */ (moved.record).text).commit, SHA_B, 'P13 records the pulled commit');
   });
 
-  it('RISEPATH_DEPLOY_SKIP_PULL=1 skips only the pull: no git call, then the same compose sequence', { skip }, () => {
+  it('RISEPATH_DEPLOY_SKIP_PULL=1 with the CI project skips only the pull: CI mode, no git call, the same compose sequence', { skip }, () => {
     for (const moving of [false, true]) {
-      const ci = runDeploy({ skipPull: '1', moving });
+      const ci = runDeploy({ skipPull: '1', moving, env: CI_CALLER });
       assert.equal(ci.status, 0, ci.out);
-      assert.deepEqual(ci.git, [], 'no git call: no pull, no re-run');
-      assert.deepEqual(ci.compose, VM_SEQUENCE);
+      assert.deepEqual(ci.git, [], 'T12d: no git call: no pull, no re-run, no commit line, no deploy record');
+      assert.deepEqual(ci.compose, CI_SEQUENCE);
+      assert.deepEqual(ci.runs.map(modeOf), ['ci'], 'T12d: CI mode');
+      assert.equal(ci.record, null, 'no deploy record in CI mode');
       assert.match(ci.out, /==> git pull skipped \(RISEPATH_DEPLOY_SKIP_PULL=1\): deploying the checked-out commit\n/);
-      assert.doesNotMatch(ci.out, /==> git pull\n|HEAD moved/);
+      assert.doesNotMatch(ci.out, /==> git pull\n|HEAD moved|デプロイするコミット/);
     }
+    // Without the CI project (or with any other of the four conditions missing) the rules are production's.
+    const noProject = runDeploy({ skipPull: '1' });
+    assert.equal(noProject.status, 0, noProject.out);
+    assert.deepEqual(noProject.runs.map(modeOf), ['prod']);
+    assert.deepEqual(noProject.git.filter((line) => / pull /.test(line)), [], 'the pull is still skipped');
   });
 
   it('only exactly 1 skips: true, yes, 0, 01, " 1" and an empty value still pull', { skip }, () => {
@@ -1200,36 +1475,260 @@ describe('deploy-stack.sh: the CI pull opt-out (Phase 7, owner decision P3)', ()
     }
   });
 
-  it('stack.env cannot turn the pull off, and a stack.env that assigns the read-only name stops before any docker call', { skip }, () => {
-    const template = read(path.join(STACK, 'ci/stack.ci.env'));
-    const viaEnv = runDeploy({ stackEnv: `${template}RISEPATH_DEPLOY_SKIP_PULL=1\n` });
+  it('stack.env cannot turn the pull off, and a stack.env that assigns a read-only name stops before any compose call', { skip }, () => {
+    const viaEnv = runDeploy({ stackEnv: `${TEMPLATE}RISEPATH_DEPLOY_SKIP_PULL=1\n` });
     assert.equal(viaEnv.status, 0, viaEnv.out);
     assert.equal(viaEnv.git.filter((line) => line.endsWith(' pull --ff-only')).length, 1, 'stack.env is read after the variable');
 
-    for (const line of ['RISEPATH_CALLER_SKIP_PULL=1', 'export RISEPATH_CALLER_SKIP_PULL=1']) {
-      const internal = runDeploy({ stackEnv: `${template}${line}\n` });
+    for (const line of ['RISEPATH_CALLER_SKIP_PULL=1', 'export RISEPATH_CALLER_SKIP_PULL=1', 'RISEPATH_CALLER_PROJECT=risepath-ci', 'RISEPATH_CALLER_EXPORTS=', `RISEPATH_STACK_ENV_SHA=${'0'.repeat(64)}`]) {
+      const internal = runDeploy({ stackEnv: `${TEMPLATE}${line}\n` });
       assert.notEqual(internal.status, 0, `${line}: ${internal.out}`);
-      assert.match(internal.out, /RISEPATH_CALLER_SKIP_PULL: readonly variable/, line);
-      assert.deepEqual(internal.docker, [], `${line}: nothing built or started`);
+      assert.match(internal.out, /RISEPATH_(?:CALLER_[A-Z_]+|STACK_ENV_SHA): readonly variable/, line);
+      assert.deepEqual(internal.compose, [], `${line}: nothing built or started`);
       assert.deepEqual(internal.git, [], `${line}: stopped at source stack.env`);
     }
   });
 
+  it('stack.env cannot select CI mode (the real 事前チェック): the template plus RISEPATH_DEPLOY_SKIP_PULL=1 is checked as production and stops (A2, C9)', { skip }, () => {
+    for (const env of [{}, CI_CALLER]) {
+      const r = runDeploy({ stackEnv: `${TEMPLATE}RISEPATH_DEPLOY_SKIP_PULL=1\n`, preflight: 'real', env });
+      assert.equal(r.status, 1, r.out);
+      assert.deepEqual(r.runs.map(modeOf), ['prod']);
+      assert.match(r.out, /^❌ \[A2\] /m);
+      assert.match(r.out, /^❌ \[C9\] .*RISEPATH_DEPLOY_SKIP_PULL/m);
+      assert.match(r.out, /^❌ 事前チェックで止めました。/m);
+      assert.deepEqual(r.git, [], 'stopped before the pull');
+      assert.deepEqual(r.compose, [], 'nothing built or started');
+    }
+  });
+
+  it('T12a: a failing 事前チェック stops the deploy before the pull and before any compose call', { skip }, () => {
+    for (const opts of [{}, { skipPull: '1', env: CI_CALLER }, { moving: true }]) {
+      const r = runDeploy({ ...opts, preflight: 'fail' });
+      assert.equal(r.status, 1, r.out);
+      assert.match(r.out, /^❌ 事前チェックで止めました。上の直し方を見てください（何も変えていません）。$/m);
+      assert.deepEqual(r.git, [], 'no git call');
+      assert.deepEqual(r.compose, [], 'no compose line');
+      assert.equal(r.record, null);
+    }
+  });
+
+  it('T12a (design §2.7): a 事前チェック that could not check (exit 2, 3) stops the deploy like an error; as root, X5 stops it before the pull', { skip }, () => {
+    for (const preflightStatus of [2, 3]) {
+      const r = runDeploy({ preflight: 'fail', preflightStatus });
+      assert.equal(r.status, 1, `${preflightStatus}: ${r.out}`);
+      assert.match(r.out, /^❌ 事前チェックで止めました。/m, String(preflightStatus));
+      assert.deepEqual([r.git, r.compose, r.record], [[], [], null], String(preflightStatus));
+    }
+    // The real preflight.sh as uid 0 (design §2.2: a root deploy would also leave root-owned files in .git
+    // and .deploy/): X5, no docker call at all, nothing pulled, built or recorded.
+    const root = runDeploy({ preflight: 'real', uid: 0 });
+    assert.equal(root.status, 1, root.out);
+    assert.match(root.out, /^❌ \[X5\] 事前チェックは sudo なしで実行します/m);
+    assert.match(root.out, /^❌ 事前チェックで止めました。/m);
+    assert.deepEqual([root.git, root.docker, root.record], [[], [], null]);
+    assert.equal(root.preflightArgv.length, 1, 'the check ran once');
+  });
+
+  it('T12b: a bare value line in stack.env (the real 事前チェック) is A9 and is never printed; bash never runs the line', { skip }, () => {
+    const S = `SENTINELX9F3${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    const r = runDeploy({ stackEnv: `${TEMPLATE}${S}\n`, preflight: 'real' });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /^❌ \[A9\] stack\.env の \d+ 行目が読めません/m);
+    assert.ok(!r.out.includes(S), 'the sentinel is in neither stdout nor stderr');
+    assert.doesNotMatch(r.out, /command not found/, 'bash never sourced the file');
+    assert.deepEqual(r.git, [], 'no git call');
+    assert.deepEqual(r.compose, []);
+  });
+
+  it('the real 事前チェック in CI mode passes the CI template with the four conditions, and the deploy goes on', { skip }, () => {
+    const r = runDeploy({ skipPull: '1', env: CI_CALLER, preflight: 'real' });
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /^（CI モード: 本番だけの決まりを飛ばしています）$/m);
+    assert.deepEqual(r.compose, CI_SEQUENCE);
+  });
+
+  it('T12c: the re-run takes the caller values the first run forwarded, never the names stack.env exported', { skip }, () => {
+    // The template sets COMPOSE_PROJECT_NAME=risepath-ci and COMPOSE_PROFILES= (empty); the caller has no
+    // project and COMPOSE_PROFILES=tts. Sourced with set -a, both reach the re-run's environment.
+    const r = runDeploy({ moving: true, env: { COMPOSE_PROFILES: 'tts', P9_CALLER_ONLY_X: '1' } });
+    assert.equal(r.status, 0, r.out);
+    assert.equal(r.preflightArgv.length, 2, 'the first run and the re-run');
+    const [first, rerun] = r.preflightArgv;
+    assert.deepEqual(rerun, first, 'the same caller values on both runs');
+    assert.equal(flagOf(rerun, '--caller-project'), '', 'forwarded, not stack.env\'s risepath-ci');
+    assert.equal(flagOf(rerun, '--caller-profiles'), 'tts', 'forwarded, not stack.env\'s empty list');
+    assert.equal(flagOf(rerun, '--caller-skip-pull'), '');
+    const exports = flagOf(rerun, '--caller-exports').split(' ');
+    assert.ok(exports.includes('P9_CALLER_ONLY_X') && exports.includes('COMPOSE_PROFILES'), 'the caller\'s exported names');
+    for (const name of ['COMPOSE_PROJECT_NAME', 'POSTGRES_PASSWORD', 'DATABASE_URL_PHASE1', 'RISEPATH_DEPLOY_REEXEC', 'RISEPATH_REEXEC_PROJECT']) {
+      assert.ok(!exports.includes(name), `${name}: not the caller's`);
+    }
+    assert.deepEqual(r.postdeployArgv, [['--from-deploy', '--caller-skip-pull', '', '--caller-project', '', '--stack-sha', r.stackSha, '--profiles', '']], 'the 事後の確かめ gets the same values');
+    assert.deepEqual(r.runs.map(modeOf), ['prod', 'prod']);
+  });
+
+  it('T12e: DB1 answers SQL_ASCII → the deploy stops before db:migrate with the DB1 lines; no answer is DB0, never DB1', { skip }, () => {
+    const r = runDeploy({ dbEncoding: 'SQL_ASCII' });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /^❌ \[DB1\] DB の文字コードが UTF8 ではありません/m);
+    assert.deepEqual(r.compose, VM_SEQUENCE.slice(0, VM_SEQUENCE.indexOf(DB1) + 1), 'nothing after the DB1 query');
+    for (const encoding of ['utf8', 'UTF8 x', 'LATIN1']) {
+      const other = runDeploy({ dbEncoding: encoding });
+      assert.equal(other.status, 1, JSON.stringify(encoding));
+      assert.match(other.out, /^❌ \[DB1\] /m, JSON.stringify(encoding));
+      assert.doesNotMatch(other.out, /\[DB0\]/, JSON.stringify(encoding));
+    }
+    // Review round 1 of Stage 2, findings 2, 6, 10: an empty answer or a failed exec says nothing about the
+    // encoding, so it never prints DB1's advice to make the DB again.
+    for (const encoding of ['', ' \n ', null]) {
+      const none = runDeploy({ dbEncoding: encoding });
+      assert.equal(none.status, 1, `${JSON.stringify(encoding)}: ${none.out}`);
+      assert.match(none.out, /^❌ \[DB0\] DB に文字コードをたずねましたが、答えがありませんでした（DB はまだ変わっていません）。$/m, JSON.stringify(encoding));
+      assert.doesNotMatch(none.out, /\[DB1\]|作り直します/, JSON.stringify(encoding));
+      assert.deepEqual(none.compose, VM_SEQUENCE.slice(0, VM_SEQUENCE.indexOf(DB1) + 1), `${JSON.stringify(encoding)}: nothing after the query`);
+    }
+  });
+
+  // Review round 1 of Stage 2, finding 3: an edit to stack.env during the deploy (a second SSH session) is
+  // never recorded as checked; the next 事前チェック still sees the old record, and the owner deploys again.
+  it('P16: stack.env edited between the 事前チェック and P13 → no record, P16, the deploy fails; unedited → the record has the hash taken before the check', { skip }, () => {
+    for (const editOn of [' build', 'up -d --wait mcp', 'postdeploy-probe.mjs']) {
+      const r = runDeploy({ editOn });
+      assert.equal(r.status, 1, `${editOn}: ${r.out}`);
+      assert.match(r.out, /^❌ \[P16\] デプロイの途中で stack\.env が変わったので、通ったデプロイを記録しませんでした。$/m, editOn);
+      assert.match(r.out, /^❌ デプロイは終わりましたが、確かめで問題が見つかりました。/m, editOn);
+      assert.equal(r.record, null, `${editOn}: no record`);
+      assert.doesNotMatch(r.out, /\[P13\]|==> Done/, editOn);
+      const given = flagOf(r.postdeployArgv[0], '--stack-sha');
+      assert.match(given, /^[0-9a-f]{64}$/);
+      assert.notEqual(given, r.stackSha, `${editOn}: the file changed after the hash`);
+    }
+    const moved = runDeploy({ moving: true });
+    assert.equal(moved.status, 0, moved.out);
+    assert.equal(JSON.parse(/** @type {{ text: string }} */ (moved.record).text).stackEnvSha256, moved.stackSha, 'the re-run hashes before its own check');
+  });
+
+  // Review round 1 of Stage 2, finding 5.
+  it('the wait fails: with tunnel listed and cloudflared not healthy, P5\'s lines and the stop line; no smoke, no 事後の確かめ, no record', { skip }, () => {
+    const tunnelEnv = TEMPLATE.replace(/^COMPOSE_PROFILES=$/m, 'COMPOSE_PROFILES=tts,tunnel').replace(/^ORIGIN_SECRET=$/m, `ORIGIN_SECRET=${'5'.repeat(64)}`)
+      .replace(/^LLM_ALLOWED_ORIGINS=$/m, 'LLM_ALLOWED_ORIGINS=https://app.example.org');
+    const tunnel = { 'tunnel.env': 'TUNNEL_TOKEN=tunnel0123456789\n' };
+    const p5 = /** @type {{ title: string, fix: string }} */ (POSTDEPLOY_CODES.find((c) => c.code === 'P5'));
+    const ok = runDeploy({ stackEnv: tunnelEnv, files: tunnel });
+    assert.equal(ok.status, 0, ok.out);
+    assert.ok(ok.compose.includes('up -d --wait mcp kokoro-tts cloudflared'), ok.compose.join('\n'));
+    for (const cloudflaredHealth of ['unhealthy', 'starting', '']) {
+      const r = runDeploy({ stackEnv: tunnelEnv, files: tunnel, waitFails: true, cloudflaredHealth });
+      assert.equal(r.status, 1, r.out);
+      assert.match(r.out, /dependency failed to start/, 'Compose\'s own line stays');
+      assert.ok(r.out.includes(`❌ [P5] ${p5.title}\n   直し方: ${p5.fix}\n   くわしく: 手順書 13 章の「P5」\n`), r.out);
+      assert.match(r.out, /^❌ 待っていた部品が healthy になりませんでした（Rise Path は、もう新しい版に入れ替わっています）。$/m);
+      assert.ok(!r.compose.some((line) => line.includes('smoke-vm-stack.mjs')), 'no smoke');
+      assert.deepEqual([r.postdeployArgv, r.record], [[], null], 'no 事後の確かめ, no record');
+    }
+    // cloudflared healthy (another part failed), or no tunnel: the stop line without P5.
+    for (const opts of [{ stackEnv: tunnelEnv, files: tunnel, cloudflaredHealth: 'healthy' }, { stackEnv: TEMPLATE.replace(/^COMPOSE_PROFILES=$/m, 'COMPOSE_PROFILES=tts') }]) {
+      const r = runDeploy({ ...opts, waitFails: true });
+      assert.equal(r.status, 1, r.out);
+      assert.doesNotMatch(r.out, /^❌ \[P5\]/m);
+      assert.match(r.out, /^❌ 待っていた部品が healthy になりませんでした/m);
+    }
+    assert.ok(!runDeploy({ stackEnv: TEMPLATE.replace(/^COMPOSE_PROFILES=$/m, 'COMPOSE_PROFILES=tts'), waitFails: true }).docker.some((line) => line.includes('{{.Health}}')), 'cloudflared is not asked without tunnel');
+  });
+
+  // Review round 1 of Stage 2, finding 4: the caller's shell picks the Compose project and the Docker daemon.
+  it('F12 (the real 事前チェック, production rules): a caller COMPOSE_PROJECT_NAME, COMPOSE_FILE, DOCKER_HOST or DOCKER_CONTEXT stops the deploy before any git or compose call', { skip }, () => {
+    // The fixtures' finished stack at setup, its record dated in the past (A12 refuses a date after today).
+    const stage = buildFiles('setup');
+    const stackEnv = stage['stack.env'];
+    const files = { 'tunnel.env': stage['tunnel.env'], 'launch-record.env': stage['launch-record.env'].replace(/=\d{4}-\d{2}-\d{2}$/gm, '=2026-01-05') };
+    const clean = runDeploy({ stackEnv, files, preflight: 'real', env: { GIT_SSH_COMMAND: 'ssh -i key', COMPOSE_PROFILES: 'tts' } });
+    assert.equal(clean.status, 0, clean.out);
+    assert.doesNotMatch(clean.out, /\[F12\]/);
+    assert.deepEqual(clean.runs.map(modeOf), ['prod']);
+    assert.ok(clean.compose.length > 0, 'the control deploys');
+    for (const [name, value] of [['COMPOSE_PROJECT_NAME', 'risepath-old'], ['COMPOSE_PROJECT_NAME', 'risepath'], ['COMPOSE_FILE', 'other.yml'], ['DOCKER_HOST', 'tcp://10.0.0.9:2375'], ['DOCKER_CONTEXT', 'other']]) {
+      const r = runDeploy({ stackEnv, files, preflight: 'real', env: { [name]: value } });
+      assert.equal(r.status, 1, `${name}: ${r.out}`);
+      assert.match(r.out, new RegExp(`^❌ \\[F12\\] このシェルに、デプロイの道具（Compose、Docker）の動きを変える値があります（${name}。`, 'm'), name);
+      assert.ok(!r.out.includes(value === 'risepath' ? '\u0000' : value), `${name}: the value is never printed`);
+      assert.match(r.out, /^❌ 事前チェックで止めました。/m);
+      assert.deepEqual([r.git, r.compose, r.record], [[], [], null], name);
+    }
+  });
+
+  it('the 事後の確かめ: errors fail the deploy after the stack is up (no Done, no record); a clean production deploy writes the record', { skip }, () => {
+    for (const probeStatus of [10, 11, 1, 125]) {
+      const r = runDeploy({ probeStatus });
+      assert.equal(r.status, 1, `${probeStatus}: ${r.out}`);
+      assert.match(r.out, /^❌ デプロイは終わりましたが、確かめで問題が見つかりました。上のコードを手順書 13 章で見てください。$/m);
+      assert.doesNotMatch(r.out, /==> Done/);
+      assert.equal(r.record, null, `${probeStatus}: no deploy record`);
+    }
+    const ok = runDeploy();
+    assert.equal(ok.status, 0, ok.out);
+    const record = /** @type {{ text: string, mode: number, dirMode: number }} */ (ok.record);
+    assert.deepEqual(Object.keys(JSON.parse(record.text)), ['at', 'commit', 'stackEnvSha256'], 'TR2: { at, commit, stackEnvSha256 }');
+    assert.equal(JSON.parse(record.text).stackEnvSha256, ok.stackSha, 'the SHA-256 of stack.env, as the 事前チェック computes it (F5)');
+    assert.equal(JSON.parse(record.text).commit, SHA_A);
+    assert.match(JSON.parse(record.text).at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    assert.deepEqual([record.mode, record.dirMode], [0o644, 0o755]);
+    assert.match(ok.out, /^ℹ️ \[P13\] 通ったデプロイを記録しました/m);
+    assert.deepEqual(ok.probeFacts, [{ profiles: '', cloudflared: '', unitStack: 'enabled', retentionLines: 1 }]);
+  });
+
+  it('T12f: with COMPOSE_PROFILES=tts the deploy waits for kokoro-tts and the 事後の確かめ runs its tts branch (P4 asks the sidecar)', { skip }, () => {
+    const r = runDeploy({ stackEnv: TEMPLATE.replace(/^COMPOSE_PROFILES=$/m, 'COMPOSE_PROFILES=tts') });
+    assert.equal(r.status, 0, r.out);
+    assert.ok(r.compose.includes('up -d --wait mcp kokoro-tts'), r.compose.join('\n'));
+    assert.deepEqual(r.postdeployArgv.map((a) => flagOf(a, '--profiles')), ['tts']);
+    assert.deepEqual(r.probeFacts.map((f) => f.profiles), ['tts']);
+  });
+
+  it('T5b: the 事前チェック\'s effective profiles equal what deploy-stack.sh gives Compose', { skip }, () => {
+    const without = TEMPLATE.replace(/^COMPOSE_PROFILES=\n/m, '');
+    assert.notEqual(without, TEMPLATE);
+    const memanto = TEMPLATE.replace(/^MEMANTO_ENABLED=false$/m, 'MEMANTO_ENABLED=true').replace(/^MEMANTO_SECRET_KEY=$/m, `MEMANTO_SECRET_KEY=${'7'.repeat(40)}`);
+    const cases = [
+      { stackEnv: TEMPLATE, caller: 'tts' },
+      { stackEnv: TEMPLATE, caller: undefined },
+      { stackEnv: without, caller: 'tts' },
+      { stackEnv: without, caller: '' },
+      { stackEnv: without, caller: undefined },
+      { stackEnv: without, caller: ' tts ' },
+      { stackEnv: TEMPLATE.replace(/^COMPOSE_PROFILES=$/m, 'COMPOSE_PROFILES=tts'), caller: 'tts,full' },
+      { stackEnv: TEMPLATE.replace(/^COMPOSE_PROFILES=$/m, 'export COMPOSE_PROFILES="tts"'), caller: '' },
+      { stackEnv: memanto.replace(/^COMPOSE_PROFILES=$/m, 'COMPOSE_PROFILES=tts'), caller: '' },
+      { stackEnv: memanto.replace(/^COMPOSE_PROFILES=\n/m, ''), caller: 'tts' },
+    ];
+    const norm = (/** @type {string} */ v) => v.split(',').map((p) => p.trim()).filter(Boolean).join(',');
+    for (const { stackEnv, caller } of cases) {
+      const r = runDeploy({ stackEnv, env: caller === undefined ? {} : { COMPOSE_PROFILES: caller } });
+      assert.equal(r.status, 0, `${caller}: ${r.out}`);
+      const build = r.composeRaw.find((line) => line.endsWith(' build'));
+      assert.ok(build, r.composeRaw.join('\n'));
+      const given = /^docker \[[^|]*\|([^\]]*)\]/.exec(/** @type {string} */ (build))?.[1] ?? '';
+      const engine = effectiveProfiles({ stackEnv: entryMap(parseEnvText(stackEnv).entries), callerProfiles: caller ?? '' });
+      assert.equal(norm(given), engine.join(','), `stack.env ${JSON.stringify(stackEnv.match(/^.*COMPOSE_PROFILES.*$/m)?.[0] ?? '(no line)')}, caller ${JSON.stringify(caller)}`);
+    }
+  });
+
   it('the CI env template passes every guard, deploys the risepath-ci project and starts no profile', { skip }, () => {
-    const ci = runDeploy({ skipPull: '1' });
+    const ci = runDeploy({ skipPull: '1', env: CI_CALLER });
     assert.equal(ci.status, 0, ci.out);
     assert.match(ci.out, /==> Billing sales: off /);
     assert.match(ci.out, /==> COMPOSE_PROFILES has no full: Hermes is not started/);
     assert.match(ci.out, /MEMANTO_SECRET_KEY unset — skipping Memanto overlay/);
     assert.doesNotMatch(ci.out, /❌|Public edge|byoa profile enabled|Memanto overlay enabled/);
-    assert.ok(ci.docker.length > 0);
-    for (const line of ci.docker) assert.match(line, /^docker \[risepath-ci\|\] compose /, 'project risepath-ci from stack.env, no profile');
+    assert.ok(ci.composeRaw.length > 0);
+    for (const line of ci.composeRaw) assert.match(line, /^docker \[risepath-ci\|\] compose /, 'project risepath-ci, no profile');
     assert.ok(!ci.compose.some((line) => line.includes('memanto')), 'one compose file');
 
-    const placeholder = runDeploy({ skipPull: '1', stackEnv: read(path.join(STACK, 'ci/stack.ci.env')).replace('ci-dummy-bridge-token', 'change-me') });
+    const placeholder = runDeploy({ skipPull: '1', stackEnv: TEMPLATE.replace('ci-dummy-bridge-token', 'change-me') });
     assert.equal(placeholder.status, 1, 'the placeholder guard still runs with the opt-out');
     assert.match(placeholder.out, /RISE_PATH_BRIDGE_TOKEN/);
-    assert.deepEqual(placeholder.docker, []);
+    assert.deepEqual(placeholder.compose, []);
   });
 });
 
@@ -1317,5 +1816,209 @@ describe('LEGAL_TERMS_REQUIRED: compose and env wiring (Phase 8)', () => {
     const training = stack.slice(stack.indexOf('# --- Job training'), stack.indexOf('# TRAINING_ENABLED=true'));
     assert.match(training.split('\n').map((line) => line.replace(/^#\s?/, '')).join(' '), /exactly true \(TRUE, 1 or yes keep it off\)/);
     assert.match(read(path.join(ROOT, 'server/routes/training.js')), /env\.TRAINING_ENABLED === 'true'/);
+  });
+});
+
+// Phase 9 (owner decision D2): the 事前チェック wrapper. The rules run in the api's base image with no
+// network, a read-only file system, every capability dropped and the caller's uid (never root: root
+// without CAP_DAC_OVERRIDE cannot open the deploy user's 0600 env files, and a root deploy would leave
+// root-owned files in the checkout). CI mode needs all four conditions of check-mode.sh. The end-to-end
+// runs with a docker shim are in preflightCli.test.js (T8); these are the static pins (T11).
+describe('preflight.sh and check-mode.sh: the wrapper pins (Phase 9, D2)', () => {
+  const script = read(path.join(STACK, 'scripts/preflight.sh'));
+  const mode = read(path.join(STACK, 'scripts/check-mode.sh'));
+  const code = (/** @type {string} */ text) => text.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+
+  it('runs under set -euo pipefail and parses with bash -n', () => {
+    assert.match(script, /^set -euo pipefail$/m);
+    for (const file of ['scripts/preflight.sh', 'scripts/check-mode.sh']) {
+      const check = spawnSync('bash', ['-n', path.join(STACK, file)], { encoding: 'utf8' });
+      assert.equal(check.status, 0, `${file}: ${check.stderr}`);
+    }
+  });
+
+  // Review round 2, finding 6: the runbook runs them as ./scripts/<name>, so a lost exec bit is 'Permission denied'.
+  it('preflight.sh, postdeploy-check.sh and deploy-stack.sh are executable in the tree, and in git once tracked (100755)', () => {
+    for (const file of ['scripts/preflight.sh', 'scripts/postdeploy-check.sh', 'scripts/deploy-stack.sh']) {
+      assert.ok(fs.statSync(path.join(STACK, file)).mode & 0o100, `${file}: owner exec bit`);
+      const staged = spawnSync('git', ['ls-files', '-s', `deploy/risepath-vm/${file}`], { cwd: ROOT, encoding: 'utf8' });
+      if (staged.status === 0 && staged.stdout.trim() !== '') assert.match(staged.stdout, /^100755 /, `${file}: git mode`);
+    }
+  });
+
+  it('refuses uid 0 before any docker call', () => {
+    const body = code(script);
+    const refusal = body.indexOf('if [[ "$(id -u)" -eq 0 ]]; then');
+    assert.ok(refusal > 0, 'the uid 0 refusal');
+    assert.match(body.slice(refusal, body.indexOf('fi', refusal)), /say_code X5 [\s\S]*exit 2/);
+    const firstDocker = body.search(/(?:^|[\s|(])docker /m);
+    assert.ok(firstDocker > refusal, 'no docker call before the refusal');
+  });
+
+  it('the container: no network, read-only, every capability dropped, no new privileges, the caller\'s uid, limits', () => {
+    const run = code(script).slice(code(script).indexOf('docker run'));
+    for (const flag of ['--rm -i', '--network none', '--read-only', '--cap-drop ALL', '--security-opt no-new-privileges', '--pids-limit 64', '--memory 256m', '--user "$(id -u):$(id -g)"']) {
+      assert.ok(run.includes(flag), flag);
+    }
+    assert.ok(!/(?:^|\s)(?:-v|--volume|--privileged|--cap-add|--network host)\b/m.test(code(script)), 'no -v, no added capability, no host network');
+  });
+
+  it('mounts only this folder and scripts/deploy, both read-only, with --mount (a missing source is an error)', () => {
+    const mounts = [...code(script).matchAll(/--mount "([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(mounts, ['type=bind,src=${STACK_DIR},dst=/stack,readonly', 'type=bind,src=${REPO_ROOT}/scripts/deploy,dst=/preflight,readonly']);
+    assert.match(code(script), /"\$\{IMAGE\}" node \/preflight\/preflight-vm\.mjs --stack \/stack --mode "\$\{MODE\}" \|\| status=\$\?$/m);
+  });
+
+  it('takes the image from the Dockerfile\'s api line (one source, as scripts/ci/stack.sh auth)', () => {
+    // `2> /dev/null … || true`: a missing Dockerfile reaches the X1 branch instead of stopping set -e (review round 2, finding 3).
+    assert.ok(script.includes(`IMAGE="$(sed -nE 's/^FROM ([^ ]+) AS api$/\\1/p' "\${STACK_DIR}/Dockerfile" 2> /dev/null | head -n 1 || true)"`));
+    assert.match(code(script), /IMAGE="[^\n]*\n\s*if \[\[ -z "\$\{IMAGE\}" \]\]; then\n\s*say_code X1 /);
+    assert.match(read(path.join(STACK, 'Dockerfile')), /^FROM node:22-slim AS api$/m);
+  });
+
+  it('selects the mode only through check-mode.sh, sourced from this folder, and never sources an env file', () => {
+    assert.match(code(script), /^source "\$\{SCRIPT_DIR\}\/check-mode\.sh"$/m);
+    assert.match(code(script), /^MODE="\$\(risepath_check_mode "\$\{FROM_DEPLOY\}" "\$\{CALLER_SKIP_PULL\}" "\$\{CALLER_PROJECT\}" "\$\{STACK_DIR\}"\)"$/m);
+    assert.equal([...code(script).matchAll(/^\s*(?:source|\.)\s/gm)].length, 1, 'check-mode.sh is the only file it sources');
+  });
+
+  it('check-mode.sh needs all four conditions in one test', () => {
+    const body = code(mode);
+    for (const part of ['"${from_deploy}" == 1', '"${skip_pull}" == 1', '"${project}" == risepath-ci', 'cmp -s "${stack_dir}/stack.env" "${stack_dir}/ci/stack.ci.env"']) {
+      assert.ok(body.includes(part), part);
+    }
+    assert.equal([...body.matchAll(/echo ci\b/g)].length, 1, 'one way to ci');
+    assert.match(body, /else\n\s+echo prod\n/);
+  });
+
+  it('no script sources launch-record.env (only the engine reads it)', () => {
+    const dirs = [path.join(STACK, 'scripts'), path.join(ROOT, 'scripts/ci')];
+    for (const dir of dirs) {
+      for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+        assert.ok(!/(?:^|[\s;&|])(?:source|\.)\s+\S*launch-record\.env/m.test(read(path.join(dir, file))), file);
+      }
+    }
+  });
+
+  it('launch-record.env and the deploy record stay out of git and the build context', () => {
+    assert.ok(lines(read(path.join(STACK, '.gitignore'))).includes('launch-record.env'));
+    assert.ok(lines(read(path.join(STACK, '.gitignore'))).includes('.deploy/'));
+    assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/.deploy'));
+    assert.ok(lines(read(path.join(ROOT, '.dockerignore'))).includes('deploy/risepath-vm/*.env'), 'covers launch-record.env');
+  });
+});
+
+// Phase 9 (design §6.1, §6.3; Scope guard TR2, TR10): the 事後の確かめ. The checks that need the stack's
+// network run in the api container (scripts/deploy/postdeploy-probe.mjs; postdeployProbe.test.js runs both
+// against fakes); these are the static pins of the wrapper.
+describe('postdeploy-check.sh: the wrapper pins (Phase 9)', () => {
+  const script = read(path.join(STACK, 'scripts/postdeploy-check.sh'));
+  const code = script.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+
+  it('runs under set -euo pipefail and parses with bash -n', () => {
+    assert.match(script, /^set -euo pipefail$/m);
+    assert.equal(spawnSync('bash', ['-n', path.join(STACK, 'scripts/postdeploy-check.sh')]).status, 0);
+  });
+
+  it('refuses uid 0 before any docker call (P0)', () => {
+    const refusal = code.indexOf('if [[ "$(id -u)" -eq 0 ]]; then cannot_check; fi');
+    assert.ok(refusal > 0);
+    // A call: `docker …` or `compose …` as a command (line start, after a pipe or in $( … )), not the fix text's `docker compose`.
+    const firstCall = code.search(/(?:^\s*|\| |\$\()(?:docker|compose) /m);
+    assert.ok(firstCall > refusal, 'no docker call before the refusal');
+    assert.ok(firstCall > code.indexOf('docker compose --env-file stack.env -f docker-compose.yml "$@"') - 4, 'the first call is the compose function');
+  });
+
+  it('selects the mode only through check-mode.sh and never sources an env file', () => {
+    assert.match(code, /^source "\$\{SCRIPT_DIR\}\/check-mode\.sh"$/m);
+    assert.match(code, /^MODE="\$\(risepath_check_mode "\$\{FROM_DEPLOY\}" "\$\{CALLER_SKIP_PULL\}" "\$\{CALLER_PROJECT\}" "\$\{STACK_DIR\}"\)"$/m);
+    assert.equal([...code.matchAll(/^\s*(?:source|\.)\s/gm)].length, 1, 'check-mode.sh is the only file it sources');
+    assert.ok(!code.includes('launch-record.env'), 'reads nothing of the launch record (TR2, TR6, TR10 removed its readers)');
+  });
+
+  it('prints no log line: the api log goes only to a count; the probe gets facts, never a value of stack.env', () => {
+    assert.ok(code.includes("compose logs --no-log-prefix api 2> /dev/null | grep -cF '[Retention] on, hourly' || true"), 'a count only');
+    assert.equal(code.match(/compose logs/g)?.length, 1);
+    assert.match(code, /printf '%s' "\$\{FACTS\}" \| compose exec -T api node scripts\/deploy\/postdeploy-probe\.mjs --mode "\$\{MODE\}" \|\| status=\$\?$/m);
+    assert.match(code, /FACTS="\$\(printf '\{"profiles":"%s","cloudflared":"%s","unitStack":"%s","retentionLines":%s\}'/);
+    // stack.env is read for one line only (COMPOSE_PROFILES), and the profile names are filtered.
+    for (const m of code.matchAll(/\bstack\.env\b/g)) {
+      const line = code.slice(code.lastIndexOf('\n', m.index) + 1, code.indexOf('\n', m.index));
+      // (P16's catalog text names the file; say_code prints fixed text only.)
+      assert.match(line, /--env-file stack\.env|-f stack\.env|COMPOSE_PROFILES|PROFILES_LINE|sha256sum stack\.env|shasum -a 256 stack\.env|^\s*say_code '❌' P16 /, line);
+    }
+    // Review round 1 of Stage 2, finding 1: a value it cannot read is sent as `unreadable` (P15), never ''.
+    assert.match(code, /if \[\[ ! "\$\{PROFILES\}" =~ \^\[a-z0-9_,\.-\]\{0,256\}\$ \]\]; then PROFILES=unreadable; fi/);
+    assert.match(code, /if \[\[ "\$\{PROFILES\}" == =\* \]\]; then PROFILES="\$\{PROFILES#=\}"; else PROFILES=unreadable; fi/);
+    assert.ok(!/PROFILES=''/.test(code.slice(code.indexOf('if [[ "${PROFILES_GIVEN}" -eq 0 ]]; then'))), 'no path drops the list to empty');
+  });
+
+  it('writes the deploy record only from the deploy, in production mode, after the probe passed; as the deploy user, 0644 in a 0755 folder', () => {
+    const at = code.indexOf('if [[ "${MODE}" == prod && "${FROM_DEPLOY}" == 1 ]]; then');
+    assert.ok(at > code.indexOf('case "${status}" in'), 'after the probe\'s result');
+    assert.match(code.slice(code.indexOf('case "${status}" in'), at), /0\) ;;\n\s*10\) exit 1 ;;\n\s*11\) exit 2 ;;\n\s*\*\) cannot_check ;;/);
+    const record = code.slice(at);
+    assert.ok(record.includes('chmod 755 "${RECORD_DIR}"') && record.includes('chmod 644 "${RECORD_DIR}/last-green.json.tmp"'));
+    assert.ok(record.includes('mv -f "${RECORD_DIR}/last-green.json.tmp" "${RECORD_DIR}/last-green.json"'), 'replaced whole, never half written');
+    assert.match(record, /printf '\{"at":"%s","commit":"%s","stackEnvSha256":"%s"\}\\n'/, 'TR2: { at, commit, stackEnvSha256 }');
+    assert.equal(code.match(/last-green\.json"/g)?.length, 1, 'written in one place');
+  });
+
+  it('the record holds the hash deploy-stack.sh took before the 事前チェック, or nothing (P16, then exit 1)', () => {
+    const record = code.slice(code.indexOf('if [[ "${MODE}" == prod && "${FROM_DEPLOY}" == 1 ]]; then'));
+    const guard = record.indexOf('if [[ -z "${STACK_SHA}" || "${STACK_SHA}" != "${GIVEN_STACK_SHA}" ]]; then');
+    assert.ok(guard > 0 && guard < record.indexOf('mkdir -p "${RECORD_DIR}"'), 'compared before anything is written');
+    assert.match(record.slice(guard), /^if[^\n]*\n\s*say_code '❌' P16 [^\n]*\n\s*exit 1\n/);
+    assert.match(code, /^ {4}--stack-sha\) GIVEN_STACK_SHA="\$2" ;;$/m);
+  });
+
+  it('prints exactly the catalog\'s titles and fixes for P0, P13 and P16', () => {
+    for (const [mark, codeName] of [['❌', 'P0'], ['ℹ️', 'P13'], ['❌', 'P16']]) {
+      const c = /** @type {{ title: string, fix: string }} */ (POSTDEPLOY_CODES.find((x) => x.code === codeName));
+      assert.ok(script.includes(`say_code '${mark}' ${codeName} '${c.title}' '${c.fix}'`), codeName);
+    }
+  });
+});
+
+// Phase 9 (design §6.4): deploy-from-mac.sh's rsync mode copies the Mac's tree over /opt/risepath with
+// --delete. Every VM env file (stack.env, tunnel.env, mcp-public.env, billing.env, launch-record.env) and the
+// deploy record (.deploy/) exist only on the VM, so the excludes must keep all of them.
+describe('deploy-from-mac.sh: rsync keeps every VM env file and the deploy record (Phase 9)', () => {
+  const script = read(path.join(ROOT, 'scripts/deploy-from-mac.sh'));
+  const rsyncCall = script.slice(script.indexOf('rsync -az --delete'), script.indexOf('"${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"'));
+  const excludes = [...rsyncCall.matchAll(/--exclude (?:'([^']+)'|(\S+))/g)].map((m) => m[1] ?? m[2]);
+  const hasRsync = spawnSync('rsync', ['--version']).status === 0;
+
+  it('excludes deploy/risepath-vm/*.env and deploy/risepath-vm/.deploy (not two env files by name)', () => {
+    assert.ok(excludes.includes('deploy/risepath-vm/*.env'), excludes.join(' '));
+    assert.ok(excludes.includes('deploy/risepath-vm/.deploy'));
+    assert.ok(!excludes.includes('deploy/risepath-vm/stack.env') && !excludes.includes('deploy/risepath-vm/tunnel.env'), 'covered by *.env');
+    assert.match(script, /echo "==> rsync local tree \(preserving the VM's env files, launch-record\.env and \.deploy\/\)"/);
+    assert.equal(spawnSync('bash', ['-n', path.join(ROOT, 'scripts/deploy-from-mac.sh')]).status, 0);
+  });
+
+  it('a real rsync with those excludes keeps the VM\'s five files and .deploy/, and still updates and deletes the rest', { skip: hasRsync ? false : 'rsync is not installed' }, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rsync-excludes-'));
+    try {
+      const src = path.join(dir, 'mac');
+      const dst = path.join(dir, 'vm');
+      const VM_ONLY = ['stack.env', 'tunnel.env', 'mcp-public.env', 'billing.env', 'launch-record.env', '.deploy/last-green.json'];
+      fs.mkdirSync(path.join(src, 'deploy/risepath-vm'), { recursive: true });
+      fs.mkdirSync(path.join(dst, 'deploy/risepath-vm/.deploy'), { recursive: true });
+      // Contents of other lengths than the VM's (rsync's quick check compares size and time).
+      fs.writeFileSync(path.join(src, 'deploy/risepath-vm/stack.env.example'), 'new from the Mac\n');
+      fs.writeFileSync(path.join(src, 'deploy/risepath-vm/launch-record.env.example'), 'new from the Mac\n');
+      for (const f of VM_ONLY) fs.writeFileSync(path.join(dst, 'deploy/risepath-vm', f), 'vm\n');
+      fs.writeFileSync(path.join(dst, 'deploy/risepath-vm/stack.env.example'), 'old\n');
+      fs.writeFileSync(path.join(dst, 'deploy/risepath-vm/obsolete.sh'), 'old\n');
+      const r = spawnSync('rsync', ['-a', '--delete', ...excludes.flatMap((e) => ['--exclude', e]), `${src}/`, `${dst}/`], { encoding: 'utf8' });
+      assert.equal(r.status, 0, r.stderr);
+      for (const f of VM_ONLY) assert.equal(read(path.join(dst, 'deploy/risepath-vm', f)), 'vm\n', `${f} kept`);
+      assert.equal(read(path.join(dst, 'deploy/risepath-vm/stack.env.example')), 'new from the Mac\n', '*.env.example is synced (not matched by *.env)');
+      assert.equal(read(path.join(dst, 'deploy/risepath-vm/launch-record.env.example')), 'new from the Mac\n');
+      assert.ok(!fs.existsSync(path.join(dst, 'deploy/risepath-vm/obsolete.sh')), '--delete still removes what the Mac no longer has');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

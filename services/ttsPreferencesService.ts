@@ -253,6 +253,11 @@ export async function checkTtsAvailable(): Promise<boolean> {
 
 let previewAudio: HTMLAudioElement | null = null;
 
+const copy = {
+    en: { tooLong: 'This text is too long to read aloud (up to 1,000 characters).' },
+    jp: { tooLong: 'この文は長すぎて、読み上げられません（1,000 文字まで）。' },
+};
+
 export function stopVoicePreview(): void {
     if (previewAudio) {
         previewAudio.pause();
@@ -283,6 +288,10 @@ export async function previewVoice(voiceId: string, uiLanguage: Language): Promi
         if (res.status === 503 || payload.error_type === 'tts_unavailable') {
             invalidateTtsAvailableCache();
             throw new TtsUnavailableError(payload.error || 'Voice service is unavailable');
+        }
+        // The server's cap (tools/core/kokoroTts.js TTS_MAX_CHARS; Phase 9, D3).
+        if (res.status === 400 && payload.code === 'text_too_long') {
+            throw new Error(copy[uiLanguage].tooLong);
         }
         throw new Error(payload.error || `TTS preview failed (${res.status})`);
     }

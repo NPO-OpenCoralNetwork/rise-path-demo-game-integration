@@ -88,6 +88,21 @@ export default defineConfig(({ mode }) => {
             if (problems.length) this.error(`VITE_FEATURE_LEGAL_PAGES=true but the legal text is not publishable:\n- ${problems.join('\n- ')}`);
           },
         },
+        // Phase 9 (D5): on Vercel only (its build sets VERCEL=1; CI's build:prod and the e2e front build never
+        // do), stop a build whose env would publish a wrong or dangerous setting, and warn about risky ones:
+        // scripts/deploy/vercel-env-rules.mjs, codes VB1-VB11 (doc/guides/first-launch.ja.md 13 章). Names only,
+        // never a value; it never reads VERCEL_AUTOMATION_BYPASS_SECRET. Dev servers are not affected.
+        {
+          name: 'vercel-env-guard',
+          apply: 'build',
+          async buildStart() {
+            if (process.env.VERCEL !== '1') return;
+            const { vercelEnvProblems, formatVercelProblems } = await import('./scripts/deploy/vercel-env-rules.mjs');
+            const { error, warnings } = formatVercelProblems(vercelEnvProblems({ env: process.env, viteEnv: env }));
+            for (const line of warnings) this.warn(line);
+            if (error) this.error(error);
+          },
+        },
       ],
       build: {
         chunkSizeWarningLimit: 600,

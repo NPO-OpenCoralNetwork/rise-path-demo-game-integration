@@ -5,6 +5,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.repl
 import { getSupabaseClient } from './supabaseClient';
 import { shouldSendLegacyUserIdHeader } from './authPolicy';
 import { reportAccountDeleted } from './accountDeletionState';
+import { notePilotOnly } from './pilotAccess';
 
 // Legacy fallback for Guest users (no Supabase session)
 let _getUserId: (() => string | null) = () => null;
@@ -50,6 +51,9 @@ export const apiFetch = async (path: string, options: RequestInit = {}): Promise
     // Phase 4 (design §5.11): this account was deleted (here or on another device). AuthContext
     // hears the signal and ends the session on this device; callers get the response unchanged.
     if (res.status === 401) await noteAccountDeleted(res);
+    // Phase 9 (D1): this account is not on the server's pilot list (403 pilot_only): App.tsx shows
+    // the full-page notice for it (services/pilotAccess.ts); callers get the response unchanged.
+    if (res.status === 403) await notePilotOnly(res, headers['Authorization']);
     return res;
 };
 

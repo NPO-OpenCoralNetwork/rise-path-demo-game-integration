@@ -1,3 +1,5 @@
+> 古い計画です（2026-06）。公開の手順は doc/guides/first-launch.ja.md です（[手順書](./first-launch.ja.md)）。
+
 # Rise Path 実プロダクト移行計画
 
 > 作成日: 2026-06-22  
@@ -101,7 +103,7 @@ server/migrations/008_seed_learning_portals.sql
 - **認証**: Supabase Auth（JWT）。VM 側 `auth.users` は ID スタブ
 - **アーカイブ**: `doc/ai-curriculum-spec/local_postgres_phase1.sql`, `doc/local_postgres.sql`（適用しない）
 
-詳細: [`server/migrations/README.md`](../server/migrations/README.md)
+詳細: [`server/migrations/README.md`](../../server/migrations/README.md)
 
 ## 5. 本番化の優先 Issue
 

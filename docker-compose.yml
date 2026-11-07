@@ -1,3 +1,4 @@
+# 古い計画です（Phase 9 より前）。公開の手順は doc/guides/first-launch.ja.md です（本番は deploy/risepath-vm/）。
 # Local dev stack: db + app only.
 # Migrations are NOT applied via docker-entrypoint-initdb.d — use schema_migrations tracking:
 #   docker compose up -d

@@ -1780,7 +1780,8 @@ describe('LeftRecordsNotice: records left on this device, on the sign-in view', 
       delete globalThis.window;
     }
     assert.match(textOf(walk(expand(ui.LeftRecordsNoticeView({ language: 'en', count: 1 })))), /^This device has learning that isn't saved yet \(one lesson\)\. Sign in with the same account to save it\. If you sign in with a different account, it is deleted\.$/);
-    assert.match(readFile('components/common/ExperienceLoginView.tsx'), /<LeftRecordsNotice \/>\s*\n\s*<div className="flex rounded-full/, 'above the form');
+    // Phase 9 (D1): the tab row below it renders only while the sign-up is open (features.legalPages).
+    assert.match(readFile('components/common/ExperienceLoginView.tsx'), /<LeftRecordsNotice \/>\s*\n\s*\{features\.legalPages && \(\s*\n\s*<div className="flex rounded-full/, 'above the form');
   });
 });
 
@@ -2271,7 +2272,7 @@ describe('logout callers and copy rules (static)', () => {
     const logout = auth.slice(auth.indexOf('const logout = useCallback'));
     const gate = logout.indexOf('if (!(await confirmUnsavedLearning(options))) return false;');
     assert.ok(gate > 0 && gate < logout.indexOf('clearSharedDeviceAiData('), 'G12');
-    assert.match(auth, /logout: \(options\?: \{ reason\?: 'reauth' \}\) => Promise<boolean>;/);
+    assert.match(auth, /logout: \(options\?: \{ reason\?: 'reauth'; scope\?: 'local' \}\) => Promise<boolean>;/);
     const deletion = auth.slice(auth.indexOf('const endDeletedAccountSession'), auth.indexOf('const logout = useCallback'));
     assert.doesNotMatch(deletion, /confirmUnsavedLearning/);
     // The primary session ending elsewhere closes an open question (it would no longer be true).

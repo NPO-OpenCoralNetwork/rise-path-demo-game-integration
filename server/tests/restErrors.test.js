@@ -368,4 +368,22 @@ describe('REST error answers', () => {
             assert.equal(invalid.json.error_type, 'validation');
         });
     });
+
+    it('TTS: a text over 1,000 characters is 400 with the cap in the body, before the sidecar or the preferences (Phase 9, D3)', async () => {
+        const pool = createPool();
+        setPoolForTests(pool);
+        await withServer(async (base) => {
+            const TOO_LONG = { error: 'text is too long', error_type: 'validation', code: 'text_too_long', max_chars: 1000 };
+            for (const headers of [{}, AS_A]) {
+                const tooLong = await call(base, 'POST', '/tts/synthesize', { headers, body: { text: '読'.repeat(1001), voice_id: 'jf_alpha', language: 'ja' } });
+                assert.equal(tooLong.status, 400, tooLong.text);
+                assert.deepEqual(tooLong.json, TOO_LONG);
+            }
+            assert.ok(!pool.queries.some((q) => q.sql.includes('user_profiles')), 'no preference read');
+            // 1,000 characters pass the cap and reach the (unreachable) sidecar: 503, as above.
+            const atCap = await call(base, 'POST', '/tts/synthesize', { headers: {}, body: { text: `${'読'.repeat(999)}${Date.now() % 10}`, voice_id: 'jf_alpha', language: 'ja' } });
+            assert.equal(atCap.status, 503, atCap.text);
+            assert.deepEqual(fs.readdirSync(cacheDir).filter((name) => !name.startsWith('.')), [], 'nothing cached');
+        });
+    });
 });
