@@ -225,6 +225,16 @@ describe('replay-deletions.mjs: the window, the margin and the state-dependent s
     assert.ok(fake.calls.includes(`progressCovered ${U.b} ${at(12)}`), 'the newest row of the key is the one checked');
     assert.ok(fake.lines.some((l) => l.includes('同じ行: 1、アカウントの削除に含まれる行: 2、同じものの古い行: 2')));
   });
+  it('a row newer than the same user\'s account row (made after a re-open) is not dropped: it is checked on its own', async () => {
+    // Deleted 5 minutes before the dump (inside the margin; the dump holds the tombstone), re-opened before the dump,
+    // then every lesson's progress reset after the dump: the reset is not in the dump, so it must be applied.
+    const fake = fakeDeps({ tombstones: { [U.a]: at(-5) } });
+    await replay(journal(account(U.a, -5, 'self', at(-3)), progress(U.a, 30), lesson(U.a, -6)), fake);
+    assert.deepEqual(writes(fake.calls), [`deleteAllProgress ${U.a}`]);
+    assert.ok(fake.calls.includes(`progressCovered ${U.a} ${at(30)}`), 'the newer row is checked against the restored database');
+    // The lesson row before the deletion is still covered by it.
+    assert.ok(fake.lines.some((l) => l.includes('アカウントの削除に含まれる行: 1')), fake.lines.join('\n'));
+  });
   it('several journals joined (each with its header) read as one', () => {
     const rows = parseJournal(journal(account(U.a, 1)) + journal(account(U.a, 1), progress(U.b, 2)));
     assert.equal(rows.length, 3);

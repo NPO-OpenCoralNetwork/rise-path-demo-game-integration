@@ -17,8 +17,9 @@
  * What it does (design §5.4, Scope guard TR9a):
  *   - keeps rows whose time is later than --since minus 15 minutes: a change that started before the dump's
  *     snapshot and committed after it is in neither the dump nor a `time > since` filter (design N6);
- *   - drops identical rows (the journals overlap), every other row of a user who has an account row (the
- *     deletion removes the rest), and for each account, learner or lesson every row but the newest;
+ *   - drops identical rows (the journals overlap), a user's other rows at or before that user's newest account
+ *     row (the deletion removes them; a newer row comes after a re-open and is kept), and for each account,
+ *     learner or lesson every row but the newest;
  *   - consent and grant rows stop it with exit 2 before anything is changed or read: this version cannot
  *     re-apply them (none can exist at the first launch: adults only, the remote MCP off). The agent restores
  *     them by hand (手順書 16.2); plan 13.5 adds them before the minors stage and before BYOA;
@@ -217,11 +218,21 @@ export function planReplay(rows, sinceMicros) {
     if (unique.has(key)) counts.identical += 1;
     else unique.set(key, r);
   }
-  const withAccount = new Set([...unique.values()].filter((r) => r.kind === 'account').map((r) => r.userId));
+  // Account precedence: a user's newest account row covers that user's other rows at or before it (the deletion
+  // removes them). A newer row can only come after a re-open (tools/core/accountDeletions.js reopenAccount) and is
+  // checked on its own: the account row may be skipped as in the dump, and the newer reset must still be applied.
+  /** @type {Map<string, bigint>} */
+  const accountAt = new Map();
+  for (const r of unique.values()) {
+    if (r.kind !== 'account') continue;
+    const seen = accountAt.get(r.userId);
+    if (seen === undefined || r.micros > seen) accountAt.set(r.userId, r.micros);
+  }
   /** @type {Map<string, JournalRow>} */
   const newest = new Map();
   for (const r of unique.values()) {
-    if (r.kind !== 'account' && withAccount.has(r.userId)) {
+    const deletedAt = r.kind === 'account' ? undefined : accountAt.get(r.userId);
+    if (deletedAt !== undefined && r.micros <= deletedAt) {
       counts.coveredByAccount += 1;
       continue;
     }
