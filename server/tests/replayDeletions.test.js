@@ -17,6 +17,10 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = path.join(ROOT, 'scripts/replay-deletions.mjs');
+// Finding 7's bash side sources the VM's backup-common.sh, which needs bash ≥ 4 and GNU date as on the VM
+// (macOS has bash 3.2 and BSD date); the same guard as backupScripts.test.js and restoreByHand.test.js.
+const bash4 = spawnSync('bash', ['-c', 'declare -A x=(); x[a]=1; : "${x[a],,}"']).status === 0;
+const skipVmBash = bash4 && process.platform === 'linux' ? false : 'needs bash ≥ 4 and Linux (GNU date), as on the VM';
 const SINCE = '2026-11-02T03:23:00Z';
 /** Sentinel ids: their full text must never be printed. */
 const U = {
@@ -331,8 +335,10 @@ describe('replay-deletions.mjs: review round 3 of Stage 5', () => {
     assert.ok(stop.lines.some((l) => l.includes('consent bbbbbbbb… もとの時刻 日本時間 2026-11-02 12:28（UTC: 2026-11-02T03:28:00.123456Z）')), stop.lines.join('\n'));
     // No printed line carries a bare UTC time outside its （UTC: …） bracket.
     for (const l of [...list.lines, ...yes.lines, ...stop.lines]) assert.doesNotMatch(l.replace(/（UTC: [^）]+）/g, ''), /\d{4}-\d\d-\d\dT\d\d:\d\d/, l);
-    // The day changes at 15:00 UTC; the minute part is what bash's bk_jst prints for the same time.
+    // The day changes at 15:00 UTC.
     assert.equal(jstLabel('2026-12-31T15:00:00Z'), '日本時間 2027-01-01 00:00（UTC: 2026-12-31T15:00:00Z）');
+  });
+  it('finding 7: the minute part is what bash\'s bk_jst (restore-db.sh) prints for the same time', { skip: skipVmBash }, () => {
     const bash = spawnSync('bash', ['-c', `source "${path.join(ROOT, 'deploy/risepath-vm/scripts/backup-common.sh')}"; bk_jst 2026-12-31T15:00:59Z`], { encoding: 'utf8', env: { ...process.env, STACK_DIR: ROOT } });
     assert.ok(jstLabel('2026-12-31T15:00:59.999999Z').startsWith(`${bash.stdout}（UTC: `), bash.stdout + bash.stderr);
   });
