@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import {
   EXIT, HEADER, MARGIN_MINUTES, STOP_CONSENT_GRANT, USAGE, isoMicros, jstLabel, parseJournal, planReplay, replayDeletions, run,
 } from '../../scripts/replay-deletions.mjs';
+import { signedInBeforeDeletion } from '../../tools/core/accountDeletions.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = path.join(ROOT, 'scripts/replay-deletions.mjs');
@@ -57,7 +58,9 @@ function fakeDeps(restored = {}) {
   const calls = [];
   /** @type {string[]} */
   const lines = [];
-  const atLeast = (/** @type {string | undefined} */ restoredTime, /** @type {string} */ time) => restoredTime !== undefined && /** @type {bigint} */ (isoMicros(restoredTime)) >= /** @type {bigint} */ (isoMicros(time));
+  /** What each deleteAccount call received (authTime included). @type {Array<{ userId: string, requestedBy: string, authTime: number }>} */
+  const accountInputs = [];
+  const atLeast =(/** @type {string | undefined} */ restoredTime, /** @type {string} */ time) => restoredTime !== undefined && /** @type {bigint} */ (isoMicros(restoredTime)) >= /** @type {bigint} */ (isoMicros(time));
   const read = (/** @type {string} */ what) => {
     calls.push(what);
     if (restored.readThrows) throw new Error(`connect ECONNREFUSED ${U.a}`);
@@ -65,6 +68,7 @@ function fakeDeps(restored = {}) {
   return {
     calls,
     lines,
+    accountInputs,
     deps: {
       state: {
         hasAccount: async (/** @type {string} */ id) => { read(`hasAccount ${id}`); return (restored.accounts ?? Object.values(U)).includes(id); },
@@ -74,8 +78,9 @@ function fakeDeps(restored = {}) {
         isPublished: (/** @type {string} */ c, /** @type {string} */ l) => !(restored.unpublished ?? []).includes(`${c}/${l}`),
         progressEpoch: async (/** @type {string} */ id) => { read(`progressEpoch ${id}`); return restored.epochs?.[id] ?? null; },
       },
-      deleteAccount: async (/** @type {{ userId: string, requestedBy: string }} */ input) => {
+      deleteAccount: async (/** @type {{ userId: string, requestedBy: string, authTime: number }} */ input) => {
         calls.push(`deleteAccount ${input.userId} ${input.requestedBy}`);
+        accountInputs.push(input);
         return restored.accountResult?.(input.userId) ?? { status: 'deleted' };
       },
       deleteAllProgress: async (/** @type {{ userId: string }} */ input) => {
@@ -168,6 +173,18 @@ describe('replay-deletions.mjs: consent and grant rows stop it before anything i
     assert.equal(code, EXIT.ok);
     assert.deepEqual(writes(fake.calls), [`deleteAccount ${U.a} self`]);
   });
+  it('a grant revoked between two deletions of the same user is covered by the later one (no stop)', async () => {
+    const fake = fakeDeps();
+    assert.equal(await replay(journal(account(U.a, 5, 'self', at(7)), grant(U.a, 10), account(U.a, 20)), fake), EXIT.ok);
+    assert.deepEqual(writes(fake.calls), [`deleteAccount ${U.a} self`]);
+  });
+  for (const [name, row] of [['consent', consent(U.a, 10)], ['grant', grant(U.a, 10)]]) {
+    it(`a ${name} row after the same user's newest account row (after a re-open) stops it`, async () => {
+      const fake = fakeDeps();
+      assert.equal(await replay(journal(account(U.a, 5, 'self', at(7)), row), fake), EXIT.refused);
+      assert.deepEqual(fake.calls, [], 'nothing read or changed');
+    });
+  }
 });
 
 describe('replay-deletions.mjs: the window, the margin and the state-dependent skips', () => {
@@ -234,6 +251,55 @@ describe('replay-deletions.mjs: the window, the margin and the state-dependent s
     assert.ok(fake.calls.includes(`progressCovered ${U.a} ${at(30)}`), 'the newer row is checked against the restored database');
     // The lesson row before the deletion is still covered by it.
     assert.ok(fake.lines.some((l) => l.includes('アカウントの削除に含まれる行: 1')), fake.lines.join('\n'));
+  });
+  // Review of f4a4edb (PR #82): the cases below each fail on the code before that review's fix.
+  it('delete, re-open, delete again in the window: the newest account row covers the re-open\'s progress row', async () => {
+    // Hourly journals joined: before the re-open, after it (its epoch row at reopened_at), after the second deletion.
+    const fake = fakeDeps();
+    const text = journal(account(U.a, 5)) + journal(account(U.a, 5, 'self', at(7)), progress(U.a, 7)) + journal(account(U.a, 20));
+    assert.equal(await replay(text, fake), EXIT.ok);
+    assert.deepEqual(writes(fake.calls), [`deleteAccount ${U.a} self`]);
+    assert.ok(!fake.calls.some((c) => c.startsWith('progressCovered')), fake.calls.join('\n'));
+    assert.ok(fake.lines.some((l) => l.includes('アカウントの削除に含まれる行: 1')), fake.lines.join('\n'));
+  });
+  it('a second deletion after a re-open gets the row\'s time as authTime, so an older restored tombstone is written again, never "already"', async () => {
+    // Restored: deleted 5 minutes before the dump, not re-opened (no stub). After the dump: a re-open at +5 and a
+    // second deletion at +40, the journal's newest account row. With authTime null deleteAccountData answered
+    // 'already' and the tombstone kept -5, so a session that signed in between -5 + 30 s and +40 re-opened the account.
+    const fake = fakeDeps({ tombstones: { [U.a]: at(-5) }, accounts: [] });
+    const text = journal(account(U.a, -5, 'self', at(5)), progress(U.a, 5)) + journal(account(U.a, 40));
+    assert.equal(await replay(text, fake), EXIT.ok);
+    assert.deepEqual(writes(fake.calls), [`deleteAccount ${U.a} self`]);
+    const authTime = fake.accountInputs[0]?.authTime;
+    assert.equal(authTime, Math.floor(Date.parse(at(40)) / 1000));
+    // deleteAccountData's own rule (tools/core/accountDeletions.js): null keeps the older tombstone; the row's time does not.
+    assert.equal(signedInBeforeDeletion(null, at(-5)), true);
+    assert.equal(signedInBeforeDeletion(authTime, at(-5)), false);
+    // The real dependencies pass it through to deleteAccountData.
+    assert.match(fs.readFileSync(SCRIPT, 'utf8'), /deleteAccount: \(\{ userId, requestedBy, authTime \}\) => staffDeps\.deleteAccountData\(\{ userId, requestedBy, authTime, /);
+  });
+  it('a progress or lesson row older than the restored tombstone is in the dump, even when the account was re-opened since', async () => {
+    // A journal read inside the margin holds the first deletion (-12, re-opened -11) and that generation's resets (-11,
+    // -10). The dump holds a second deletion at -6 (its cascade removed the -10 lesson reset), a re-open at -5 and new
+    // progress. Replaying the -10 lesson reset would delete that new progress.
+    const fake = fakeDeps({ tombstones: { [U.a]: at(-6) }, resets: { [U.a]: at(-5) } });
+    assert.equal(await replay(journal(account(U.a, -12, 'self', at(-11)), progress(U.a, -11), lesson(U.a, -10)), fake), EXIT.ok);
+    assert.deepEqual(writes(fake.calls), []);
+    assert.ok(fake.lines.includes('当てた: account 0、progress 0、lesson 0'), fake.lines.join('\n'));
+    assert.ok(!fake.calls.some((c) => c.startsWith('lessonCovered')), 'the tombstone decides it first');
+  });
+  it('a learner deleted after the dump who signed in again: the list and the run agree (the later rows are no_account in both)', async () => {
+    // The account row (+10, re-opened +20) is applied; the re-open's epoch row (+20) and a later lesson reset (+30) belong
+    // to the account the replayed deletion removes. The fake keeps the stub, so only the run's own record can tell.
+    const text = journal(account(U.a, 10, 'self', at(20)), progress(U.a, 20), lesson(U.a, 30));
+    const dry = fakeDeps();
+    const wet = fakeDeps();
+    assert.equal(await replay(text, dry, false), EXIT.ok);
+    assert.equal(await replay(text, wet, true), EXIT.ok);
+    assert.deepEqual(writes(wet.calls), [`deleteAccount ${U.a} self`]);
+    assert.ok(dry.lines.includes('当てる: account 1、progress 0、lesson 0'), dry.lines.join('\n'));
+    assert.ok(wet.lines.includes('当てた: account 1、progress 0、lesson 0'), wet.lines.join('\n'));
+    assert.equal(dry.lines.find((l) => l.startsWith('とばした')), wet.lines.find((l) => l.startsWith('とばした')));
   });
   it('several journals joined (each with its header) read as one', () => {
     const rows = parseJournal(journal(account(U.a, 1)) + journal(account(U.a, 1), progress(U.b, 2)));

@@ -26,10 +26,14 @@
  *   - applies the rest in time order, each only when the restored database does not already show it or
  *     something later (so the 15-minute margin never applies twice what the dump holds):
  *       account  skip when the restored tombstone's deleted_at is at or after the row's time; else
- *                deleteAccountData with the row's requested_by (scripts/delete-account-data.mjs defaultDeps).
+ *                deleteAccountData with the row's requested_by and the row's time as authTime
+ *                (scripts/delete-account-data.mjs defaultDeps): an older restored tombstone that was not
+ *                re-opened is then written again, never answered 'already' (a second deletion after a re-open).
  *                The tombstone and the proofs get the replay time (fail closed: every older session is refused);
- *       progress skip when the account is not in the restored database or its reset_at is at or after the
- *                time; else deleteAllLessonProgress;
+ *       progress skip when the account is not in the restored database, when this run deletes it (an earlier
+ *                account row of the same user: the dry run counts as the --yes run finds it), when the restored
+ *                tombstone's deleted_at is at or after the time (that deletion removed it), or when its reset_at
+ *                is at or after the time; else deleteAllLessonProgress;
  *       lesson   skip as progress (per lesson), or when the lesson is no longer published; else
  *                resetLessonProgress with the learner's current progress epoch (it also deletes that lesson's
  *                review cards).
@@ -266,7 +270,7 @@ export function planReplay(rows, sinceMicros) {
  * @typedef {{ status: string, reason?: string }} AccountResult
  * @typedef {{
  *   state: StateReader,
- *   deleteAccount: (input: { userId: string, requestedBy: 'self' | 'staff' | 'orphan' }) => Promise<AccountResult>,
+ *   deleteAccount: (input: { userId: string, requestedBy: 'self' | 'staff' | 'orphan', authTime: number }) => Promise<AccountResult>,
  *   deleteAllProgress: (input: { userId: string }) => Promise<{ error_type?: string } & Record<string, unknown>>,
  *   resetLesson: (input: { userId: string, epoch: string | null, courseSlug: string, lessonId: string }) => Promise<{ error_type?: string } & Record<string, unknown>>,
  *   log: (line: string) => void,
@@ -284,6 +288,9 @@ const ACCOUNT_UNAVAILABLE = new Set(['payment_provider_unavailable', 'memory_ser
 async function decide(row, state) {
   if (row.kind === 'account') return (await state.accountCovered(row.userId, row.time)) ? 'in_dump' : null;
   if (!(await state.hasAccount(row.userId))) return 'no_account';
+  // A restored tombstone at or after the row: that deletion (in the dump) removed the row's generation by cascade,
+  // and the account was re-opened since (a stub exists). Re-applying the row would reset the new generation's data.
+  if (await state.accountCovered(row.userId, row.time)) return 'in_dump';
   if (row.kind === 'progress') return (await state.progressCovered(row.userId, row.time)) ? 'in_dump' : null;
   if (await state.lessonCovered(row.userId, row.courseSlug, row.lessonId, row.time)) return 'in_dump';
   return state.isPublished(row.courseSlug, row.lessonId) ? null : 'unpublished';
@@ -331,20 +338,33 @@ export async function replayDeletions({ text, since, yes, deps }) {
   const applied = [];
   /** @type {number} */
   let exit = EXIT.ok;
+  // Users whose account row this run deletes (without --yes: would delete). Their later rows (made after a re-open)
+  // are no_account: with --yes the deletion has just removed the stub, and the dry run counts them the same way.
+  /** @type {Set<string>} */
+  const deletedHere = new Set();
   try {
     for (const row of apply) {
-      const reason = await decide(row, deps.state);
+      const reason = row.kind !== 'account' && deletedHere.has(row.userId) ? 'no_account' : await decide(row, deps.state);
       if (reason) {
         skipped[reason] += 1;
         continue;
       }
       if (!yes) {
+        if (row.kind === 'account') deletedHere.add(row.userId);
         applied.push(describe(row));
         done[/** @type {'account' | 'progress' | 'lesson'} */ (row.kind)] += 1;
         continue;
       }
       if (row.kind === 'account') {
-        const result = await deps.deleteAccount({ userId: row.userId, requestedBy: /** @type {'self' | 'staff' | 'orphan'} */ (row.requestedBy) });
+        // authTime: the row's own time (whole seconds). An older restored tombstone that was not re-opened is then
+        // written again at the replay time instead of answering 'already' (a second deletion after a re-open: the
+        // re-open needed a sign-in later than the first deleted_at + 30 s, and this deletion came after it).
+        const result = await deps.deleteAccount({
+          userId: row.userId,
+          requestedBy: /** @type {'self' | 'staff' | 'orphan'} */ (row.requestedBy),
+          authTime: Number(row.micros / 1_000_000n),
+        });
+        if (result.status === 'deleted' || result.status === 'already') deletedHere.add(row.userId);
         if (result.status === 'deleted') done.account += 1;
         else if (result.status === 'already') done.already += 1;
         else if (result.status === 'refused' && !ACCOUNT_UNAVAILABLE.has(String(result.reason))) {
@@ -450,7 +470,7 @@ export async function defaultDeps() {
         return epoch ? String(epoch) : null;
       },
     },
-    deleteAccount: ({ userId, requestedBy }) => staffDeps.deleteAccountData({ userId, requestedBy, authTime: null, billing: staffDeps.readBillingDeps() }),
+    deleteAccount: ({ userId, requestedBy, authTime }) => staffDeps.deleteAccountData({ userId, requestedBy, authTime, billing: staffDeps.readBillingDeps() }),
     deleteAllProgress: ({ userId }) => progress.deleteAllLessonProgress({ userId }),
     resetLesson: (input) => progress.resetLessonProgress(input),
     log: (line) => console.log(line),
