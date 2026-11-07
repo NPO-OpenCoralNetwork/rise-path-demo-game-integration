@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import {
   EXIT, HEADER, MARGIN_MINUTES, STOP_CONSENT_GRANT, USAGE, isoMicros, jstLabel, parseJournal, planReplay, replayDeletions, run,
 } from '../../scripts/replay-deletions.mjs';
-import { signedInBeforeDeletion } from '../../tools/core/accountDeletions.js';
+import { ACCOUNT_SKEW_SECONDS, signedInBeforeDeletion } from '../../tools/core/accountDeletions.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = path.join(ROOT, 'scripts/replay-deletions.mjs');
@@ -262,7 +262,7 @@ describe('replay-deletions.mjs: the window, the margin and the state-dependent s
     assert.ok(!fake.calls.some((c) => c.startsWith('progressCovered')), fake.calls.join('\n'));
     assert.ok(fake.lines.some((l) => l.includes('アカウントの削除に含まれる行: 1')), fake.lines.join('\n'));
   });
-  it('a second deletion after a re-open gets the row\'s time as authTime, so an older restored tombstone is written again, never "already"', async () => {
+  it('a second deletion after a re-open gets an authTime past its time + 30 s, so an older restored tombstone is written again, never "already"', async () => {
     // Restored: deleted 5 minutes before the dump, not re-opened (no stub). After the dump: a re-open at +5 and a
     // second deletion at +40, the journal's newest account row. With authTime null deleteAccountData answered
     // 'already' and the tombstone kept -5, so a session that signed in between -5 + 30 s and +40 re-opened the account.
@@ -271,12 +271,34 @@ describe('replay-deletions.mjs: the window, the margin and the state-dependent s
     assert.equal(await replay(text, fake), EXIT.ok);
     assert.deepEqual(writes(fake.calls), [`deleteAccount ${U.a} self`]);
     const authTime = fake.accountInputs[0]?.authTime;
-    assert.equal(authTime, Math.floor(Date.parse(at(40)) / 1000));
-    // deleteAccountData's own rule (tools/core/accountDeletions.js): null keeps the older tombstone; the row's time does not.
+    assert.equal(authTime, Math.floor(Date.parse(at(40)) / 1000) + ACCOUNT_SKEW_SECONDS + 1);
+    // deleteAccountData's own rule (tools/core/accountDeletions.js): null keeps the older tombstone; this authTime does not.
     assert.equal(signedInBeforeDeletion(null, at(-5)), true);
     assert.equal(signedInBeforeDeletion(authTime, at(-5)), false);
     // The real dependencies pass it through to deleteAccountData.
     assert.match(fs.readFileSync(SCRIPT, 'utf8'), /deleteAccount: \(\{ userId, requestedBy, authTime \}\) => staffDeps\.deleteAccountData\(\{ userId, requestedBy, authTime, /);
+  });
+  it('a second deletion less than 30 s after the restored tombstone (Supabase\'s clock ahead of the database\'s) is not "already" either', async () => {
+    // Deleted at 03:30:00.300, re-opened by a session whose Supabase sign-in time was more than 30 s later, deleted again
+    // 20 s after the first deletion by the database's clock; and a row 30.05 s later, which whole seconds alone round down.
+    for (const [tombstone, rowTime] of [['2026-11-02T03:30:00.300000Z', '2026-11-02T03:30:20.050000Z'], ['2026-11-02T03:30:00.100000Z', '2026-11-02T03:30:30.150000Z']]) {
+      const fake = fakeDeps({ tombstones: { [U.a]: tombstone }, accounts: [] });
+      assert.equal(await replay(journal(line({ kind: 'account', user_id: U.a, time: rowTime, requested_by: 'self' })), fake), EXIT.ok);
+      assert.deepEqual(writes(fake.calls), [`deleteAccount ${U.a} self`]);
+      const authTime = /** @type {number} */ (fake.accountInputs[0]?.authTime);
+      assert.equal(signedInBeforeDeletion(authTime, tombstone), false, `${rowTime}: authTime ${authTime} must clear ${tombstone} + 30 s`);
+    }
+  });
+  it('an account deletion refused (a renewing plan): the user\'s later rows are skipped in the list and in the run alike', async () => {
+    const text = journal(account(U.a, 10, 'self', at(20)), progress(U.a, 30), lesson(U.a, 40, 'ai-basics', 'lesson-2'));
+    const restored = { accountResult: () => ({ status: 'refused', reason: 'subscription_active' }) };
+    const dry = fakeDeps(restored);
+    const wet = fakeDeps(restored);
+    assert.equal(await replay(text, dry, false), EXIT.ok);
+    assert.equal(await replay(text, wet, true), EXIT.refused);
+    assert.deepEqual(writes(wet.calls), [`deleteAccount ${U.a} self`], 'nothing applied after the refusal');
+    assert.equal(dry.lines.find((l) => l.startsWith('とばした')), wet.lines.find((l) => l.startsWith('とばした')));
+    assert.ok(wet.lines.includes('当てた: account 0、progress 0、lesson 0'), wet.lines.join('\n'));
   });
   it('a progress or lesson row older than the restored tombstone is in the dump, even when the account was re-opened since', async () => {
     // A journal read inside the margin holds the first deletion (-12, re-opened -11) and that generation's resets (-11,

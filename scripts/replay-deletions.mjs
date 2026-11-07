@@ -26,8 +26,8 @@
  *   - applies the rest in time order, each only when the restored database does not already show it or
  *     something later (so the 15-minute margin never applies twice what the dump holds):
  *       account  skip when the restored tombstone's deleted_at is at or after the row's time; else
- *                deleteAccountData with the row's requested_by and the row's time as authTime
- *                (scripts/delete-account-data.mjs defaultDeps): an older restored tombstone that was not
+ *                deleteAccountData with the row's requested_by and an authTime past the row's time + the 30 s
+ *                skew (scripts/delete-account-data.mjs defaultDeps): an older restored tombstone that was not
  *                re-opened is then written again, never answered 'already' (a second deletion after a re-open).
  *                The tombstone and the proofs get the replay time (fail closed: every older session is refused);
  *       progress skip when the account is not in the restored database, when this run deletes it (an earlier
@@ -47,6 +47,7 @@
  */
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { ACCOUNT_SKEW_SECONDS } from '../tools/core/accountDeletions.js';
 
 export const EXIT = Object.freeze({ ok: 0, usage: 1, refused: 2, unavailable: 3 });
 export const MARGIN_MINUTES = 15;
@@ -338,8 +339,9 @@ export async function replayDeletions({ text, since, yes, deps }) {
   const applied = [];
   /** @type {number} */
   let exit = EXIT.ok;
-  // Users whose account row this run deletes (without --yes: would delete). Their later rows (made after a re-open)
-  // are no_account: with --yes the deletion has just removed the stub, and the dry run counts them the same way.
+  // Users whose account row this run deletes (without --yes: would delete; with --yes also a refused deletion). Their
+  // later rows (made after a re-open) are no_account: with --yes the deletion has just removed the stub, and the dry
+  // run counts them the same way.
   /** @type {Set<string>} */
   const deletedHere = new Set();
   try {
@@ -356,13 +358,15 @@ export async function replayDeletions({ text, since, yes, deps }) {
         continue;
       }
       if (row.kind === 'account') {
-        // authTime: the row's own time (whole seconds). An older restored tombstone that was not re-opened is then
-        // written again at the replay time instead of answering 'already' (a second deletion after a re-open: the
-        // re-open needed a sign-in later than the first deleted_at + 30 s, and this deletion came after it).
+        // authTime: decide() has shown that any restored tombstone is older than this row, so this is a later, real
+        // deletion (a second one after a re-open). deleteAccountData answers 'already' for a tombstone that was not
+        // re-opened when authTime <= deleted_at + 30 s; the row's whole seconds + 31 s always clears that, also when
+        // Supabase's clock ran ahead of the database's (the reason for the 30 s), so that tombstone is written again
+        // at the replay time and every older session is refused. deleteAccountData reads authTime for nothing else.
         const result = await deps.deleteAccount({
           userId: row.userId,
           requestedBy: /** @type {'self' | 'staff' | 'orphan'} */ (row.requestedBy),
-          authTime: Number(row.micros / 1_000_000n),
+          authTime: Number(row.micros / 1_000_000n) + ACCOUNT_SKEW_SECONDS + 1,
         });
         if (result.status === 'deleted' || result.status === 'already') deletedHere.add(row.userId);
         if (result.status === 'deleted') done.account += 1;
@@ -370,6 +374,9 @@ export async function replayDeletions({ text, since, yes, deps }) {
         else if (result.status === 'refused' && !ACCOUNT_UNAVAILABLE.has(String(result.reason))) {
           log(`❌ account ${tag(row.userId)}: 削除を断られました（${String(result.reason).replace(/[^a-z_]/g, '')}）。`);
           exit = EXIT.refused;
+          // As the list (no --yes) counted them: the user's later rows wait for the run after the refusal is settled,
+          // which deletes the account and with it those rows.
+          deletedHere.add(row.userId);
           continue;
         } else {
           log(`❌ account ${tag(row.userId)}: DB か外のサービスが答えません（${String(result.reason ?? result.status).replace(/[^a-z_]/g, '')}）。ここで止めます。`);
