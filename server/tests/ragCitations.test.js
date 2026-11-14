@@ -439,6 +439,16 @@ describe('searchContent on the remote endpoint (REMOTE_RAG_CITE)', () => {
     });
 });
 
+describe('the content-search skill cites by place', () => {
+    it('asks for the location and the quoted passage, never a lesson title the results do not have', () => {
+        const skill = readFileSync(path.join(ROOT, 'skills/content-search/SKILL.md'), 'utf8');
+        const step3 = skill.slice(skill.indexOf('### Step 3'), skill.indexOf('## ルール'));
+        assert.match(step3, /`location`/);
+        assert.match(step3, /`content`/);
+        assert.doesNotMatch(step3, /レッスンタイトル|このレッスンを始めますか/);
+    });
+});
+
 describe('rag-search over MCP on stdio and SSE (no remote policy)', () => {
     afterEach(() => clearMcpUserScopeForTests());
 

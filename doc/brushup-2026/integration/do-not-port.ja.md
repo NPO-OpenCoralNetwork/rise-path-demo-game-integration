@@ -73,7 +73,7 @@
 | 発想 | 個人側の出どころ | このリポジトリでの作り方 |
 |---|---|---|
 | 出典を学習者に見せる | `CitationBadge`（7c0786e） | スキーマにある `sources` と `cite` を LessonReader に表示します。ブロックごとのチップと、レッスン末の出典一覧です。 |
-| 検索結果に出典情報を付ける | `ragSearch.js` の `source_title`（7c0786e） | `rag-search` が、引用に使える形の結果を返すようにします。 |
+| 検索結果に出典情報を付ける | `ragSearch.js` の `source_title`（7c0786e） | 済み（「出典と検索」の 3）。`rag-search` の結果は、教材の中の場所（`location`。PDF はページ）と、当たった語のまわりの本文を返します。教材の名前を返すのは手元の MCP（stdio・SSE）だけで、リモートの MCP では返しません。 |
 | 下書きの読み戻し | `get-curriculum-draft`（1c7f5dc） | DB だけを読み、所有者を確かめるツールとして作ります。 |
 | 生成カリキュラムの一覧・詳細の認証 | `services/curriculumApi.ts`（1c7f5dc） | `/curricula` の一覧と詳細も `apiFetch` で呼びます。一覧では `total_lessons` も返します。 |
 | Mermaid のガード | `GeneratedDocView.tsx`（d7a29b7） | `chart` がないブロックでは `code` を使い、どちらもなければ描画しません。 |
