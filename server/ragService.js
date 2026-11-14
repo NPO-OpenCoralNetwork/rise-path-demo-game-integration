@@ -64,35 +64,52 @@ const pageText = async (pageData) => {
 };
 
 /**
- * The text of a stored file, as pages: one per PDF page (`page` counts from 1), else one without a
- * page. A PDF page that pdf.js cannot read is left out (pdf-parse skips it too).
- * @returns {Promise<Array<{ text: string, page?: number }>>}
+ * The text of a stored file, and for a PDF where each page starts in it. The text is pdf-parse's,
+ * as before: "\n\n" and the page's text for every page, '' for a page pdf.js cannot read. Page
+ * numbers count the file's pages from 1 (not the numbers printed on them). `pageStarts` is null
+ * for a file without pages, and when the pages do not add up to the text (then no page is stored
+ * rather than a wrong one).
+ * @returns {Promise<{ text: string, pageStarts: number[] | null }>} pageStarts[i]: where page i + 1's
+ *   text starts in `text`
  */
-const extractPages = async (filePath, mimeType) => {
+const extractText = async (filePath, mimeType) => {
     const data = await fs.readFile(filePath);
-    if (mimeType !== 'application/pdf') return [{ text: data.toString('utf8') }];
-    /** @type {Array<{ text: string, page: number }>} */
+    if (mimeType !== 'application/pdf') return { text: data.toString('utf8'), pageStarts: null };
+    /** @type {string[]} page i + 1's text at i */
     const pages = [];
+    let parsed;
     try {
         // A Uint8Array, not the Buffer: pdf.js copies its input with `new input.constructor(input)`,
         // a copied Buffer under 4 KB lies inside Node's shared pool, and pdf.js then reads it from the
         // wrong offset (a valid small PDF failed with "bad XRef entry").
-        await pdf(new Uint8Array(data), {
+        parsed = await pdf(new Uint8Array(data), {
             pagerender: async (pageData) => {
                 const text = await pageText(pageData);
-                pages.push({ text, page: pageData.pageNumber });
+                pages[pageData.pageNumber - 1] = text;
                 return text;
             },
         });
     } catch (error) {
         throw unreadable('extract_failed', error);
     }
-    return pages.sort((a, b) => a.page - b.page);
+    const pageStarts = [];
+    let at = 0;
+    for (let i = 0; i < parsed.numrender; i += 1) {
+        at += 2;
+        pageStarts.push(at);
+        at += (pages[i] ?? '').length;
+    }
+    return { text: parsed.text, pageStarts: at === parsed.text.length ? pageStarts : null };
 };
 
 /** Whether extracted text has anything to search: a letter (page numbers alone are not text). */
 const hasText = (text) => /\p{L}/u.test(text);
 
+/**
+ * The chunks of a text (1,000 characters with 200 overlapping, cut at a paragraph or sentence when
+ * one is near): each with `start`, where its trimmed text starts in `text`.
+ * @returns {Promise<Array<{ content: string, start: number }>>}
+ */
 const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
     const chunks = [];
     let start = 0;
@@ -109,32 +126,34 @@ const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
                 : lastPeriod > chunkSize * 0.5 ? lastPeriod : -1;
             if (bp > 0) end = start + bp + 1;
         }
-        chunks.push(text.slice(start, end).trim());
+        const raw = text.slice(start, end);
+        const content = raw.trim();
+        if (content.length > 0) chunks.push({ content, start: start + raw.length - raw.trimStart().length });
         // Stop at the end of the text; stepping back by `overlap` here re-emitted ~overlap tail chunks.
         if (end >= text.length) break;
         start = Math.max(start + 1, end - overlap);
     }
-    return chunks.filter(c => c.length > 0);
-};
-
-/**
- * The chunks of a file's pages, in order: each page is split on its own, so a chunk never spans two
- * pages and keeps its page (material_chunks.metadata.page, which rag-search cites). A page without a
- * letter (blank, an image, only a page number) adds no chunk.
- * @param {Array<{ text: string, page?: number }>} pages
- * @returns {Promise<Array<{ content: string, page?: number }>>}
- */
-const chunkPages = async (pages) => {
-    const chunks = [];
-    for (const { text, page } of pages) {
-        if (!hasText(text)) continue;
-        for (const content of await chunkText(text)) chunks.push(page === undefined ? { content } : { content, page });
-    }
     return chunks;
 };
 
-/** material_chunks.metadata of a chunk: its page, or NULL when the file has none. */
-const chunkMetadata = (chunk) => (chunk.page === undefined ? null : JSON.stringify({ page: chunk.page }));
+/**
+ * material_chunks.metadata of a chunk: for a PDF, `page`, the page its text starts on, and
+ * `breaks`, where the next pages start in its text (page + 1 at breaks[0], and so on; left out when
+ * the chunk stays on one page). rag-search cites the page of the passage it quotes. NULL without
+ * pages.
+ * @param {{ content: string, start: number }} chunk
+ * @param {number[] | null} pageStarts
+ */
+const pageMetadata = ({ content, start }, pageStarts) => {
+    if (!pageStarts || pageStarts.length === 0) return null;
+    let index = 0;
+    while (index + 1 < pageStarts.length && pageStarts[index + 1] <= start) index += 1;
+    const breaks = [];
+    for (let next = index + 1; next < pageStarts.length && pageStarts[next] < start + content.length; next += 1) {
+        breaks.push(pageStarts[next] - start);
+    }
+    return JSON.stringify(breaks.length > 0 ? { page: index + 1, breaks } : { page: index + 1 });
+};
 
 /**
  * Most chunks embedded for one material (about 160,000 characters at 1,000 per chunk with 200
@@ -164,10 +183,11 @@ const markUnreadable = (pool, materialId, reason) => pool.query(
 
 /**
  * Read, chunk, embed and store one material, and mark it 'ready'.
- * - A PDF is chunked page by page (chunkPages): each chunk keeps its page in metadata.page, which
- *   rag-search cites. Other files have no page (metadata NULL). Each run replaces the chunks, so
- *   indexing a material again (POST /api/v2/rag/index) gives an older PDF its pages, unless its
- *   stored vectors are kept (below).
+ * - A PDF's chunks are cut as before, from pdf-parse's text, and each records its pages in metadata
+ *   (pageMetadata: the page it starts on and where the next pages start), which rag-search cites.
+ *   Other files have no page (metadata NULL). Each run replaces the chunks, so indexing a material
+ *   again (POST /api/v2/rag/index) gives an older PDF its pages, unless its stored vectors are kept
+ *   (below).
  * - Embeddings off (Gemini not allowed, or no key: tools/core/ragSearch.js isEmbeddingConfigured):
  *   the chunks are stored without a vector or model (embedding_model NULL), keyword search finds
  *   them, and scripts/rag/reembed.mjs can embed them later. A material that already has chunks
@@ -202,8 +222,9 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
         }
 
         stage = 'extract';
-        const allChunks = await chunkPages(await extractPages(filePath, mimeType));
-        if (allChunks.length === 0) throw unreadable('no_text');
+        const { text, pageStarts } = await extractText(filePath, mimeType);
+        if (!hasText(text)) throw unreadable('no_text');
+        const allChunks = await chunkText(text);
         const chunks = allChunks.slice(0, MAX_CHUNKS_PER_MATERIAL);
         const truncated = allChunks.length > chunks.length ? { indexed: chunks.length, total: allChunks.length } : null;
         if (truncated) {
@@ -242,7 +263,7 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
 
             for (let i = 0; i < chunks.length; i++) {
                 const { content } = chunks[i];
-                const metadata = chunkMetadata(chunks[i]);
+                const metadata = pageMetadata(chunks[i], pageStarts);
 
                 if (!vectors) {
                     // Embeddings off or failed: text only. The NULL model marks the row for reembed.mjs.

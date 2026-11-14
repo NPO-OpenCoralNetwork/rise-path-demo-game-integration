@@ -1,15 +1,17 @@
 // 「出典と検索」 step 3: rag-search results that a learner or an AI app can cite.
-// - A PDF is read page by page (pdf-parse's pagerender): a chunk never spans two pages and keeps its
-//   page in material_chunks.metadata.page; a page without a letter adds no chunk. Other files have no
-//   page (metadata NULL). A material indexed before this gets its pages when it is read again
-//   (POST /api/v2/rag/index runs the same ingestMaterial).
-// - searchContent results name the material (its title: stdio and SSE only), the page, the part of
-//   the material the chunk is (part of parts) and a label to cite (location), and quote the 500
-//   characters around the first matched word instead of the chunk's first 500.
-// - The remote endpoint reads and returns neither the title nor the page (mcp-server/remotePolicy.js
-//   REMOTE_RAG_CITE): the owner chose that AI apps see where a passage is, not the file's name, and
-//   the remote role (deploy/risepath-vm/sql/mcp_remote_role.sql) grants neither column. Every column
-//   its statements read is granted to that role.
+// - A PDF's chunks are cut as before, from pdf-parse's text (so short pages such as slides still
+//   share a chunk, and the 200-chunk cap and the course generator's 3 chunks read as much as before).
+//   Each chunk records its pages in material_chunks.metadata (server/ragService.js pageMetadata): the
+//   page its text starts on, and `breaks`, where the next pages start in it. Pages count the file's
+//   pages from 1. Other files have no page (metadata NULL). A material indexed before this gets its
+//   pages when it is read again (POST /api/v2/rag/index runs the same ingestMaterial).
+// - searchContent results name the material (its title: stdio and SSE only), the page of the quote,
+//   the part of the material the chunk is (part of parts) and a label to cite (location), and quote up
+//   to 500 characters from the sentence of the first matched word, on that word's page.
+// - searchContent reads neither the title nor the page unless asked. The remote endpoint never asks
+//   (mcp-server/remotePolicy.js REMOTE_RAG_CITE): the owner chose that AI apps see where a passage is,
+//   not the file's name, and the remote role (deploy/risepath-vm/sql/mcp_remote_role.sql) grants
+//   neither column. Every column its statements read is granted to that role.
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -24,6 +26,8 @@ import { setPoolForTests, resetPoolForTests } from '../db.js';
 import {
     EMBEDDING_DIM,
     EXCERPT_CHARS,
+    LOCAL_RAG_CITE,
+    citedPassage,
     excerptAround,
     locationLabel,
     resetEmbeddingClientForTests,
@@ -56,7 +60,7 @@ const embeddingClient = () => ({
 /**
  * Mock pg pool recording every query: `keywordRows` answers the ILIKE search, `vectorRows` the vector
  * search, `coverage` the EXISTS probes, `parts` (material id → chunk count) the count of the materials
- * found; everything else gets one empty row.
+ * found (a function: it throws); everything else gets one empty row.
  */
 const mockPool = ({ hasVector = true, coverage = { current: true, legacy: false }, keywordRows = [], vectorRows = [], parts = {} } = {}) => {
     const queries = [];
@@ -68,6 +72,7 @@ const mockPool = ({ hasVector = true, coverage = { current: true, legacy: false 
         if (/ILIKE/.test(sql)) return { rowCount: keywordRows.length, rows: keywordRows };
         if (/<=>/.test(sql)) return { rowCount: vectorRows.length, rows: vectorRows };
         if (/AS parts/.test(sql)) {
+            if (typeof parts === 'function') return parts();
             const rows = params.at(-1).filter((id) => Object.hasOwn(parts, id)).map((id) => ({ material_id: id, parts: parts[id] }));
             return { rowCount: rows.length, rows };
         }
@@ -113,14 +118,15 @@ const pdfWithPages = (pages) => {
     return Buffer.from(pdf, 'latin1');
 };
 
-/** Run `fn` with the console silenced. */
+/** Run `fn` with the console silenced; `warnings` holds what it warned. */
 const quietly = async (fn) => {
     const saved = { log: console.log, warn: console.warn, error: console.error };
+    const warnings = [];
     console.log = () => {};
-    console.warn = () => {};
+    console.warn = (...args) => warnings.push(args.join(' '));
     console.error = () => {};
     try {
-        return await fn();
+        return { value: await fn(), warnings };
     } finally {
         Object.assign(console, saved);
     }
@@ -132,7 +138,7 @@ const ingest = async (name, bytes, mimeType) => {
     const file = path.join(dir, name);
     await fs.writeFile(file, bytes);
     try {
-        return await quietly(() => ingestMaterial(MATERIAL, file, mimeType, LEARNER).then((value) => ({ value }), (error) => ({ error })));
+        return (await quietly(() => ingestMaterial(MATERIAL, file, mimeType, LEARNER).then((value) => ({ value }), (error) => ({ error })))).value;
     } finally {
         await fs.rm(dir, { recursive: true, force: true });
     }
@@ -142,6 +148,9 @@ const ingest = async (name, bytes, mimeType) => {
 const storedChunks = (pool) => pool.queries
     .filter((q) => /INSERT INTO material_chunks/.test(q.sql))
     .map((q) => ({ index: q.params[1], content: q.params[2], metadata: typeof q.params.at(-1) === 'string' ? JSON.parse(q.params.at(-1)) : q.params.at(-1), sql: q.sql }));
+
+/** The page a position of a stored chunk is on, by its metadata. */
+const pageAt = ({ metadata }, offset) => metadata.page + (metadata.breaks ?? []).filter((at) => at <= offset).length;
 
 /** A chunk whose first 500 characters do not hold the matched words (they start at 700). */
 const LATE_HIT = `${'The book starts with other things. '.repeat(20)}The mirror modifier copies one half of the mesh to the other. ${'It ends with other things too. '.repeat(20)}`;
@@ -169,46 +178,68 @@ afterEach(() => {
     resetPoolForTests();
 });
 
-describe('ingestMaterial reads a PDF page by page (material_chunks.metadata.page)', () => {
-    it('a chunk never spans two pages and keeps its page; a page without a letter adds no chunk', async () => {
+describe('ingestMaterial records the pages of a PDF\'s chunks (material_chunks.metadata)', () => {
+    it('short pages (slides) still share a chunk, which records where each page starts', async () => {
+        const pool = mockPool();
+        setPoolForTests(pool);
+        const slides = Array.from({ length: 6 }, (_, i) => [`Slide ${i + 1}: one short idea about modifiers.`]);
+        const { error } = await ingest('slides.pdf', pdfWithPages(slides), 'application/pdf');
+
+        assert.equal(error, undefined, String(error));
+        const [chunk, ...rest] = storedChunks(pool);
+        assert.deepEqual(rest, [], 'one chunk, as before: not one per page');
+        assert.equal(chunk.metadata.page, 1);
+        assert.equal(chunk.metadata.breaks.length, 5);
+        chunk.metadata.breaks.forEach((at, i) => assert.ok(chunk.content.slice(at).startsWith(`Slide ${i + 2}:`), `page ${i + 2} starts at ${at}`));
+    });
+
+    it('chunks are cut from pdf-parse\'s text as before; a blank page and a long page are mapped too', async () => {
         const pool = mockPool();
         setPoolForTests(pool);
         const long = Array.from({ length: 24 }, (_, i) => `Page four, line ${i + 10}: the modifier stack runs from top to bottom.`);
-        const { error } = await ingest('book.pdf', pdfWithPages([['Alpha opens the book.'], null, ['7'], long, ['Omega closes it.']]), 'application/pdf');
+        const bytes = pdfWithPages([['Alpha opens the book.'], null, ['7'], long, ['Omega closes it.']]);
+        const { error } = await ingest('book.pdf', bytes, 'application/pdf');
 
         assert.equal(error, undefined, String(error));
         const chunks = storedChunks(pool);
-        assert.deepEqual(chunks.map((c) => c.index), chunks.map((_, i) => i), 'chunk_index counts on across pages');
-        assert.deepEqual([chunks[0].content, chunks[0].metadata], ['Alpha opens the book.', { page: 1 }]);
-        assert.deepEqual([chunks.at(-1).content, chunks.at(-1).metadata], ['Omega closes it.', { page: 5 }]);
-        const pageFour = chunks.slice(1, -1);
-        assert.ok(pageFour.length >= 2, 'the long page gives several chunks');
-        for (const chunk of pageFour) {
-            assert.deepEqual(chunk.metadata, { page: 4 });
-            assert.ok(long.join('\n').includes(chunk.content), `only page 4's text: ${chunk.content.slice(0, 60)}`);
+        const whole = (await pdfParse(new Uint8Array(bytes))).text;
+        let from = 0;
+        for (const chunk of chunks) {
+            const at = whole.indexOf(chunk.content, from);
+            assert.ok(at >= 0, `chunk ${chunk.index} is a part of pdf-parse's text, in order`);
+            from = at + 1;
         }
-        assert.ok(!chunks.some((c) => /^7$/m.test(c.content)), 'the page holding only a number adds nothing');
+        assert.deepEqual(chunks.map((c) => c.index), chunks.map((_, i) => i));
+        const [first, ...later] = chunks;
+        assert.ok(first.content.startsWith('Alpha opens the book.') && first.content.includes('Page four, line 10'), 'pages 1 to 4 in the first chunk');
+        assert.equal(first.metadata.page, 1);
+        const [blank, seven, four] = first.metadata.breaks;
+        assert.deepEqual([seven - blank, first.content.slice(seven, seven + 1)], [2, '7'], 'the blank page 2 starts and ends between pages 1 and 3');
+        assert.ok(first.content.slice(four).startsWith('Page four, line 10'));
+        assert.equal(pageAt(first, first.content.indexOf('line 12')), 4);
+        const last = later.at(-1);
+        assert.equal(last.metadata.page, 4, 'the last chunk starts inside page 4');
+        assert.deepEqual(last.metadata.breaks, [last.content.indexOf('Omega closes it.')]);
+        assert.equal(pageAt(last, last.content.indexOf('Omega')), 5);
         const deleted = pool.queries.findIndex((q) => /DELETE FROM material_chunks WHERE material_id = \$1/.test(q.sql));
         assert.ok(deleted >= 0 && deleted < pool.queries.findIndex((q) => /INSERT INTO material_chunks/.test(q.sql)),
             'reading a material again replaces its chunks, so an older one gets its pages');
     });
 
-    it('reads each page as pdf-parse itself does: a new line where the text moves to another line', async () => {
+    it('a chunk on one page records only its page', async () => {
         const pool = mockPool();
         setPoolForTests(pool);
-        const bytes = pdfWithPages([['Two lines', 'on page one.'], ['Page two.'], ['Three', 'short', 'lines.']]);
-        const { error } = await ingest('lines.pdf', bytes, 'application/pdf');
+        const lines = Array.from({ length: 40 }, (_, i) => `Line ${i + 10} of a long first page about the mirror modifier.`);
+        const { error } = await ingest('long.pdf', pdfWithPages([lines, ['Second page.']]), 'application/pdf');
 
         assert.equal(error, undefined, String(error));
-        const chunks = storedChunks(pool);
-        assert.deepEqual(chunks.map((c) => [c.content, c.metadata]), [
-            ['Two lines\non page one.', { page: 1 }], ['Page two.', { page: 2 }], ['Three\nshort\nlines.', { page: 3 }],
-        ]);
-        const whole = await pdfParse(new Uint8Array(bytes));
-        assert.equal(whole.text, chunks.map((c) => `\n\n${c.content}`).join(''), "pdf-parse's own text is the same pages");
+        const [first, ...later] = storedChunks(pool);
+        assert.deepEqual(first.metadata, { page: 1 });
+        assert.equal(later.at(-1).metadata.page, 1);
+        assert.ok(later.at(-1).metadata.breaks.length === 1 && later.at(-1).content.endsWith('Second page.'));
     });
 
-    it('with embeddings on, the rows with a vector carry the page too', async () => {
+    it('with embeddings on, the rows with a vector carry the pages too', async () => {
         process.env.GEMINI_ALLOWED = 'true';
         setEmbeddingClientForTests(embeddingClient());
         const pool = mockPool();
@@ -216,10 +247,10 @@ describe('ingestMaterial reads a PDF page by page (material_chunks.metadata.page
         const { value, error } = await ingest('two.pdf', pdfWithPages([['First page.'], ['Second page.']]), 'application/pdf');
 
         assert.equal(error, undefined, String(error));
-        assert.deepEqual(value, { chunks: 2, embedded: 2 });
-        const chunks = storedChunks(pool);
-        assert.deepEqual(chunks.map((c) => [c.content, c.metadata]), [['First page.', { page: 1 }], ['Second page.', { page: 2 }]]);
-        assert.match(chunks[0].sql, /\(material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata\)\s+VALUES \(\$1, \$2, \$3, \$4::vector, \$5, \$6, \$7, \$8::jsonb\)/);
+        assert.deepEqual(value, { chunks: 1, embedded: 1 });
+        const [chunk] = storedChunks(pool);
+        assert.deepEqual([chunk.content, chunk.metadata], ['First page.\n\nSecond page.', { page: 1, breaks: [13] }]);
+        assert.match(chunk.sql, /\(material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata\)\s+VALUES \(\$1, \$2, \$3, \$4::vector, \$5, \$6, \$7, \$8::jsonb\)/);
     });
 
     it('a text file has no page: its chunks keep metadata NULL', async () => {
@@ -237,8 +268,8 @@ describe('ingestMaterial reads a PDF page by page (material_chunks.metadata.page
     });
 });
 
-describe('excerptAround and locationLabel', () => {
-    it('quotes 500 characters from the sentence before the first match, the chunk\'s first 500 without one', () => {
+describe('excerptAround, citedPassage and locationLabel', () => {
+    it('quotes 500 characters from the sentence of the first match, the chunk\'s first 500 without one', () => {
         assert.equal(EXCERPT_CHARS, 500);
         assert.equal(excerptAround('Short text about mirrors.', ['mirror']), 'Short text about mirrors.');
         const late = excerptAround(LATE_HIT, ['modifier']);
@@ -247,6 +278,13 @@ describe('excerptAround and locationLabel', () => {
         assert.ok(LATE_HIT.includes(late), 'a verbatim part of the chunk');
         assert.equal(excerptAround('y'.repeat(800), ['mirror']), 'y'.repeat(500));
         assert.equal(excerptAround('y'.repeat(800), []), 'y'.repeat(500));
+    });
+
+    it('a sentence that starts exactly at the edge of the window counts', () => {
+        const text = `${'a'.repeat(499)}。${'b'.repeat(299)}。${'c'.repeat(99)}。mirror${'d'.repeat(94)}`;
+        assert.equal(excerptAround(text, ['mirror']), text.slice(500), 'from 500, not from the later sentence at 800');
+        const lead = `${'e'.repeat(449)}。${'f'.repeat(150)}mirror${'g'.repeat(600)}`;
+        assert.ok(excerptAround(lead, ['mirror']).startsWith('f'), 'a sentence 150 characters before the word');
     });
 
     it('a printed line break is not a sentence end (PDF text), but a line is when no sentence ends near', () => {
@@ -281,41 +319,86 @@ describe('excerptAround and locationLabel', () => {
         }
     });
 
-    it('names the place: the page, or the part of the material; 「あなたの教材」 without a name', () => {
-        assert.equal(locationLabel({ title: 'Blender入門.pdf', page: 3, part: 5, parts: 12 }), '「Blender入門.pdf」3 ページ');
-        assert.equal(locationLabel({ title: null, page: 3, part: 5, parts: 12 }), 'あなたの教材・3 ページ');
+    it('quotes one page: the one holding the matched word, or the longest without one', () => {
+        const chunk = 'End of page seven.\n\nPage eight is about the mirror modifier.\n\nPage nine.';
+        const breaks = [chunk.indexOf('Page eight'), chunk.indexOf('Page nine')];
+        assert.deepEqual(citedPassage(chunk, ['mirror'], 7, breaks), { quote: 'Page eight is about the mirror modifier.', page: 8 });
+        assert.deepEqual(citedPassage(chunk, ['nine'], 7, breaks), { quote: 'Page nine.', page: 9 });
+        assert.deepEqual(citedPassage(chunk, ['zebra'], 7, breaks), { quote: 'Page eight is about the mirror modifier.', page: 8 }, 'a vector match');
+        assert.deepEqual(citedPassage(chunk, ['mirror'], 7, undefined), { quote: chunk, page: 7 }, 'a chunk on one page');
+        assert.deepEqual(citedPassage(chunk, ['mirror'], null, breaks), { quote: chunk, page: null }, 'no page: the whole chunk');
+        for (const bad of [[0], [500], [40, 30], ['20'], 'x']) {
+            assert.deepEqual(citedPassage(chunk, ['mirror'], 7, bad), { quote: chunk, page: 7 }, `breaks ${JSON.stringify(bad)} do not fit: the chunk's own page`);
+        }
+    });
+
+    it('names the place: the page counted from the file\'s start, or the part; 「あなたの教材」 without a name', () => {
+        assert.equal(locationLabel({ title: 'Blender入門.pdf', page: 3, part: 5, parts: 12 }), '「Blender入門.pdf」3 ページ目');
+        assert.equal(locationLabel({ title: null, page: 3, part: 5, parts: 12 }), 'あなたの教材・3 ページ目');
         assert.equal(locationLabel({ title: 'メモ.md', part: 2, parts: 4 }), '「メモ.md」4 つの部分のうち 2 番目');
         assert.equal(locationLabel({ part: 2, parts: 4 }), 'あなたの教材・4 つの部分のうち 2 番目');
         assert.equal(locationLabel({ title: 'メモ.md', part: 1, parts: 1 }), '「メモ.md」');
         assert.equal(locationLabel({ part: 1, parts: 1 }), 'あなたの教材');
         assert.equal(locationLabel({ title: 'メモ.md', part: 2 }), '「メモ.md」', 'no count: no part');
+        assert.equal(locationLabel({ part: 5, parts: 4 }), 'あなたの教材', 'a count older than the chunk (re-indexed between the two statements)');
     });
 });
 
-describe('searchContent: results that can be cited (stdio and SSE)', () => {
-    it('the material\'s name, the page, the part and a location to cite; the name and page read with the chunk', async () => {
+describe('searchContent: results that can be cited (stdio and SSE: LOCAL_RAG_CITE)', () => {
+    it('the material\'s name, the page, the part and a location to cite; the name and pages read with the chunk', async () => {
         const pool = mockPool({
             hasVector: false,
-            keywordRows: [{ content: LATE_HIT, chunk_index: 4, material_id: MATERIAL, material_title: 'Blender入門.pdf', page: '3' }],
+            keywordRows: [{ content: LATE_HIT, chunk_index: 4, material_id: MATERIAL, material_title: 'Blender入門.pdf', page: '3', page_breaks: null }],
             parts: { [MATERIAL]: 12 },
         });
         setPoolForTests(pool);
-        const result = await searchContent({ query: 'mirror modifier', userId: LEARNER });
+        const result = await searchContent({ query: 'mirror modifier', userId: LEARNER, cite: LOCAL_RAG_CITE });
 
         assert.equal(result.fallback_reason, 'no_pgvector', 'the reason for a keyword match stays (step 2)');
         const [hit] = result.results;
         assert.deepEqual(
             { title: hit.title, page: hit.page, part: hit.part, parts: hit.parts, location: hit.location, source: hit.source, relevance: hit.relevance_score },
-            { title: 'Blender入門.pdf', page: 3, part: 5, parts: 12, location: '「Blender入門.pdf」3 ページ', source: MATERIAL, relevance: 0.5 });
+            { title: 'Blender入門.pdf', page: 3, part: 5, parts: 12, location: '「Blender入門.pdf」3 ページ目', source: MATERIAL, relevance: 0.5 });
         assert.ok(hit.content.startsWith('The mirror modifier copies'), 'the passage around the match, not the chunk\'s first 500');
         assert.ok(hit.content.length <= EXCERPT_CHARS);
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
-        assert.match(keyword.sql, /^SELECT c\.content, c\.chunk_index, m\.id as material_id, m\.title AS material_title, c\.metadata->>'page' AS page\s+FROM material_chunks c/);
+        assert.match(keyword.sql, /^SELECT c\.content, c\.chunk_index, m\.id as material_id, m\.title AS material_title, c\.metadata->>'page' AS page, c\.metadata->'breaks' AS page_breaks\s+FROM material_chunks c/);
         assert.deepEqual(keyword.params, [LEARNER, '%mirror%', '%modifier%', 3], 'no new parameter');
         const count = partsQuery(pool);
         assert.match(count.sql, /SELECT c\.material_id, count\(\*\)::int AS parts\s+FROM material_chunks c\s+JOIN materials m ON c\.material_id = m\.id\s+WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.material_id = ANY\(\$2::uuid\[\]\)\s+GROUP BY c\.material_id/,
             'counted in the same scope as the search: the learner\'s own ready materials');
         assert.deepEqual(count.params, [LEARNER, [MATERIAL]]);
+    });
+
+    it('a chunk over several pages cites the page of the matched word, and quotes that page only', async () => {
+        const content = 'The end of page seven.\n\nPage eight explains the mirror modifier.\n\nPage nine.';
+        setPoolForTests(mockPool({
+            hasVector: false,
+            keywordRows: [{ content, chunk_index: 2, material_id: MATERIAL, material_title: 'Blender入門.pdf', page: '7', page_breaks: [24, 66] }],
+            parts: { [MATERIAL]: 9 },
+        }));
+        const { results: [hit] } = await searchContent({ query: 'mirror', userId: LEARNER, cite: LOCAL_RAG_CITE });
+        assert.deepEqual([hit.page, hit.location, hit.content], [8, '「Blender入門.pdf」8 ページ目', 'Page eight explains the mirror modifier.']);
+    });
+
+    it('a vector match reads the same, and quotes around a word of the query', async () => {
+        process.env.GEMINI_ALLOWED = 'true';
+        setEmbeddingClientForTests(embeddingClient());
+        const pool = mockPool({
+            vectorRows: [{ content: LATE_HIT, chunk_index: 1, distance: 0.2, material_id: MATERIAL, material_title: 'メモ.md', page: null, page_breaks: null }],
+            parts: { [MATERIAL]: 4 },
+        });
+        setPoolForTests(pool);
+        const result = await searchContent({ query: 'mirror modifier', userId: LEARNER, cite: LOCAL_RAG_CITE });
+
+        assert.equal(result.search_type, 'vector');
+        const [hit] = result.results;
+        assert.equal(hit.location, '「メモ.md」4 つの部分のうち 2 番目');
+        assert.ok(!('page' in hit), 'a text file has no page');
+        assert.ok(hit.content.startsWith('The mirror modifier copies'), hit.content.slice(0, 40));
+        const search = pool.queries.find((q) => /<=>/.test(q.sql));
+        assert.match(search.sql, /m\.id as material_id, m\.title AS material_title, c\.metadata->>'page' AS page, c\.metadata->'breaks' AS page_breaks\s+FROM material_chunks c/);
+        assert.match(partsQuery(pool).sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.material_id = ANY\(\$2::uuid\[\]\)/);
     });
 
     it('counts each material found once, and nothing when nothing is found', async () => {
@@ -330,7 +413,7 @@ describe('searchContent: results that can be cited (stdio and SSE)', () => {
             parts: { [MATERIAL]: 2, [OTHER]: 3 },
         });
         setPoolForTests(pool);
-        const { results } = await searchContent({ query: 'mirror', userId: LEARNER });
+        const { results } = await searchContent({ query: 'mirror', userId: LEARNER, cite: LOCAL_RAG_CITE });
         assert.deepEqual(partsQuery(pool).params, [LEARNER, [MATERIAL, OTHER]]);
         assert.deepEqual(results.map((r) => [r.part, r.parts, r.location]), [
             [1, 2, 'あなたの教材・2 つの部分のうち 1 番目'],
@@ -340,28 +423,22 @@ describe('searchContent: results that can be cited (stdio and SSE)', () => {
 
         const empty = mockPool({ hasVector: false });
         setPoolForTests(empty);
-        assert.deepEqual((await searchContent({ query: 'mirror', userId: LEARNER })).results, []);
+        assert.deepEqual((await searchContent({ query: 'mirror', userId: LEARNER, cite: LOCAL_RAG_CITE })).results, []);
         assert.equal(partsQuery(empty), undefined, 'no count without a result');
     });
 
-    it('a vector match reads the same, and quotes around a word of the query', async () => {
-        process.env.GEMINI_ALLOWED = 'true';
-        setEmbeddingClientForTests(embeddingClient());
-        const pool = mockPool({
-            vectorRows: [{ content: LATE_HIT, chunk_index: 1, distance: 0.2, material_id: MATERIAL, material_title: 'メモ.md', page: null }],
-            parts: { [MATERIAL]: 4 },
-        });
-        setPoolForTests(pool);
-        const result = await searchContent({ query: 'mirror modifier', userId: LEARNER });
-
-        assert.equal(result.search_type, 'vector');
-        const [hit] = result.results;
-        assert.equal(hit.location, '「メモ.md」4 つの部分のうち 2 番目');
-        assert.ok(!('page' in hit), 'a text file has no page');
-        assert.ok(hit.content.startsWith('The mirror modifier copies'), hit.content.slice(0, 40));
-        const search = pool.queries.find((q) => /<=>/.test(q.sql));
-        assert.match(search.sql, /m\.id as material_id, m\.title AS material_title, c\.metadata->>'page' AS page\s+FROM material_chunks c/);
-        assert.match(partsQuery(pool).sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.material_id = ANY\(\$2::uuid\[\]\)/);
+    it('when counting fails, the results stand without a count (logged without the query)', async () => {
+        setPoolForTests(mockPool({
+            hasVector: false,
+            keywordRows: [{ content: 'The mirror modifier.', chunk_index: 1, material_id: MATERIAL, material_title: 'メモ.md' }],
+            parts: () => { throw Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' }); },
+        }));
+        const { value: result, warnings } = await quietly(() => searchContent({ query: 'secret mirror words', userId: LEARNER, cite: LOCAL_RAG_CITE }));
+        assert.equal(result.error_type, undefined);
+        assert.deepEqual([result.results[0].location, result.results[0].parts], ['「メモ.md」', undefined]);
+        assert.equal(warnings.length, 1);
+        assert.match(warnings[0], /57014/);
+        assert.doesNotMatch(warnings[0], /secret/);
     });
 
     it('a material without a title, or with a page that is not a whole number, is cited by what is known', async () => {
@@ -373,12 +450,20 @@ describe('searchContent: results that can be cited (stdio and SSE)', () => {
             ],
             parts: { [MATERIAL]: 3 },
         }));
-        const { results } = await searchContent({ query: 'mirror', userId: LEARNER });
+        const { results } = await searchContent({ query: 'mirror', userId: LEARNER, cite: LOCAL_RAG_CITE });
 
         assert.deepEqual(results.map((r) => [r.title, r.page, r.location]), [
-            [undefined, 2, 'あなたの教材・2 ページ'],
+            [undefined, 2, 'あなたの教材・2 ページ目'],
             [undefined, undefined, 'あなたの教材・3 つの部分のうち 2 番目'],
         ]);
+    });
+
+    it('without `cite`, neither the name nor the page is read', async () => {
+        const pool = mockPool({ hasVector: false, keywordRows: [{ content: 'The mirror modifier.', chunk_index: 0, material_id: MATERIAL }], parts: { [MATERIAL]: 2 } });
+        setPoolForTests(pool);
+        const { results: [hit] } = await searchContent({ query: 'mirror', userId: LEARNER });
+        assert.equal(hit.location, 'あなたの教材・2 つの部分のうち 1 番目');
+        for (const { sql } of pool.queries) assert.doesNotMatch(sql, /title|metadata/, sql);
     });
 });
 
@@ -420,7 +505,7 @@ describe('searchContent on the remote endpoint (REMOTE_RAG_CITE)', () => {
             const found = [{ content: 'Blender mirror', chunk_index: 0, material_id: MATERIAL, distance: 0.1 }];
             const pool = mockPool({ ...search.pool, keywordRows: found, vectorRows: found, parts: { [MATERIAL]: 2 } });
             setPoolForTests(pool);
-            const result = await quietly(() => searchContent({ query: 'Blender の押し出し mirror', userId: LEARNER, cite: REMOTE_RAG_CITE }));
+            const { value: result } = await quietly(() => searchContent({ query: 'Blender の押し出し mirror', userId: LEARNER, cite: REMOTE_RAG_CITE }));
             assert.equal(result.results[0]?.location, 'あなたの教材・2 つの部分のうち 1 番目', JSON.stringify(result));
             statements.push(...pool.queries.map((q) => q.sql));
         }
@@ -455,6 +540,7 @@ describe('the content-search skill cites by place', () => {
         const step3 = skill.slice(skill.indexOf('### Step 3'), skill.indexOf('## ルール'));
         assert.match(step3, /`location`/);
         assert.match(step3, /`content`/);
+        assert.match(step3, /ファイルの先頭から数えた/, 'the page is counted from the file\'s first page');
         assert.doesNotMatch(step3, /レッスンタイトル|このレッスンを始めますか/);
     });
 });
@@ -474,15 +560,15 @@ describe('rag-search over MCP on stdio and SSE (no remote policy)', () => {
         const client = new Client({ name: 'rag-citations-test', version: '1.0.0' });
         await client.connect(clientSide);
         try {
-            const body = await quietly(async () => {
+            const { value: body } = await quietly(async () => {
                 const turn = await registerAgentTurn(LEARNER);
                 const result = await client.callTool({ name: 'rag-search', arguments: { query: 'mirror modifier', rp_turn: turn } });
                 assert.ok(!result.isError, result.content[0].text);
                 return JSON.parse(result.content[0].text);
             });
-            assert.deepEqual([body.results[0].title, body.results[0].page, body.results[0].location], ['Blender入門.pdf', 3, '「Blender入門.pdf」3 ページ']);
+            assert.deepEqual([body.results[0].title, body.results[0].page, body.results[0].location], ['Blender入門.pdf', 3, '「Blender入門.pdf」3 ページ目']);
             const { tools } = await client.listTools();
-            assert.match(tools.find((t) => t.name === 'rag-search').description, /location/);
+            assert.match(tools.find((t) => t.name === 'rag-search').description, /location は引用する場所（教材の名前とページ/);
         } finally {
             await client.close();
         }

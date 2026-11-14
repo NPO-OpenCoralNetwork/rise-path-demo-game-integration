@@ -145,7 +145,8 @@ const whereClause = (scope, extra = []) => {
 /**
  * Columns a search reads besides the chunk, to cite it (searchContent):
  * - title: the material's name (materials.title, AS material_title);
- * - page: the chunk's PDF page (material_chunks.metadata.page, server/ragService.js chunkPages).
+ * - page: the chunk's PDF pages (material_chunks.metadata, server/ragService.js pageMetadata): the
+ *   page its text starts on (AS page) and where the next pages start in it (AS page_breaks).
  * The remote endpoint reads neither (mcp-server/remotePolicy.js REMOTE_RAG_CITE): its database role
  * is not granted those columns.
  * @typedef {{ title?: boolean, page?: boolean }} CiteColumns
@@ -154,7 +155,7 @@ const whereClause = (scope, extra = []) => {
 /** The SELECT list's columns for `cite`, each after a comma ('' for none). @param {CiteColumns} [cite] */
 const citeColumns = (cite = {}) => [
     ...(cite.title ? ['m.title AS material_title'] : []),
-    ...(cite.page ? ["c.metadata->>'page' AS page"] : []),
+    ...(cite.page ? ["c.metadata->>'page' AS page", "c.metadata->'breaks' AS page_breaks"] : []),
 ].map((column) => `, ${column}`).join('');
 
 /**
@@ -597,17 +598,21 @@ const sentenceEndsAt = (text, i) => '。！？'.includes(text[i])
     || (text[i] === '\n' && text[i + 1] === '\n');
 
 /**
- * Where a quote that may start anywhere in [from, to] starts: after the sentence end nearest to `to`
- * (`last`) or to `from`, else after such a line break (a list item, a heading), else at `from`.
+ * Where a quote that may start anywhere in [from, to] starts: at the start of the sentence nearest
+ * to `to` (`last`) or to `from` (`first`), else of such a line (a list item, a heading), else at
+ * `from`. A sentence starts after the end of the one before, so the ends looked at are those at
+ * from - 1 to to - 1.
  * @param {string} text
  * @param {number} from
  * @param {number} to
  * @param {'first' | 'last'} which
  */
 function quoteStart(text, from, to, which) {
+    const low = Math.max(0, from - 1);
+    const count = Math.max(0, to - low);
     const order = which === 'last'
-        ? Array.from({ length: to - from }, (_, k) => to - 1 - k)
-        : Array.from({ length: to - from }, (_, k) => from + k);
+        ? Array.from({ length: count }, (_, k) => to - 1 - k)
+        : Array.from({ length: count }, (_, k) => low + k);
     const end = order.find((i) => sentenceEndsAt(text, i)) ?? order.find((i) => text[i] === '\n');
     return end === undefined ? from : end + 1;
 }
@@ -642,32 +647,60 @@ export function excerptAround(text, words) {
     return value.slice(start, end).trimEnd();
 }
 
+/**
+ * The passage a result quotes and the page it is on. With the chunk's PDF pages (`page` it starts
+ * on, `breaks` where the next pages start: server/ragService.js pageMetadata), the quote stays on
+ * one page: the one holding the first of `words`, or with no word in the chunk (a vector match)
+ * its longest page. Without pages (or with breaks that do not fit the chunk), excerptAround over the
+ * whole chunk, on the chunk's own page if it has one.
+ * @param {string} text the chunk
+ * @param {string[]} words
+ * @param {number | null} page
+ * @param {unknown} breaks
+ * @returns {{ quote: string, page: number | null }}
+ */
+export function citedPassage(text, words, page, breaks) {
+    const value = String(text ?? '');
+    const fits = Array.isArray(breaks) && breaks.length > 0
+        && breaks.every((at, i) => Number.isInteger(at) && at > (i === 0 ? 0 : breaks[i - 1]) && at < value.length);
+    if (!page || !fits) return { quote: excerptAround(value, words), page: page ?? null };
+    const bounds = [0, ...breaks, value.length];
+    const segments = bounds.slice(0, -1).map((from, i) => ({ from, to: bounds[i + 1], page: page + i }));
+    const hit = firstMatch(value, words);
+    const longest = () => segments.reduce((best, s) => (value.slice(s.from, s.to).trim().length > value.slice(best.from, best.to).trim().length ? s : best));
+    const on = hit >= 0 ? segments.find((s) => hit >= s.from && hit < s.to) : longest();
+    return { quote: excerptAround(value.slice(on.from, on.to).trim(), words), page: on.page };
+}
+
 /** What a result calls a material when it does not name it: the learner's own material. */
 const OWN_MATERIAL = 'あなたの教材';
 
 /**
  * The place of a passage, to cite it (searchContent `location`): the material, 「by its name」 or
- * あなたの教材 without one (always on the remote endpoint), then the page, else which of its parts:
- * 「Blender入門.pdf」3 ページ, あなたの教材・4 つの部分のうち 2 番目. A material in one part, or with an
- * unknown count, is named alone.
+ * あなたの教材 without one (always on the remote endpoint), then the page, counted from the file's
+ * first page (not the number printed on it), else which of its parts: 「Blender入門.pdf」3 ページ目,
+ * あなたの教材・4 つの部分のうち 2 番目. A material in one part, or with an unknown or stale count,
+ * is named alone.
  * @param {{ title?: string | null, page?: number | null, part?: number, parts?: number | null }} place
  */
 export function locationLabel({ title, page, part, parts }) {
     const name = title ? `「${title}」` : OWN_MATERIAL;
     const joiner = title ? '' : '・';
-    if (page) return `${name}${joiner}${page} ページ`;
-    if (parts > 1 && part >= 1) return `${name}${joiner}${parts} つの部分のうち ${part} 番目`;
+    if (page) return `${name}${joiner}${page} ページ目`;
+    if (parts > 1 && part >= 1 && part <= parts) return `${name}${joiner}${parts} つの部分のうち ${part} 番目`;
     return name;
 }
 
 /**
  * What rag-search cites a result by besides its place in the material: the material's name (title)
- * and the PDF page (page). Both on stdio and SSE; the remote endpoint passes
- * mcp-server/remotePolicy.js REMOTE_RAG_CITE.
+ * and the PDF page (page). searchContent reads neither unless asked (NO_RAG_CITE); stdio and SSE ask
+ * for both (LOCAL_RAG_CITE); the remote endpoint passes mcp-server/remotePolicy.js REMOTE_RAG_CITE.
  * @typedef {{ title: boolean, page: boolean }} RagCite
  */
 /** @type {Readonly<RagCite>} */
 export const LOCAL_RAG_CITE = Object.freeze({ title: true, page: true });
+/** @type {Readonly<RagCite>} */
+export const NO_RAG_CITE = Object.freeze({ title: false, page: false });
 
 /** A positive whole page number (material_chunks.metadata->>'page'), else null. */
 const pageNumber = (value) => {
@@ -679,10 +712,13 @@ const pageNumber = (value) => {
  * Search the learner's own uploaded materials (material_chunks): searchChunks over
  * learnerChunkScope, as the MCP rag-search result. Each result cites its passage:
  * - title: the material's name (only with cite.title);
- * - page: its PDF page, when the material was indexed page by page (only with cite.page);
- * - part, parts: which part of the material the chunk is;
+ * - page: the PDF page of the quote, when the material was indexed with its pages (only with
+ *   cite.page; citedPassage);
+ * - part, parts: which part of the material the chunk is (parts: counted after the search, left out
+ *   when that fails);
  * - location: the place to cite (locationLabel), naming the material only with cite.title;
- * - content: EXCERPT_CHARS characters of the chunk around the first word of the query (excerptAround).
+ * - content: up to EXCERPT_CHARS characters around the first word of the query (excerptAround), on
+ *   one page when the page is known.
  *
  * @param {Object} params
  * @param {string} params.query - Search query text
@@ -691,9 +727,9 @@ const pageNumber = (value) => {
  * @param {string} params.userId - The learner whose materials are searched. Required: a missing
  *   or non-UUID id returns no results without querying.
  * @param {RagCite} [params.cite] - Whether the material's name and page are read and returned
- *   (default LOCAL_RAG_CITE: both)
+ *   (default NO_RAG_CITE: neither)
  */
-export async function searchContent({ query, domain, maxResults = 3, userId, cite = LOCAL_RAG_CITE }) {
+export async function searchContent({ query, domain, maxResults = 3, userId, cite = NO_RAG_CITE }) {
     if (typeof userId !== 'string' || !UUID.test(userId)) {
         return { results: [], search_type: 'none', message: 'No learner in scope' };
     }
@@ -708,7 +744,14 @@ export async function searchContent({ query, domain, maxResults = 3, userId, cit
         if (found.search_type === 'keyword' && extractKeywords(query).length === 0) {
             return { results: [], search_type: 'keyword', message: 'No valid search keywords', ...reason };
         }
-        const counts = await materialParts(pool, scope, [...new Set(found.rows.map((row) => String(row.material_id)))]);
+        /** @type {Map<string, number>} */
+        let counts = new Map();
+        try {
+            counts = await materialParts(pool, scope, [...new Set(found.rows.map((row) => String(row.material_id)))]);
+        } catch (error) {
+            // The results stand without the count (name, code and message only: never the query).
+            console.warn(`[RAG] Counting the parts of the materials found failed (${describeError(error)}); results give no part count.`);
+        }
         // The words a keyword match selects chunks by (keywordSearchChunks): the quote starts at one.
         const plan = keywordPlan(query);
         const anchors = (plan.some(({ selects }) => selects) ? plan.filter(({ selects }) => selects) : plan).map(({ word }) => word);
@@ -716,17 +759,17 @@ export async function searchContent({ query, domain, maxResults = 3, userId, cit
             ...reason,
             results: found.rows.map((row) => {
                 const title = columns.title && typeof row.material_title === 'string' && row.material_title.trim() ? row.material_title.trim() : null;
-                const page = columns.page ? pageNumber(row.page) : null;
+                const { quote, page } = citedPassage(row.content ?? '', anchors, columns.page ? pageNumber(row.page) : null, columns.page ? row.page_breaks : null);
                 const part = Number(row.chunk_index) + 1;
                 const count = counts.get(String(row.material_id));
-                const parts = Number.isInteger(count) && count > 0 ? count : null;
+                const parts = Number.isInteger(count) && count >= part ? count : null;
                 return {
                     ...(title ? { title } : {}),
                     location: locationLabel({ title, page, part, parts }),
                     ...(page ? { page } : {}),
                     part,
                     ...(parts ? { parts } : {}),
-                    content: excerptAround(row.content ?? '', anchors),
+                    content: quote,
                     relevance_score: row.relevance,
                     source: row.material_id,
                     domain: domain,

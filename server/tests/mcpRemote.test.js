@@ -284,6 +284,10 @@ describe('remote MCP endpoint (in process)', () => {
         const search = db.pool.queries.filter((q) => q.sql.includes('material_chunks'));
         assert.ok(search.some((q) => q.sql.includes(' ilike ') && q.params[0] === user), 'the token user\'s own materials');
         for (const { sql } of search) assert.doesNotMatch(sql, /title|metadata/, 'columns the remote role is not granted');
+        const { tools } = await client.listTools();
+        const description = tools.find((t) => t.name === 'rag-search').description;
+        assert.match(description, /location は引用する場所（教材の中で何番目の部分か）/);
+        assert.doesNotMatch(description, /ページ/, 'the tool promises no page here');
     });
 
     it('daily caps: mcp_write after 2 writes, mcp after 6 calls, as daily_limit_reached tool errors', async () => {

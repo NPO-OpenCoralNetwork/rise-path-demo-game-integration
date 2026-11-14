@@ -35,7 +35,7 @@ import { checkPolicy, auditLog, hasCallLimit } from './policy.js';
 
 import { getProgress, updateProgress } from '../tools/core/learnerState.js';
 import { logEntry, getSummary, getRecent, getAdaptationSignals } from '../tools/core/journal.js';
-import { searchContent, MAX_SEARCH_RESULTS } from '../tools/core/ragSearch.js';
+import { searchContent, LOCAL_RAG_CITE, MAX_SEARCH_RESULTS } from '../tools/core/ragSearch.js';
 import { getKit, validateIntake, saveDraft } from '../tools/core/curriculum.js';
 import {
     SAFE_SLUG,
@@ -423,13 +423,16 @@ policyTool(
 // --- rag-search ---
 // Searches only the acting learner's own uploaded materials (there is no shared material). Each
 // result cites its passage (searchContent): stdio and SSE name the material and its PDF page; the
-// remote endpoint names neither (remote.ragCite).
+// remote endpoint names neither (remote.ragCite), only where the passage sits in the material.
 const ragCite = remote
     ? { title: remote.ragCite?.title === true, page: remote.ragCite?.page === true }
-    : undefined;
+    : LOCAL_RAG_CITE;
+const ragPlace = ragCite.title || ragCite.page
+    ? '教材の名前とページ（ページはファイルの先頭から数える）など'
+    : '教材の中で何番目の部分か';
 policyTool(
     'rag-search',
-    '学習者本人がアップロードした教材から関連箇所を検索する（他の学習者の教材やコース教材は対象外）。各結果の location は教材の中の場所（教材とページなど）で、引用するときはそれを示す / Searches the learner\'s own uploaded materials only; cite each passage by its location',
+    `学習者本人がアップロードした教材から関連箇所を検索する（他の学習者の教材やコース教材は対象外）。各結果の location は引用する場所（${ragPlace}）で、引用するときはそれを示す / Searches the learner's own uploaded materials only; cite each passage by its location`,
     {
         query: z.string().describe('検索クエリ'),
         domain: z.string().optional().describe('結果にそのまま付けるラベル。絞り込みには使わない / Label echoed in the results; not a filter'),
