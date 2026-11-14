@@ -249,10 +249,20 @@ describe('excerptAround and locationLabel', () => {
         assert.equal(excerptAround('y'.repeat(800), []), 'y'.repeat(500));
     });
 
-    it('near the end of a chunk, the last 500 characters', () => {
+    it('a printed line break is not a sentence end (PDF text), but a line is when no sentence ends near', () => {
+        const pdfText = `${'a'.repeat(200)}。The sentence that holds\nthe mirror word goes on.「引用。」その後。${'z'.repeat(600)}`;
+        assert.ok(excerptAround(pdfText, ['mirror']).startsWith('The sentence that holds\nthe mirror'), 'from the sentence, not the printed line');
+        const list = `${'x'.repeat(600)}\n- item one\n- item two with the mirror\n${'y'.repeat(600)}`;
+        assert.ok(excerptAround(list, ['mirror']).startsWith('- item two with the mirror'), 'a list item without punctuation');
+        const quoted = `${'b'.repeat(200)}「前の文です。」後の文に mirror があります。${'c'.repeat(600)}`;
+        assert.ok(excerptAround(quoted, ['mirror']).startsWith('後の文に mirror'), 'not from the closing bracket');
+    });
+
+    it('near the end of a chunk, from the first sentence in the last 500 characters (else the last 500)', () => {
         const text = `${'x'.repeat(980)} mirror.`;
-        const excerpt = excerptAround(text, ['mirror']);
-        assert.equal(excerpt, text.slice(-500));
+        assert.equal(excerptAround(text, ['mirror']), text.slice(-500));
+        const sentences = `${'a'.repeat(300)}。${'b'.repeat(400)}。\nThe mirror.`;
+        assert.equal(excerptAround(sentences, ['mirror']), `${'b'.repeat(400)}。\nThe mirror.`, 'not from the middle of the a-sentence');
     });
 
     it('finds the word in full-width, half-width and upper-case forms, and quotes the chunk as written', () => {

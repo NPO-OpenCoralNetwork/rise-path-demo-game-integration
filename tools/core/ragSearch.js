@@ -588,17 +588,39 @@ function firstMatch(text, words) {
     return first < 0 ? -1 : origin[first];
 }
 
-/** Whether a sentence ends at text[i]: 。！？ or a new line, or . ! ? before a space. */
-const sentenceEndsAt = (text, i) => '。！？\n'.includes(text[i]) || ('.!?'.includes(text[i]) && /\s/.test(text[i + 1] ?? ''));
+/**
+ * Whether a sentence ends at text[i]: 。！？, . ! ? before a space, or a blank line. A single line
+ * break is not one: PDF text breaks wherever the printed line ends.
+ */
+const sentenceEndsAt = (text, i) => '。！？'.includes(text[i])
+    || ('.!?'.includes(text[i]) && /\s/.test(text[i + 1] ?? ''))
+    || (text[i] === '\n' && text[i + 1] === '\n');
+
+/**
+ * Where a quote that may start anywhere in [from, to] starts: after the sentence end nearest to `to`
+ * (`last`) or to `from`, else after such a line break (a list item, a heading), else at `from`.
+ * @param {string} text
+ * @param {number} from
+ * @param {number} to
+ * @param {'first' | 'last'} which
+ */
+function quoteStart(text, from, to, which) {
+    const order = which === 'last'
+        ? Array.from({ length: to - from }, (_, k) => to - 1 - k)
+        : Array.from({ length: to - from }, (_, k) => from + k);
+    const end = order.find((i) => sentenceEndsAt(text, i)) ?? order.find((i) => text[i] === '\n');
+    return end === undefined ? from : end + 1;
+}
 
 const isHighSurrogate = (unit) => unit >= 0xd800 && unit <= 0xdbff;
 const isLowSurrogate = (unit) => unit >= 0xdc00 && unit <= 0xdfff;
 
 /**
- * The part of a chunk a search result quotes: EXCERPT_CHARS units from the sentence before the first
- * of `words` (one that starts at most EXCERPT_LEAD units before it), or the last EXCERPT_CHARS when
- * the word is near the end; the first EXCERPT_CHARS when no word occurs (a vector match may hold
- * none). A verbatim slice of the chunk that never splits a character outside the BMP.
+ * The part of a chunk a search result quotes: EXCERPT_CHARS units from the sentence that holds the
+ * first of `words` (when it starts at most EXCERPT_LEAD units before the word); near the end of the
+ * chunk, from the first sentence that starts in its last EXCERPT_CHARS units, so the quote may be
+ * shorter; the first EXCERPT_CHARS when no word occurs (a vector match may hold none). A verbatim
+ * slice of the chunk that never splits a character outside the BMP.
  * @param {string} text
  * @param {string[]} words
  */
@@ -608,15 +630,11 @@ export function excerptAround(text, words) {
     const hit = firstMatch(value, words);
     let start = 0;
     if (hit > 0) {
-        start = Math.max(0, hit - EXCERPT_LEAD);
-        for (let i = hit - 1; i >= start; i -= 1) {
-            if (sentenceEndsAt(value, i)) {
-                start = i + 1;
-                break;
-            }
-        }
-        while (start < hit && /\s/.test(value[start])) start += 1;
-        start = Math.min(start, value.length - EXCERPT_CHARS);
+        start = quoteStart(value, Math.max(0, hit - EXCERPT_LEAD), hit, 'last');
+        const latest = value.length - EXCERPT_CHARS;
+        if (start > latest) start = quoteStart(value, latest, start, 'first');
+        // Not from a space or a closing bracket left after the sentence end.
+        while (start < hit && /[\s」』）)\]】〕]/.test(value[start])) start += 1;
     }
     if (isLowSurrogate(value.charCodeAt(start))) start += 1;
     let end = Math.min(value.length, start + EXCERPT_CHARS);
