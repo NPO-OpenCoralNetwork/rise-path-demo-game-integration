@@ -19,6 +19,7 @@
  *   the learner's lesson records already fix); every course-review-grade call, a reveal included,
  *   is charged 'mcp_write' too, so a 10-card review with reveals uses at most 20 of the 50 daily
  *   'mcp_write' calls (server/middleware/dailyCaps.js).
+ * - ragCite: what rag-search reads and returns to cite a passage (REMOTE_RAG_CITE).
  */
 import { reserveDailyCapFor } from '../server/middleware/dailyCaps.js';
 import { resolveMcpUserId } from '../tools/core/mcpUserScope.js';
@@ -27,6 +28,15 @@ import { createRemoteTermsCheck } from '../tools/core/legalAcceptance.js';
 
 /** Remote tools that write learner data: charged to 'mcp_write' as well (not course-quiz-check: see above). */
 export const REMOTE_WRITE_TOOLS = Object.freeze(['journal-log', 'learner-state-update', 'course-progress-update', 'course-review-grade']);
+
+/**
+ * rag-search on the remote endpoint (tools/core/ragSearch.js searchContent `cite`): neither the
+ * material's name nor the PDF page is read or returned. AI apps see where a passage is instead
+ * (あなたの教材・4 つの部分のうち 2 番目): the owner chose that they do not get the file's name, and
+ * the endpoint's database role (deploy/risepath-vm/sql/mcp_remote_role.sql) is granted neither
+ * materials.title nor material_chunks.metadata.
+ */
+export const REMOTE_RAG_CITE = Object.freeze({ title: false, page: false });
 
 /**
  * daily_limit_reached text by the refusal's scope: the learner's own cap, the cap shared by every
@@ -95,6 +105,8 @@ export function createRemotePolicy({ env = process.env, reserveCap = reserveDail
     const writes = new Set(REMOTE_WRITE_TOOLS);
 
     return {
+        ragCite: REMOTE_RAG_CITE,
+
         /** @param {any} extra */
         async gate(extra) {
             const scope = await resolveMcpUserId({ extra, remote: true });

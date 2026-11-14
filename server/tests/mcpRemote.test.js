@@ -59,6 +59,12 @@ function remotePool() {
             }
             if (sql.startsWith('select completed_stages, completed_steps from user_progress')) return { rowCount: 0, rows: [] };
             if (sql.startsWith('insert into user_progress')) return { rowCount: 1, rows: [] };
+            // rag-search: no pgvector here (pg_type answers no row), so the keyword search, then the
+            // count of the found material's parts.
+            if (sql.includes(' ilike ')) {
+                return { rowCount: 1, rows: [{ content: 'The mirror modifier copies one half of the mesh.', chunk_index: 1, material_id: 'e5e5e5e5-0000-4000-8000-0000000000e5' }] };
+            }
+            if (sql.includes(' as parts ')) return { rowCount: 1, rows: [{ material_id: 'e5e5e5e5-0000-4000-8000-0000000000e5', parts: 4 }] };
             return undefined;
         },
     });
@@ -264,6 +270,20 @@ describe('remote MCP endpoint (in process)', () => {
         assert.equal(parse(bad).error_type, 'invalid_domain');
         const good = await client.callTool({ name: 'learner-state-update', arguments: { domain: 'vibe-coding', lesson_id: 'vibe-ch1' } });
         assert.ok(!good.isError, good.content[0].text);
+    });
+
+    it('rag-search names the place of a passage, never the material\'s title or page (remotePolicy REMOTE_RAG_CITE)', async () => {
+        const user = 'e6e6e6e6-0000-4000-8000-0000000000e6';
+        db.pool.ages[user] = '1982-03';
+        const client = await connect(tokenFor(user));
+        const result = await client.callTool({ name: 'rag-search', arguments: { query: 'mirror modifier' } });
+        assert.ok(!result.isError, result.content[0].text);
+        const [hit] = parse(result).results;
+        assert.equal(hit.location, 'あなたの教材・4 つの部分のうち 2 番目');
+        assert.ok(!('title' in hit) && !('page' in hit), JSON.stringify(hit));
+        const search = db.pool.queries.filter((q) => q.sql.includes('material_chunks'));
+        assert.ok(search.some((q) => q.sql.includes(' ilike ') && q.params[0] === user), 'the token user\'s own materials');
+        for (const { sql } of search) assert.doesNotMatch(sql, /title|metadata/, 'columns the remote role is not granted');
     });
 
     it('daily caps: mcp_write after 2 writes, mcp after 6 calls, as daily_limit_reached tool errors', async () => {

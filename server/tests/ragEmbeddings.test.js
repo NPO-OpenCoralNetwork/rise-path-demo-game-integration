@@ -498,8 +498,9 @@ describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
         const inserts = pool.queries.filter((q) => /INSERT INTO material_chunks/.test(q.sql));
         assert.equal(inserts.length, 3);
         for (const insert of inserts) {
-            assert.match(insert.sql, /VALUES \(\$1, \$2, \$3, NULL, \$4, NULL, NULL\)/, 'NULL embedding, model and dimension');
-            assert.equal(insert.params.length, 4);
+            assert.match(insert.sql, /VALUES \(\$1, \$2, \$3, NULL, \$4, NULL, NULL, \$5::jsonb\)/, 'NULL embedding, model and dimension');
+            assert.equal(insert.params.length, 5);
+            assert.equal(insert.params[4], null, 'a text file has no page (ragCitations.test.js)');
         }
         const ready = pool.queries.find((q) => /UPDATE materials SET status/.test(q.sql));
         assert.deepEqual(ready.params, ['ready', 'mat-off', '{}']);

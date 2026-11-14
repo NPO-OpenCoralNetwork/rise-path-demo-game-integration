@@ -143,6 +143,43 @@ const whereClause = (scope, extra = []) => {
 };
 
 /**
+ * Columns a search reads besides the chunk, to cite it (searchContent):
+ * - title: the material's name (materials.title, AS material_title);
+ * - page: the chunk's PDF page (material_chunks.metadata.page, server/ragService.js chunkPages).
+ * The remote endpoint reads neither (mcp-server/remotePolicy.js REMOTE_RAG_CITE): its database role
+ * is not granted those columns.
+ * @typedef {{ title?: boolean, page?: boolean }} CiteColumns
+ */
+
+/** The SELECT list's columns for `cite`, each after a comma ('' for none). @param {CiteColumns} [cite] */
+const citeColumns = (cite = {}) => [
+    ...(cite.title ? ['m.title AS material_title'] : []),
+    ...(cite.page ? ["c.metadata->>'page' AS page"] : []),
+].map((column) => `, ${column}`).join('');
+
+/**
+ * How many chunks each material in `ids` has (with chunk_index: which part of it a chunk is), counted
+ * in `scope` like every other statement over material_chunks (the learner's own ready materials).
+ * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
+ * @param {ChunkScope} scope
+ * @param {string[]} ids material ids
+ * @returns {Promise<Map<string, number>>}
+ */
+export async function materialParts(pool, scope, ids) {
+    if (ids.length === 0) return new Map();
+    const params = [...scope.params, ids];
+    const result = await pool.query(
+        `SELECT c.material_id, count(*)::int AS parts
+         FROM material_chunks c
+         JOIN materials m ON c.material_id = m.id
+         ${whereClause(scope, [`c.material_id = ANY($${params.length}::uuid[])`])}
+         GROUP BY c.material_id`,
+        params
+    );
+    return new Map((result.rows ?? []).map((row) => [String(row.material_id), Number(row.parts)]));
+}
+
+/**
  * "Not embedded with the model in `placeholder`" (another model, or NULL). Same rows as
  * `IS DISTINCT FROM`, written so the material_chunks_embedding_model_idx btree index
  * (migration 010) can answer it with range scans.
@@ -354,10 +391,10 @@ export function extractKeywords(query) {
  *   select only when the query has nothing else. Every keyword ranks: chunks with the larger sum
  *   of weights first.
  * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
- * @param {{ query: string, scope: ChunkScope, limit: number }} options
+ * @param {{ query: string, scope: ChunkScope, limit: number, cite?: CiteColumns }} options
  * @returns {Promise<Array<{ content: string, chunk_index: number, material_id: string }>>} [] when the query has no keywords
  */
-export async function keywordSearchChunks(pool, { query, scope, limit }) {
+export async function keywordSearchChunks(pool, { query, scope, limit, cite }) {
     const plan = keywordPlan(query);
     if (plan.length === 0) return [];
 
@@ -371,7 +408,7 @@ export async function keywordSearchChunks(pool, { query, scope, limit }) {
     const selecting = matches.some(({ selects }) => selects) ? matches.filter(({ selects }) => selects) : matches;
 
     const result = await pool.query(
-        `SELECT c.content, c.chunk_index, m.id as material_id
+        `SELECT c.content, c.chunk_index, m.id as material_id${citeColumns(cite)}
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
          CROSS JOIN LATERAL (SELECT normalize(c.content, NFKC) AS text OFFSET 0) n
@@ -443,31 +480,32 @@ export function queryEmbedder(query) {
  * (server/ragService.js retrieveContext).
  * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
  * @param {{ query: string, scope: ChunkScope, limit: number,
- *   embedQuery?: () => Promise<number[]> }} options embedQuery: a queryEmbedder, for a caller that
- *   searches several scopes with one embedding (default: a new one)
+ *   embedQuery?: () => Promise<number[]>, cite?: CiteColumns }} options embedQuery: a queryEmbedder,
+ *   for a caller that searches several scopes with one embedding (default: a new one); cite: the
+ *   columns read to cite each row (default: none)
  * @returns {Promise<{ rows: FoundChunk[], search_type: 'vector' | 'vector+keyword' | 'keyword' | 'none',
  *   fallback_reason?: FallbackReason, reembed_required?: true }>}
  */
-export async function searchChunks(pool, { query, scope, limit, embedQuery = queryEmbedder(query) }) {
+export async function searchChunks(pool, { query, scope, limit, embedQuery = queryEmbedder(query), cite }) {
     const typeCheck = await pool.query(
         "SELECT 1 FROM pg_type WHERE typname = 'vector'"
     );
-    if (typeCheck.rowCount === 0) return keywordMatches(pool, { query, scope, limit }, 'no_pgvector');
-    if (!isEmbeddingConfigured()) return keywordMatches(pool, { query, scope, limit }, 'embeddings_off');
+    if (typeCheck.rowCount === 0) return keywordMatches(pool, { query, scope, limit, cite }, 'no_pgvector');
+    if (!isEmbeddingConfigured()) return keywordMatches(pool, { query, scope, limit, cite }, 'embeddings_off');
 
     // Vectors from different models are never compared. With no EMBEDDING_MODEL chunks in scope
     // (everything still from an older model), match those chunks by keyword instead.
     const coverage = await embeddingCoverage(pool, scope);
     warnLegacyEmbeddingsOnce(coverage.legacy);
     if (!coverage.current && !coverage.legacy) return { rows: [], search_type: 'none' };
-    if (!coverage.current) return keywordMatches(pool, { query, scope, limit }, 'reembed_required');
+    if (!coverage.current) return keywordMatches(pool, { query, scope, limit, cite }, 'reembed_required');
 
     let queryVector;
     try {
         queryVector = await embedQuery();
     } catch {
         // queryEmbedder logged it.
-        return keywordMatches(pool, { query, scope, limit }, 'embedding_error');
+        return keywordMatches(pool, { query, scope, limit, cite }, 'embedding_error');
     }
 
     // Only compare against chunks embedded by the same model (scripts/rag/reembed.mjs migrates older
@@ -481,7 +519,7 @@ export async function searchChunks(pool, { query, scope, limit, embedQuery = que
     const result = await pool.query(
         `SELECT c.content, c.chunk_index,
                 (c.embedding <=> ${vectorParam}::vector) as distance,
-                m.id as material_id
+                m.id as material_id${citeColumns(cite)}
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
          ${whereClause(scope, [modelCondition])}
@@ -493,7 +531,7 @@ export async function searchChunks(pool, { query, scope, limit, embedQuery = que
     // Older-model chunks in the same scope are matched by keyword and merged in by relevance,
     // so they do not disappear once some chunks use the current model.
     const legacyRows = coverage.legacy
-        ? await keywordSearchChunks(pool, { query, scope: legacyChunkScope(scope), limit })
+        ? await keywordSearchChunks(pool, { query, scope: legacyChunkScope(scope), limit, cite })
         : [];
     return {
         rows: mergeByRelevance(result.rows, legacyRows, limit),
@@ -505,11 +543,11 @@ export async function searchChunks(pool, { query, scope, limit, embedQuery = que
 /**
  * Keyword (ILIKE) matches in `scope`, as searchChunks rows, with the reason vectors were not used.
  * @param {{ query: (sql: string, params?: unknown[]) => Promise<any> }} pool
- * @param {{ query: string, scope: ChunkScope, limit: number }} options
+ * @param {{ query: string, scope: ChunkScope, limit: number, cite?: CiteColumns }} options
  * @param {FallbackReason} reason
  */
-async function keywordMatches(pool, { query, scope, limit }, reason) {
-    const rows = await keywordSearchChunks(pool, { query, scope, limit });
+async function keywordMatches(pool, { query, scope, limit, cite }, reason) {
+    const rows = await keywordSearchChunks(pool, { query, scope, limit, cite });
     return {
         rows: rows.map((row) => ({ ...row, relevance: KEYWORD_RELEVANCE, match: /** @type {const} */ ('keyword') })),
         search_type: /** @type {const} */ ('keyword'),
@@ -517,9 +555,116 @@ async function keywordMatches(pool, { query, scope, limit }, reason) {
     };
 }
 
+/** How much of a chunk a search result quotes (searchContent `content`), in UTF-16 units. */
+export const EXCERPT_CHARS = 500;
+/** Text kept before the first matched word, at most: the quote starts at a sentence in it. */
+const EXCERPT_LEAD = 150;
+const graphemes = new Intl.Segmenter('ja', { granularity: 'grapheme' });
+
+/**
+ * Where the first of `words` occurs in `text` (an index into `text`), matched in NFKC and lower case
+ * like the keyword search (Postgres normalize, ILIKE): Blender finds ＢＬＥＮＤＥＲ and モディファイア
+ * finds ﾓﾃﾞｨﾌｧｲｱ. Each grapheme is folded on its own, so a combining mark stays with its letter.
+ * @param {string} text
+ * @param {string[]} words
+ * @returns {number} -1 when no word occurs
+ */
+function firstMatch(text, words) {
+    const needles = words.map((word) => String(word).normalize('NFKC').toLowerCase()).filter(Boolean);
+    if (needles.length === 0) return -1;
+    let folded = '';
+    /** @type {number[]} for each UTF-16 unit of `folded`, the index in `text` of its grapheme */
+    const origin = [];
+    for (const { segment, index } of graphemes.segment(text)) {
+        const piece = segment.normalize('NFKC').toLowerCase();
+        folded += piece;
+        for (let i = 0; i < piece.length; i += 1) origin.push(index);
+    }
+    let first = -1;
+    for (const needle of needles) {
+        const at = folded.indexOf(needle);
+        if (at >= 0 && (first < 0 || at < first)) first = at;
+    }
+    return first < 0 ? -1 : origin[first];
+}
+
+/** Whether a sentence ends at text[i]: 。！？ or a new line, or . ! ? before a space. */
+const sentenceEndsAt = (text, i) => '。！？\n'.includes(text[i]) || ('.!?'.includes(text[i]) && /\s/.test(text[i + 1] ?? ''));
+
+const isHighSurrogate = (unit) => unit >= 0xd800 && unit <= 0xdbff;
+const isLowSurrogate = (unit) => unit >= 0xdc00 && unit <= 0xdfff;
+
+/**
+ * The part of a chunk a search result quotes: EXCERPT_CHARS units from the sentence before the first
+ * of `words` (one that starts at most EXCERPT_LEAD units before it), or the last EXCERPT_CHARS when
+ * the word is near the end; the first EXCERPT_CHARS when no word occurs (a vector match may hold
+ * none). A verbatim slice of the chunk that never splits a character outside the BMP.
+ * @param {string} text
+ * @param {string[]} words
+ */
+export function excerptAround(text, words) {
+    const value = String(text ?? '');
+    if (value.length <= EXCERPT_CHARS) return value;
+    const hit = firstMatch(value, words);
+    let start = 0;
+    if (hit > 0) {
+        start = Math.max(0, hit - EXCERPT_LEAD);
+        for (let i = hit - 1; i >= start; i -= 1) {
+            if (sentenceEndsAt(value, i)) {
+                start = i + 1;
+                break;
+            }
+        }
+        while (start < hit && /\s/.test(value[start])) start += 1;
+        start = Math.min(start, value.length - EXCERPT_CHARS);
+    }
+    if (isLowSurrogate(value.charCodeAt(start))) start += 1;
+    let end = Math.min(value.length, start + EXCERPT_CHARS);
+    if (end < value.length && isHighSurrogate(value.charCodeAt(end - 1))) end -= 1;
+    return value.slice(start, end).trimEnd();
+}
+
+/** What a result calls a material when it does not name it: the learner's own material. */
+const OWN_MATERIAL = 'あなたの教材';
+
+/**
+ * The place of a passage, to cite it (searchContent `location`): the material, 「by its name」 or
+ * あなたの教材 without one (always on the remote endpoint), then the page, else which of its parts:
+ * 「Blender入門.pdf」3 ページ, あなたの教材・4 つの部分のうち 2 番目. A material in one part, or with an
+ * unknown count, is named alone.
+ * @param {{ title?: string | null, page?: number | null, part?: number, parts?: number | null }} place
+ */
+export function locationLabel({ title, page, part, parts }) {
+    const name = title ? `「${title}」` : OWN_MATERIAL;
+    const joiner = title ? '' : '・';
+    if (page) return `${name}${joiner}${page} ページ`;
+    if (parts > 1 && part >= 1) return `${name}${joiner}${parts} つの部分のうち ${part} 番目`;
+    return name;
+}
+
+/**
+ * What rag-search cites a result by besides its place in the material: the material's name (title)
+ * and the PDF page (page). Both on stdio and SSE; the remote endpoint passes
+ * mcp-server/remotePolicy.js REMOTE_RAG_CITE.
+ * @typedef {{ title: boolean, page: boolean }} RagCite
+ */
+/** @type {Readonly<RagCite>} */
+export const LOCAL_RAG_CITE = Object.freeze({ title: true, page: true });
+
+/** A positive whole page number (material_chunks.metadata->>'page'), else null. */
+const pageNumber = (value) => {
+    const page = value === null || value === undefined ? NaN : Number(value);
+    return Number.isInteger(page) && page > 0 ? page : null;
+};
+
 /**
  * Search the learner's own uploaded materials (material_chunks): searchChunks over
- * learnerChunkScope, as the MCP rag-search result.
+ * learnerChunkScope, as the MCP rag-search result. Each result cites its passage:
+ * - title: the material's name (only with cite.title);
+ * - page: its PDF page, when the material was indexed page by page (only with cite.page);
+ * - part, parts: which part of the material the chunk is;
+ * - location: the place to cite (locationLabel), naming the material only with cite.title;
+ * - content: EXCERPT_CHARS characters of the chunk around the first word of the query (excerptAround).
  *
  * @param {Object} params
  * @param {string} params.query - Search query text
@@ -527,8 +672,10 @@ async function keywordMatches(pool, { query, scope, limit }, reason) {
  * @param {number} [params.maxResults=3] - Maximum results to return (1-10)
  * @param {string} params.userId - The learner whose materials are searched. Required: a missing
  *   or non-UUID id returns no results without querying.
+ * @param {RagCite} [params.cite] - Whether the material's name and page are read and returned
+ *   (default LOCAL_RAG_CITE: both)
  */
-export async function searchContent({ query, domain, maxResults = 3, userId }) {
+export async function searchContent({ query, domain, maxResults = 3, userId, cite = LOCAL_RAG_CITE }) {
     if (typeof userId !== 'string' || !UUID.test(userId)) {
         return { results: [], search_type: 'none', message: 'No learner in scope' };
     }
@@ -536,22 +683,39 @@ export async function searchContent({ query, domain, maxResults = 3, userId }) {
     if (!pool) return { results: [], error: 'DB not configured', error_type: 'db_connection' };
 
     try {
-        const found = await searchChunks(pool, { query, scope: learnerChunkScope(userId), limit: clampResults(maxResults) });
+        const scope = learnerChunkScope(userId);
+        const columns = { title: cite.title === true, page: cite.page === true };
+        const found = await searchChunks(pool, { query, scope, limit: clampResults(maxResults), cite: columns });
         const reason = found.fallback_reason ? { fallback_reason: found.fallback_reason } : {};
         if (found.search_type === 'keyword' && extractKeywords(query).length === 0) {
             return { results: [], search_type: 'keyword', message: 'No valid search keywords', ...reason };
         }
+        const counts = await materialParts(pool, scope, [...new Set(found.rows.map((row) => String(row.material_id)))]);
+        // The words a keyword match selects chunks by (keywordSearchChunks): the quote starts at one.
+        const plan = keywordPlan(query);
+        const anchors = (plan.some(({ selects }) => selects) ? plan.filter(({ selects }) => selects) : plan).map(({ word }) => word);
         return {
             ...reason,
-            results: found.rows.map(row => ({
-                title: `Chunk ${row.chunk_index}`,
-                content: row.content?.substring(0, 500) || '',
-                relevance_score: row.relevance,
-                source: row.material_id,
-                domain: domain,
-                // Marked only where vector and keyword hits are mixed.
-                ...(found.search_type !== 'keyword' && row.match === 'keyword' ? { match: 'keyword' } : {}),
-            })),
+            results: found.rows.map((row) => {
+                const title = columns.title && typeof row.material_title === 'string' && row.material_title.trim() ? row.material_title.trim() : null;
+                const page = columns.page ? pageNumber(row.page) : null;
+                const part = Number(row.chunk_index) + 1;
+                const count = counts.get(String(row.material_id));
+                const parts = Number.isInteger(count) && count > 0 ? count : null;
+                return {
+                    ...(title ? { title } : {}),
+                    location: locationLabel({ title, page, part, parts }),
+                    ...(page ? { page } : {}),
+                    part,
+                    ...(parts ? { parts } : {}),
+                    content: excerptAround(row.content ?? '', anchors),
+                    relevance_score: row.relevance,
+                    source: row.material_id,
+                    domain: domain,
+                    // Marked only where vector and keyword hits are mixed.
+                    ...(found.search_type !== 'keyword' && row.match === 'keyword' ? { match: 'keyword' } : {}),
+                };
+            }),
             search_type: found.search_type,
             ...(found.reembed_required ? { reembed_required: true } : {}),
             query_used: query.substring(0, 100),

@@ -46,18 +46,48 @@ export const unreadableReason = (error) => {
     return reason === 'no_text' || reason === 'extract_failed' ? reason : null;
 };
 
-const extractText = async (filePath, mimeType) => {
+/**
+ * One page's text as pdf-parse's own renderer (lib/pdf-parse.js render_page) reads it: the page's
+ * text items in order, with a new line where the text moves to another line.
+ * @param {any} pageData a pdf.js page (PDFPageProxy)
+ * @returns {Promise<string>}
+ */
+const pageText = async (pageData) => {
+    const { items } = await pageData.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false });
+    let lastY;
+    let text = '';
+    for (const item of items) {
+        text += lastY === item.transform[5] || !lastY ? item.str : `\n${item.str}`;
+        lastY = item.transform[5];
+    }
+    return text;
+};
+
+/**
+ * The text of a stored file, as pages: one per PDF page (`page` counts from 1), else one without a
+ * page. A PDF page that pdf.js cannot read is left out (pdf-parse skips it too).
+ * @returns {Promise<Array<{ text: string, page?: number }>>}
+ */
+const extractPages = async (filePath, mimeType) => {
     const data = await fs.readFile(filePath);
-    if (mimeType !== 'application/pdf') return data.toString('utf8');
+    if (mimeType !== 'application/pdf') return [{ text: data.toString('utf8') }];
+    /** @type {Array<{ text: string, page: number }>} */
+    const pages = [];
     try {
         // A Uint8Array, not the Buffer: pdf.js copies its input with `new input.constructor(input)`,
         // a copied Buffer under 4 KB lies inside Node's shared pool, and pdf.js then reads it from the
         // wrong offset (a valid small PDF failed with "bad XRef entry").
-        const parsed = await pdf(new Uint8Array(data));
-        return parsed.text;
+        await pdf(new Uint8Array(data), {
+            pagerender: async (pageData) => {
+                const text = await pageText(pageData);
+                pages.push({ text, page: pageData.pageNumber });
+                return text;
+            },
+        });
     } catch (error) {
         throw unreadable('extract_failed', error);
     }
+    return pages.sort((a, b) => a.page - b.page);
 };
 
 /** Whether extracted text has anything to search: a letter (page numbers alone are not text). */
@@ -88,6 +118,25 @@ const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
 };
 
 /**
+ * The chunks of a file's pages, in order: each page is split on its own, so a chunk never spans two
+ * pages and keeps its page (material_chunks.metadata.page, which rag-search cites). A page without a
+ * letter (blank, an image, only a page number) adds no chunk.
+ * @param {Array<{ text: string, page?: number }>} pages
+ * @returns {Promise<Array<{ content: string, page?: number }>>}
+ */
+const chunkPages = async (pages) => {
+    const chunks = [];
+    for (const { text, page } of pages) {
+        if (!hasText(text)) continue;
+        for (const content of await chunkText(text)) chunks.push(page === undefined ? { content } : { content, page });
+    }
+    return chunks;
+};
+
+/** material_chunks.metadata of a chunk: its page, or NULL when the file has none. */
+const chunkMetadata = (chunk) => (chunk.page === undefined ? null : JSON.stringify({ page: chunk.page }));
+
+/**
  * Most chunks embedded for one material (about 160,000 characters at 1,000 per chunk with 200
  * overlap). One 'embeddings' unit of the daily caps (server/middleware/dailyCaps.js) is one
  * material, so this bounds what a unit costs for /upload, /rag/index and the job worker alike.
@@ -115,6 +164,10 @@ const markUnreadable = (pool, materialId, reason) => pool.query(
 
 /**
  * Read, chunk, embed and store one material, and mark it 'ready'.
+ * - A PDF is chunked page by page (chunkPages): each chunk keeps its page in metadata.page, which
+ *   rag-search cites. Other files have no page (metadata NULL). Each run replaces the chunks, so
+ *   indexing a material again (POST /api/v2/rag/index) gives an older PDF its pages, unless its
+ *   stored vectors are kept (below).
  * - Embeddings off (Gemini not allowed, or no key: tools/core/ragSearch.js isEmbeddingConfigured):
  *   the chunks are stored without a vector or model (embedding_model NULL), keyword search finds
  *   them, and scripts/rag/reembed.mjs can embed them later. A material that already has chunks
@@ -149,9 +202,8 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
         }
 
         stage = 'extract';
-        const text = await extractText(filePath, mimeType);
-        if (!hasText(text)) throw unreadable('no_text');
-        const allChunks = await chunkText(text);
+        const allChunks = await chunkPages(await extractPages(filePath, mimeType));
+        if (allChunks.length === 0) throw unreadable('no_text');
         const chunks = allChunks.slice(0, MAX_CHUNKS_PER_MATERIAL);
         const truncated = allChunks.length > chunks.length ? { indexed: chunks.length, total: allChunks.length } : null;
         if (truncated) {
@@ -163,7 +215,7 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
         let embeddingFailed = false;
         if (isEmbeddingConfigured()) {
             try {
-                vectors = await embedTexts(chunks);
+                vectors = await embedTexts(chunks.map((chunk) => chunk.content));
             } catch (e) {
                 const embedded = await embeddedChunks(pool, materialId);
                 if (embedded > 0) {
@@ -189,33 +241,34 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
             const hasVector = typeCheck.rowCount > 0;
 
             for (let i = 0; i < chunks.length; i++) {
-                const chunk = chunks[i];
+                const { content } = chunks[i];
+                const metadata = chunkMetadata(chunks[i]);
 
                 if (!vectors) {
                     // Embeddings off or failed: text only. The NULL model marks the row for reembed.mjs.
                     await client.query(
-                        `INSERT INTO material_chunks 
-                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
-                        VALUES ($1, $2, $3, NULL, $4, NULL, NULL)`,
-                        [materialId, i, chunk, chunk.length]
+                        `INSERT INTO material_chunks
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata)
+                        VALUES ($1, $2, $3, NULL, $4, NULL, NULL, $5::jsonb)`,
+                        [materialId, i, content, content.length, metadata]
                     );
                     continue;
                 }
                 const vector = vectors[i];
-                
+
                 if (hasVector) {
                     await client.query(
-                        `INSERT INTO material_chunks 
-                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
-                        VALUES ($1, $2, $3, $4::vector, $5, $6, $7)`,
-                        [materialId, i, chunk, JSON.stringify(vector), chunk.length, EMBEDDING_MODEL, EMBEDDING_DIM]
+                        `INSERT INTO material_chunks
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata)
+                        VALUES ($1, $2, $3, $4::vector, $5, $6, $7, $8::jsonb)`,
+                        [materialId, i, content, JSON.stringify(vector), content.length, EMBEDDING_MODEL, EMBEDDING_DIM, metadata]
                     );
                 } else {
                     await client.query(
-                        `INSERT INTO material_chunks 
-                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        [materialId, i, chunk, vector, chunk.length, EMBEDDING_MODEL, EMBEDDING_DIM]
+                        `INSERT INTO material_chunks
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+                        [materialId, i, content, vector, content.length, EMBEDDING_MODEL, EMBEDDING_DIM, metadata]
                     );
                 }
             }
