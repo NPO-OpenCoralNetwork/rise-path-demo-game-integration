@@ -29,6 +29,7 @@ import {
     LOCAL_RAG_CITE,
     citedPassage,
     excerptAround,
+    keywordPlan,
     locationLabel,
     resetEmbeddingClientForTests,
     resetLegacyEmbeddingWarningForTests,
@@ -85,10 +86,11 @@ const mockPool = ({ hasVector = true, coverage = { current: true, legacy: false 
 const partsQuery = (pool) => pool.queries.find((q) => /AS parts/.test(q.sql));
 
 /**
- * A PDF with one page per entry: the page's lines of text, each 14 points below the last, or null for
- * a page with no content stream (as a scan's text layer is). Hand-built like tinyPdf in
- * materialFailures.test.js: a few hundred bytes a page, Helvetica, ASCII text without parentheses.
- * @param {Array<string[] | null>} pages
+ * A PDF with one page per entry: the page's lines of text, each 14 points below the last; null for a
+ * page with no content stream (as a scan's text layer is); or { raw } for the page object as written
+ * (a broken one). Hand-built like tinyPdf in materialFailures.test.js: a few hundred bytes a page,
+ * Helvetica, ASCII text without parentheses.
+ * @param {Array<string[] | null | { raw: string }>} pages
  */
 const pdfWithPages = (pages) => {
     const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
@@ -98,6 +100,10 @@ const pdfWithPages = (pages) => {
         kids.push(`${number} 0 R`);
         if (lines === null) {
             objects.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] >>');
+            continue;
+        }
+        if (!Array.isArray(lines)) {
+            objects.push(lines.raw);
             continue;
         }
         const stream = `BT /F1 10 Tf 20 780 Td ${lines.map((line) => `(${line}) Tj 0 -14 Td`).join(' ')} ET`;
@@ -226,6 +232,40 @@ describe('ingestMaterial records the pages of a PDF\'s chunks (material_chunks.m
             'reading a material again replaces its chunks, so an older one gets its pages');
     });
 
+    it('a chunk cut in the blank line between two pages starts on the later page', async () => {
+        // The text is "\n\n" + page 1 (400) + "\n\n" + page 2. The first chunk ends after page 2's first
+        // line, 200 characters after the blank line (a line break is the last cut point past 500), so
+        // the next chunk starts, 200 back, on the blank line itself.
+        const pool = mockPool();
+        setPoolForTests(pool);
+        const page1 = 'Alpha '.repeat(66).padEnd(400, 'a');
+        const page2 = ['Bravo '.repeat(32).padEnd(197, 'b'), 'Charlie '.repeat(88).padEnd(700, 'c')];
+        const { error } = await ingest('cut.pdf', pdfWithPages([[page1], page2]), 'application/pdf');
+
+        assert.equal(error, undefined, String(error));
+        const chunks = storedChunks(pool);
+        assert.equal(chunks.length, 2);
+        assert.deepEqual(chunks[0].metadata, { page: 1, breaks: [402] });
+        assert.ok(chunks[1].content.startsWith('Bravo Bravo'), chunks[1].content.slice(0, 20));
+        assert.deepEqual(chunks[1].metadata, { page: 2 }, 'credited to page 2, not to page 1 before the blank line');
+    });
+
+    it('a page that pdf.js cannot read is empty, and the pages after it keep their numbers', async () => {
+        const pool = mockPool();
+        setPoolForTests(pool);
+        const bytes = pdfWithPages([['Page one about extrude.'], { raw: '<< /Foo /Bar >>' }, ['Page three about the mirror modifier.'], ['Page four.']]);
+        const { error } = await ingest('broken-page.pdf', bytes, 'application/pdf');
+
+        assert.equal(error, undefined, String(error));
+        const [chunk, ...rest] = storedChunks(pool);
+        assert.deepEqual(rest, []);
+        const [two, three, four] = chunk.metadata.breaks;
+        assert.equal(three - two, 2, 'page 2 holds nothing');
+        assert.ok(chunk.content.slice(three).startsWith('Page three') && chunk.content.slice(four).startsWith('Page four'));
+        assert.deepEqual(citedPassage(chunk.content, keywordPlan('mirror'), chunk.metadata.page, chunk.metadata.breaks),
+            { quote: 'Page three about the mirror modifier.', page: 3 });
+    });
+
     it('a chunk on one page records only its page', async () => {
         const pool = mockPool();
         setPoolForTests(pool);
@@ -322,14 +362,28 @@ describe('excerptAround, citedPassage and locationLabel', () => {
     it('quotes one page: the one holding the matched word, or the longest without one', () => {
         const chunk = 'End of page seven.\n\nPage eight is about the mirror modifier.\n\nPage nine.';
         const breaks = [chunk.indexOf('Page eight'), chunk.indexOf('Page nine')];
-        assert.deepEqual(citedPassage(chunk, ['mirror'], 7, breaks), { quote: 'Page eight is about the mirror modifier.', page: 8 });
-        assert.deepEqual(citedPassage(chunk, ['nine'], 7, breaks), { quote: 'Page nine.', page: 9 });
-        assert.deepEqual(citedPassage(chunk, ['zebra'], 7, breaks), { quote: 'Page eight is about the mirror modifier.', page: 8 }, 'a vector match');
-        assert.deepEqual(citedPassage(chunk, ['mirror'], 7, undefined), { quote: chunk, page: 7 }, 'a chunk on one page');
-        assert.deepEqual(citedPassage(chunk, ['mirror'], null, breaks), { quote: chunk, page: null }, 'no page: the whole chunk');
+        assert.deepEqual(citedPassage(chunk, keywordPlan('mirror'), 7, breaks), { quote: 'Page eight is about the mirror modifier.', page: 8 });
+        assert.deepEqual(citedPassage(chunk, keywordPlan('nine'), 7, breaks), { quote: 'Page nine.', page: 9 });
+        assert.deepEqual(citedPassage(chunk, keywordPlan('zebra'), 7, breaks), { quote: 'Page eight is about the mirror modifier.', page: 8 }, 'a vector match');
+        assert.deepEqual(citedPassage(chunk, keywordPlan('mirror'), 7, undefined), { quote: chunk, page: 7 }, 'a chunk on one page');
+        assert.deepEqual(citedPassage(chunk, keywordPlan('mirror'), 7, []), { quote: chunk, page: 7 }, 'a chunk on one page');
+        assert.deepEqual(citedPassage(chunk, keywordPlan('mirror'), null, breaks), { quote: chunk, page: null }, 'no page: the whole chunk');
         for (const bad of [[0], [500], [40, 30], ['20'], 'x']) {
-            assert.deepEqual(citedPassage(chunk, ['mirror'], 7, bad), { quote: chunk, page: 7 }, `breaks ${JSON.stringify(bad)} do not fit: the chunk's own page`);
+            assert.deepEqual(citedPassage(chunk, keywordPlan('mirror'), 7, bad), { quote: chunk, page: null }, `breaks ${JSON.stringify(bad)} do not fit: no page is claimed`);
         }
+    });
+
+    it('cites the page where the query\'s words weigh most, not the first one that mentions one', () => {
+        const slides = [
+            'Slide 3: Next time we look at the mirror tool.',
+            'Slide 4: Extrude and inset faces.',
+            'Slide 5: Mirror modifier settings: axis, bisect and clipping keep both halves joined.',
+        ];
+        const chunk = slides.join('\n\n');
+        const breaks = [slides[0].length + 2, slides[0].length + 2 + slides[1].length + 2];
+        assert.deepEqual(citedPassage(chunk, keywordPlan('mirror modifier settings'), 3, breaks), { quote: slides[2], page: 5 });
+        assert.deepEqual(citedPassage(chunk, keywordPlan('mirror'), 3, breaks), { quote: slides[0], page: 3 }, 'a tie: the earliest page');
+        assert.deepEqual(citedPassage(chunk, keywordPlan('ミラーの面'), 3, breaks).page, 5, 'no Japanese word here: the longest page');
     });
 
     it('names the place: the page counted from the file\'s start, or the part; 「あなたの教材」 without a name', () => {

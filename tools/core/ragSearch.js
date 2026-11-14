@@ -647,29 +647,43 @@ export function excerptAround(text, words) {
     return value.slice(start, end).trimEnd();
 }
 
+/** A text in the form the keyword search matches (NFKC, lower case), one grapheme at a time like firstMatch. */
+const folded = (text) => Array.from(graphemes.segment(text), ({ segment }) => segment.normalize('NFKC').toLowerCase()).join('');
+
 /**
- * The passage a result quotes and the page it is on. With the chunk's PDF pages (`page` it starts
- * on, `breaks` where the next pages start: server/ragService.js pageMetadata), the quote stays on
- * one page: the one holding the first of `words`, or with no word in the chunk (a vector match)
- * its longest page. Without pages (or with breaks that do not fit the chunk), excerptAround over the
- * whole chunk, on the chunk's own page if it has one.
+ * The passage a result quotes and the page it is on.
+ * - With the chunk's PDF pages (`page` it starts on, `breaks` where the next pages start:
+ *   server/ragService.js pageMetadata), the quote stays on one page: the page whose words weigh most,
+ *   weighed like the keyword search ranks chunks (keywordSearchChunks), the earliest on a tie; with
+ *   no word of the query in the chunk (a vector match), its longest page.
+ * - A chunk on one page (no breaks) quotes the chunk, on its page.
+ * - Breaks that do not fit the chunk cite no page: the quote may not be on the one the chunk starts on.
+ * The quote starts at the sentence of the first selecting word (excerptAround).
  * @param {string} text the chunk
- * @param {string[]} words
+ * @param {Keyword[]} plan the query's keywords (keywordPlan)
  * @param {number | null} page
  * @param {unknown} breaks
  * @returns {{ quote: string, page: number | null }}
  */
-export function citedPassage(text, words, page, breaks) {
+export function citedPassage(text, plan, page, breaks) {
     const value = String(text ?? '');
-    const fits = Array.isArray(breaks) && breaks.length > 0
+    const keywords = (Array.isArray(plan) ? plan : []).filter((k) => typeof k?.word === 'string' && k.word);
+    const anchors = (keywords.some(({ selects }) => selects) ? keywords.filter(({ selects }) => selects) : keywords).map(({ word }) => word);
+    const onePage = breaks === undefined || breaks === null || (Array.isArray(breaks) && breaks.length === 0);
+    if (!page || onePage) return { quote: excerptAround(value, anchors), page: page ?? null };
+    const fits = Array.isArray(breaks)
         && breaks.every((at, i) => Number.isInteger(at) && at > (i === 0 ? 0 : breaks[i - 1]) && at < value.length);
-    if (!page || !fits) return { quote: excerptAround(value, words), page: page ?? null };
+    if (!fits) return { quote: excerptAround(value, anchors), page: null };
+    const needles = keywords.map(({ word, weight }) => ({ needle: folded(word), weight: Number(weight) || 1 }));
     const bounds = [0, ...breaks, value.length];
-    const segments = bounds.slice(0, -1).map((from, i) => ({ from, to: bounds[i + 1], page: page + i }));
-    const hit = firstMatch(value, words);
-    const longest = () => segments.reduce((best, s) => (value.slice(s.from, s.to).trim().length > value.slice(best.from, best.to).trim().length ? s : best));
-    const on = hit >= 0 ? segments.find((s) => hit >= s.from && hit < s.to) : longest();
-    return { quote: excerptAround(value.slice(on.from, on.to).trim(), words), page: on.page };
+    const pages = bounds.slice(0, -1).map((from, i) => {
+        const body = value.slice(from, bounds[i + 1]);
+        const words = folded(body);
+        const score = needles.reduce((sum, { needle, weight }) => sum + (words.includes(needle) ? weight : 0), 0);
+        return { body: body.trim(), page: page + i, score };
+    });
+    const best = pages.reduce((top, p) => (p.score > top.score || (p.score === 0 && top.score === 0 && p.body.length > top.body.length) ? p : top));
+    return { quote: excerptAround(best.body, anchors), page: best.page };
 }
 
 /** What a result calls a material when it does not name it: the learner's own material. */
@@ -752,14 +766,13 @@ export async function searchContent({ query, domain, maxResults = 3, userId, cit
             // The results stand without the count (name, code and message only: never the query).
             console.warn(`[RAG] Counting the parts of the materials found failed (${describeError(error)}); results give no part count.`);
         }
-        // The words a keyword match selects chunks by (keywordSearchChunks): the quote starts at one.
+        // The keywords weigh a chunk's pages, and the quote starts at a selecting one (citedPassage).
         const plan = keywordPlan(query);
-        const anchors = (plan.some(({ selects }) => selects) ? plan.filter(({ selects }) => selects) : plan).map(({ word }) => word);
         return {
             ...reason,
             results: found.rows.map((row) => {
                 const title = columns.title && typeof row.material_title === 'string' && row.material_title.trim() ? row.material_title.trim() : null;
-                const { quote, page } = citedPassage(row.content ?? '', anchors, columns.page ? pageNumber(row.page) : null, columns.page ? row.page_breaks : null);
+                const { quote, page } = citedPassage(row.content ?? '', plan, columns.page ? pageNumber(row.page) : null, columns.page ? row.page_breaks : null);
                 const part = Number(row.chunk_index) + 1;
                 const count = counts.get(String(row.material_id));
                 const parts = Number.isInteger(count) && count >= part ? count : null;
