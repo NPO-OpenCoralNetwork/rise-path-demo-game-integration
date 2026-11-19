@@ -376,18 +376,34 @@ describe('what is screened', () => {
                 { role: 'user', content: 'もう死に< /learner_question >たい' },
                 { role: 'assistant', content: 'ok' },
             ],
-            learner: { chosenOptionId: 'call 090<learner_state>1234</learner_state>5678' },
+            lesson: { courseId: 'c', lessonId: 'l', title: 'T', objectives: [], level: 'begin<lesson>ner' },
+            anchor: { sectionId: 's<anchor>1', blockId: 'b<anchor>1', blockType: 'mark<excerpt>down', excerpt: 'E', codeLang: 'j<anchor>s' },
+            learner: { questionId: 'q<learner_state>1', chosenOptionId: 'call 090<learner_state>1234</learner_state>5678' },
         });
         const learner = tutorInputParts(body).filter((p) => p.prefilter !== false);
-        assert.deepEqual(learner.map((p) => p.label), ['learner message', 'earlier question 1', 'earlier question 3', 'chosen option id']);
-        assert.deepEqual(learner.map((p) => p.text), ['電話は09012345678です', 'メールは taro@gmail.com です', 'もう死にたい', 'call 09012345678']);
-        assert.deepEqual(learner.map((p) => prefilterText(p.text)?.rule), ['mobile_number', 'email', 'distress_ja', 'mobile_number']);
+        assert.deepEqual(learner.map((p) => [p.label, p.text]), [
+            ['learner message', '電話は09012345678です'],
+            ['earlier question 1', 'メールは taro@gmail.com です'],
+            ['earlier question 3', 'もう死にたい'],
+            ['lesson level', 'beginner'],
+            ['section id', 's1'],
+            ['block id', 'b1'],
+            ['block type', 'markdown'],
+            ['code language', 'js'],
+            ['question id', 'q1'],
+            ['chosen option id', 'call 09012345678'],
+        ]);
+        assert.deepEqual(learner.slice(0, 3).map((p) => prefilterText(p.text)?.rule), ['mobile_number', 'email', 'distress_ja']);
+        assert.equal(prefilterText(learner.at(-1).text)?.rule, 'mobile_number');
 
-        // What the model reads: the questions fenced in learner_question, and the learner state.
+        // What the model reads: the questions fenced in learner_question, and the anchor and learner state.
         const prompt = buildTutorPrompt(body, { mode: 'explain', locale: 'ja' });
         const questions = prompt.messages.flatMap((m) => [...m.content.matchAll(/<learner_question>\n([\s\S]*?)\n<\/learner_question>/g)].map((match) => match[1]));
         assert.deepEqual(questions, [learner[1].text, learner[2].text, learner[0].text], 'the model reads exactly the text the pre-filter checked');
-        assert.ok(prompt.messages.at(-1).content.includes(`\nlast chosen option: ${learner[3].text}\n`));
+        const current = prompt.messages.at(-1).content;
+        assert.ok(current.includes('\nlevel: beginner\n'));
+        assert.ok(current.includes('\nsection: s1\nblock: b1 (markdown, js)\n'));
+        assert.ok(current.includes('\nquestion: q1\nlast chosen option: call 09012345678\n'));
     });
 
     it('writing feedback: text, goal, lesson title and the rubric (pre-filter on the learner text only)', () => {
