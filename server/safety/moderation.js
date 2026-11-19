@@ -4,8 +4,8 @@
  *
  *   await screenForMinor({ direction: 'input', surface: 'tutor', parts, userId, ip });
  *
- * Input: the local pre-filter first on the text the learner wrote (prefilter.js: distress phrases
- * and personal information, no model call), then the Claude classifier on every part (task 'safety.screen', cheap tier, zod verdict). Output:
+ * Input: the local pre-filter first on the text the learner wrote, as the prompt carries it
+ * (prefilter.js: distress phrases and personal information, no model call), then the Claude classifier on every part (task 'safety.screen', cheap tier, zod verdict). Output:
  * the classifier only. Adults are never screened; routes call this only when
  * res.locals.aiAudience === 'minor' (server/middleware/aiAccessGate.js).
  *
@@ -36,6 +36,8 @@ import { getGateway } from '../llm/index.js';
 import { isLlmError } from '../llm/errors.js';
 import { SafetyScreen } from '../llm/schemas.js';
 import { fence } from '../llm/prompts/shared.js';
+import { tutorText } from '../llm/prompts/tutor.js';
+import { writingText } from '../llm/prompts/writingFeedback.js';
 import { prefilterParts } from './prefilter.js';
 import { recordSafetyEvent } from './events.js';
 
@@ -153,44 +155,56 @@ export function safetyErrorResponse(error) {
 const part = (label, text, flags = {}) => (typeof text === 'string' && text.trim() ? [{ label, text, ...flags }] : []);
 
 /**
+ * Text the learner wrote (the pre-filter checks it), as the prompt carries it: `asPrompted` is the
+ * prompt's own tag removal. Checked as sent, a tag the prompt removes could split a phone number
+ * or a distress phrase that the model then reads whole ("090<excerpt>1234<excerpt>5678").
+ * @param {string} label @param {unknown} text @param {(text: string) => string} asPrompted
+ * @returns {ScreenPart[]}
+ */
+const learnerPart = (label, text, asPrompted) => (typeof text === 'string' ? part(label, asPrompted(text)) : []);
+
+/**
  * Every client-sent text of a tutor request that reaches the prompt: the message, every history
  * turn (both roles: a caller can forge "assistant" turns), the lesson title, level and
  * objectives, the anchor ids, block type, code language and excerpt, the learner's question and
  * option ids, and the legacy context. The ids are free strings in TutorRequest, so they are
- * screened like learner text.
+ * screened like learner text. Learner text is screened without tutor tags (tutorText), field by
+ * field: the prompt removes tags from the lesson, anchor and learner-state lines together, so a
+ * tag there could also span two fields, none of which the learner types.
  * @param {any} body  a parsed TutorRequest
  * @returns {ScreenPart[]}
  */
 export function tutorInputParts(body) {
   const history = Array.isArray(body?.history) ? body.history : [];
+  /** @param {string} label @param {unknown} text */
+  const learner = (label, text) => learnerPart(label, text, tutorText);
   return [
-    ...part('learner message', body?.message),
-    ...history.flatMap((turn, i) => {
-      const fromTutor = turn?.role === 'assistant';
-      return part(`earlier ${fromTutor ? 'answer' : 'question'} ${i + 1}`, turn?.content, { prefilter: !fromTutor });
-    }),
+    ...learner('learner message', body?.message),
+    ...history.flatMap((turn, i) => (turn?.role === 'assistant'
+      ? part(`earlier answer ${i + 1}`, turn?.content, { prefilter: false })
+      : learner(`earlier question ${i + 1}`, turn?.content))),
     ...part('lesson title', body?.lesson?.title, { prefilter: false }),
-    ...part('lesson level', body?.lesson?.level),
+    ...learner('lesson level', body?.lesson?.level),
     ...(Array.isArray(body?.lesson?.objectives) ? body.lesson.objectives.flatMap((o, i) => part(`lesson objective ${i + 1}`, o, { prefilter: false })) : []),
-    ...part('section id', body?.anchor?.sectionId),
-    ...part('block id', body?.anchor?.blockId),
-    ...part('block type', body?.anchor?.blockType),
-    ...part('code language', body?.anchor?.codeLang),
+    ...learner('section id', body?.anchor?.sectionId),
+    ...learner('block id', body?.anchor?.blockId),
+    ...learner('block type', body?.anchor?.blockType),
+    ...learner('code language', body?.anchor?.codeLang),
     ...part('lesson excerpt', body?.anchor?.excerpt, { prefilter: false }),
-    ...part('question id', body?.learner?.questionId),
-    ...part('chosen option id', body?.learner?.chosenOptionId),
+    ...learner('question id', body?.learner?.questionId),
+    ...learner('chosen option id', body?.learner?.chosenOptionId),
     ...part('context', body?.context, { prefilter: false }),
   ];
 }
 
 /**
- * Every text of a writing-feedback request.
+ * Every text of a writing-feedback request; the learner text as the prompt carries it (writingText).
  * @param {any} body  a parsed WritingFeedbackRequest
  * @returns {ScreenPart[]}
  */
 export function writingInputParts(body) {
   return [
-    ...part('learner text', body?.text),
+    ...learnerPart('learner text', body?.text, writingText),
     ...part('goal', body?.goal, { prefilter: false }),
     ...part('lesson title', body?.lessonTitle, { prefilter: false }),
     ...part('rubric clarity', body?.rubric?.clarity, { prefilter: false }),
