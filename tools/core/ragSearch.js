@@ -143,7 +143,8 @@ const whereClause = (scope, extra = []) => {
 };
 
 /**
- * Columns a search reads besides the chunk, to cite it (searchContent):
+ * Columns a search reads besides the chunk, to cite it (searchContent, and the course generator's
+ * server/ragService.js retrieveContext):
  * - title: the material's name (materials.title, AS material_title);
  * - page: the chunk's PDF pages (material_chunks.metadata, server/ragService.js pageMetadata): the
  *   page its text starts on (AS page) and where the next pages start in it (AS page_breaks).
@@ -153,7 +154,7 @@ const whereClause = (scope, extra = []) => {
  */
 
 /** The SELECT list's columns for `cite`, each after a comma ('' for none). @param {CiteColumns} [cite] */
-const citeColumns = (cite = {}) => [
+export const citeColumns = (cite = {}) => [
     ...(cite.title ? ['m.title AS material_title'] : []),
     ...(cite.page ? ["c.metadata->>'page' AS page", "c.metadata->'breaks' AS page_breaks"] : []),
 ].map((column) => `, ${column}`).join('');
@@ -657,6 +658,17 @@ export function excerptAround(text, words) {
     return value.slice(start, end).trimEnd();
 }
 
+/**
+ * Whether a chunk's page breaks (material_chunks.metadata breaks) fit a chunk of `length`
+ * characters: whole offsets, each after the one before it, inside the chunk. The shape only: a
+ * break that fits may still point elsewhere than where the page starts.
+ * @param {unknown} breaks
+ * @param {number} length
+ * @returns {breaks is number[]}
+ */
+const breaksFit = (breaks, length) => Array.isArray(breaks)
+    && breaks.every((at, i) => Number.isInteger(at) && at > (i === 0 ? 0 : breaks[i - 1]) && at < length);
+
 /** A text in the form the keyword search matches (NFKC, lower case), one grapheme at a time like firstMatch. */
 const folded = (text) => Array.from(graphemes.segment(text), ({ segment }) => segment.normalize('NFKC').toLowerCase()).join('');
 
@@ -683,9 +695,7 @@ export function citedPassage(text, plan, page, breaks) {
     const anchors = (keywords.some(({ selects }) => selects) ? keywords.filter(({ selects }) => selects) : keywords).map(({ word }) => word);
     const onePage = breaks === undefined || breaks === null || (Array.isArray(breaks) && breaks.length === 0);
     if (!page || onePage) return { quote: excerptAround(value, anchors), page: page ?? null };
-    const fits = Array.isArray(breaks)
-        && breaks.every((at, i) => Number.isInteger(at) && at > (i === 0 ? 0 : breaks[i - 1]) && at < value.length);
-    if (!fits) return { quote: excerptAround(value, anchors), page: null };
+    if (!breaksFit(breaks, value.length)) return { quote: excerptAround(value, anchors), page: null };
     const someSelect = keywords.some(({ selects }) => selects);
     const needles = keywords.map(({ word, weight, selects }) => ({ needle: folded(word), weight: Number(weight) || 1, selects: !someSelect || Boolean(selects) }));
     const bounds = [0, ...breaks, value.length];
@@ -733,11 +743,42 @@ export const LOCAL_RAG_CITE = Object.freeze({ title: true, page: true });
 /** @type {Readonly<RagCite>} */
 export const NO_RAG_CITE = Object.freeze({ title: false, page: false });
 
-/** A positive whole page number (material_chunks.metadata->>'page'), else null. */
-const pageNumber = (value) => {
+/**
+ * A positive whole page number (material_chunks.metadata->>'page'), else null.
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export const pageNumber = (value) => {
     const page = value === null || value === undefined ? NaN : Number(value);
     return Number.isInteger(page) && page > 0 ? page : null;
 };
+
+/**
+ * A chunk the course generator reads (server/ragService.js retrieveContext) as passages to cite:
+ * one per PDF page when its breaks fit it, else the whole chunk, on its page when it has one and no
+ * breaks (as citedPassage cites a page). Each passage names its place like locationLabel, without
+ * the part: 「Blender入門.pdf」3 ページ目, 「メモ.md」, あなたの教材 (no name). A name is read on one
+ * line; empty passages are left out.
+ * @param {{ content?: string | null, title?: string | null, page?: unknown, breaks?: unknown }} chunk
+ * @returns {Array<{ text: string, page: number | null, location: string }>}
+ */
+export function chunkPassages({ content, title, page, breaks }) {
+    const value = String(content ?? '');
+    const first = pageNumber(page);
+    const name = typeof title === 'string' && title.trim() ? title.replace(/\s+/gu, ' ').trim() : null;
+    const onePage = breaks === undefined || breaks === null || (Array.isArray(breaks) && breaks.length === 0);
+    /** @type {Array<{ text: string, page: number | null }>} */
+    let pieces;
+    if (!first || onePage) pieces = [{ text: value, page: first }];
+    else if (!breaksFit(breaks, value.length)) pieces = [{ text: value, page: null }];
+    else {
+        const bounds = [0, ...breaks, value.length];
+        pieces = bounds.slice(0, -1).map((from, i) => ({ text: value.slice(from, bounds[i + 1]), page: first + i }));
+    }
+    return pieces
+        .map((piece) => ({ text: piece.text.trim(), page: piece.page, location: locationLabel({ title: name, page: piece.page }) }))
+        .filter(({ text }) => text);
+}
 
 /**
  * Search the learner's own uploaded materials (material_chunks): searchChunks over

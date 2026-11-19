@@ -25,6 +25,10 @@
  * produced output (timeouts, refusals, cut-off or invalid replies, a cancelled request). Any other
  * error (the database, say) keeps it too. A refund never depends on the wording of an error message.
  *
+ * Materials (「出典と検索」 step 7): the files attached to a message are kept with the draft
+ * (ATTACHED_MATERIALS_KEY in intake_json), the newest first, so every stage, the roadmap and the
+ * curriculum included, reads them before the learner's other materials (server/services/aiGenerator.js).
+ *
  * Minors (Phase 0.5): server.js runs the AI access gate (server/middleware/aiAccessGate.js) before
  * this route, so res.locals.aiAudience is 'adult' or 'minor'. For a minor every stage screens the
  * learner's text before the model and the stage result before anything is saved
@@ -273,12 +277,65 @@ export function invalidGenerateBody(body) {
   if (curriculumId != null && curriculumId !== '' && !isUuid(curriculumId)) {
     return 'curriculum_id must be a UUID';
   }
-  // Uploaded files sent with the topic (CourseGeneratorView): the requirements stage reads them first.
+  // Uploaded files sent with a message (CourseGeneratorView): the stages read them first.
   if (attachments != null && (!Array.isArray(attachments) || attachments.length > MAX_ATTACHED_MATERIALS
     || !attachments.every((item) => isUuid(item?.material_id)))) {
     return `attachments must be at most ${MAX_ATTACHED_MATERIALS} items of { material_id: UUID }`;
   }
   return null;
+}
+
+/**
+ * The key of curricula.intake_json that keeps the files attached to the conversation (ids of the
+ * learner's materials, the newest first, at most MAX_ATTACHED_MATERIALS), so each later stage reads
+ * them first too ("出典と検索" step 7; no migration). Only the server writes it: a key of that name
+ * in the model's intake is dropped, and the stages never see it. The saved version's requirements
+ * keep it, as the record of the files the course was made from.
+ */
+export const ATTACHED_MATERIALS_KEY = 'attached_material_ids';
+
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/** UUIDs only, each once, at most MAX_ATTACHED_MATERIALS, in order. @param {unknown} ids */
+const attachedIds = (ids) => [...new Set(asArray(ids).filter(isUuid))].slice(0, MAX_ATTACHED_MATERIALS);
+
+/**
+ * The intake to store: the stage's intake without a model-written ATTACHED_MATERIALS_KEY, with the
+ * attached ids when there are any (an intake that is not an object is kept as it is without them).
+ * @param {unknown} intake
+ * @param {unknown} ids
+ */
+export function withAttachedMaterials(intake, ids) {
+  const kept = attachedIds(ids);
+  const own = isPlainObject(intake)
+    ? Object.fromEntries(Object.entries(/** @type {Record<string, unknown>} */ (intake)).filter(([key]) => key !== ATTACHED_MATERIALS_KEY))
+    : intake;
+  if (kept.length === 0) return own;
+  return { ...(isPlainObject(own) ? own : {}), [ATTACHED_MATERIALS_KEY]: kept };
+}
+
+/**
+ * A stored intake_json split into the intake the stages see and its attached material ids.
+ * @param {unknown} stored
+ * @returns {{ intake: any, materialIds: string[] }}
+ */
+export function attachedMaterials(stored) {
+  if (!isPlainObject(stored)) return { intake: stored ?? null, materialIds: [] };
+  const { [ATTACHED_MATERIALS_KEY]: ids, ...intake } = /** @type {Record<string, unknown>} */ (stored);
+  return { intake, materialIds: attachedIds(ids) };
+}
+
+/**
+ * The files a draft keeps (its intake_json's ATTACHED_MATERIALS_KEY); [] when the draft is not the
+ * learner's or does not exist.
+ * @param {import('pg').Pool} pool @param {string} curriculumId @param {string} userId
+ */
+async function draftMaterialIds(pool, curriculumId, userId) {
+  const draft = await pool.query(
+    'SELECT intake_json FROM curricula WHERE id = $1 AND user_id = CAST($2 AS uuid)',
+    [curriculumId, userId]
+  );
+  return attachedMaterials(draft.rows[0]?.intake_json).materialIds;
 }
 
 /**
@@ -342,8 +399,9 @@ router.post('/generate', async (req, res) => {
     const kit = await getCachedKit(userId, getKit);
     // Who the stages are for (the access gate decided); minors' stages are screened.
     const stageOptions = { audience: res.locals?.aiAudience === 'minor' ? 'minor' : 'adult', ip: req.ip ?? null };
-    // Files sent with a topic or a requirements revision: the requirements stage reads them first.
-    const materialIds = asArray(attachments).map((item) => item.material_id);
+    // Files sent with this message. Every stage reads the conversation's files first: these, then
+    // the ones the draft keeps (ATTACHED_MATERIALS_KEY).
+    const sentIds = asArray(attachments).map((item) => item.material_id);
 
     // --- Stage Router ---
 
@@ -351,8 +409,11 @@ router.post('/generate', async (req, res) => {
     if (!decision && (!stage || stage === 'requirements')) {
       if (!message) return res.status(400).json({ error: 'message is required for requirements stage' });
 
+      const earlier = curriculum_id ? await draftMaterialIds(pool, curriculum_id, userId) : [];
+      const materialIds = attachedIds([...sentIds, ...earlier]);
       const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds });
       const title = result.intake?.goal || message.slice(0, 100);
+      const intakeJson = JSON.stringify(withAttachedMaterials(result.intake, materialIds));
 
       let draftId = curriculum_id;
 
@@ -361,7 +422,7 @@ router.post('/generate', async (req, res) => {
         await pool.query(
           `UPDATE curricula SET title = $1, intake_json = $2, updated_at = NOW()
            WHERE id = $3 AND user_id = CAST($4 AS uuid)`,
-          [title, JSON.stringify(result.intake), curriculum_id, userId]
+          [title, intakeJson, curriculum_id, userId]
         );
       } else {
         // Create new draft
@@ -369,7 +430,7 @@ router.post('/generate', async (req, res) => {
           `INSERT INTO curricula (user_id, title, status, intake_json, created_at, updated_at)
            VALUES (CAST($1 AS uuid), $2, 'draft_requirements', $3, NOW(), NOW())
            RETURNING id`,
-          [userId, title, JSON.stringify(result.intake)]
+          [userId, title, intakeJson]
         );
         draftId = draftRes.rows[0].id;
       }
@@ -397,8 +458,8 @@ router.post('/generate', async (req, res) => {
       );
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
-      const intake = draft.rows[0].intake_json;
-      const result = await generateRoadmap(intake, userId, kit, stageOptions);
+      const { intake, materialIds } = attachedMaterials(draft.rows[0].intake_json);
+      const result = await generateRoadmap(intake, userId, kit, { ...stageOptions, materialIds });
 
       // Update draft
       await pool.query(
@@ -428,20 +489,21 @@ router.post('/generate', async (req, res) => {
       );
       if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
 
-      const { intake_json: intake, modules_json: modules } = draft.rows[0];
-      const result = await generateCurriculum(intake, modules, userId, kit, stageOptions);
+      const { intake_json: storedIntake, modules_json: modules } = draft.rows[0];
+      const { intake, materialIds } = attachedMaterials(storedIntake);
+      const result = await generateCurriculum(intake, modules, userId, kit, { ...stageOptions, materialIds });
 
       if (!result.curriculum) {
         return res.status(422).json({ error: '生成に失敗しました。再試行してください' });
       }
 
       // Save as a draft version (see saveDraftVersion). Generated content is never published
-      // automatically; a person publishes it after review.
+      // automatically; a person publishes it after review. Its requirements keep the attached files.
       await saveDraftVersion(pool, {
         curriculumId: curriculum_id,
         userId,
         curriculum: result.curriculum,
-        intake,
+        intake: storedIntake,
         modules,
         learningMode: kit?.learning_mode,
       });
@@ -478,12 +540,14 @@ router.post('/generate', async (req, res) => {
 
       // Re-generate the current stage with the feedback
       if (stage === 'requirements') {
+        const earlier = curriculum_id ? await draftMaterialIds(pool, curriculum_id, userId) : [];
+        const materialIds = attachedIds([...sentIds, ...earlier]);
         const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds });
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET intake_json = $1, updated_at = NOW()
              WHERE id = $2 AND user_id = CAST($3 AS uuid)`,
-            [JSON.stringify(result.intake), curriculum_id, userId]
+            [JSON.stringify(withAttachedMaterials(result.intake, materialIds)), curriculum_id, userId]
           );
         }
         return res.json({
@@ -504,15 +568,17 @@ router.post('/generate', async (req, res) => {
           [curriculum_id, userId]
         );
         if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
-        const intake = draft.rows[0].intake_json;
+        const stored = attachedMaterials(draft.rows[0].intake_json);
+        // Files sent with the feedback come first, and the draft keeps them for the curriculum.
+        const materialIds = attachedIds([...sentIds, ...stored.materialIds]);
         // Append feedback to intake for re-generation
-        const modifiedIntake = { ...intake, revision_feedback: message };
-        const result = await generateRoadmap(modifiedIntake, userId, kit, stageOptions);
+        const modifiedIntake = { ...stored.intake, revision_feedback: message };
+        const result = await generateRoadmap(modifiedIntake, userId, kit, { ...stageOptions, materialIds });
         if (curriculum_id) {
           await pool.query(
-            `UPDATE curricula SET modules_json = $1, updated_at = NOW()
-             WHERE id = $2 AND user_id = CAST($3 AS uuid)`,
-            [JSON.stringify(result.modules), curriculum_id, userId]
+            `UPDATE curricula SET modules_json = $1, intake_json = $2, updated_at = NOW()
+             WHERE id = $3 AND user_id = CAST($4 AS uuid)`,
+            [JSON.stringify(result.modules), JSON.stringify(withAttachedMaterials(stored.intake, materialIds)), curriculum_id, userId]
           );
         }
         return res.json({

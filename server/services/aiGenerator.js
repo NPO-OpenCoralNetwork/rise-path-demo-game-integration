@@ -5,6 +5,13 @@
  * Handles 3-stage curriculum generation:
  *   requirements → roadmap → curriculum
  *
+ * Grounding (「出典と検索」 step 7): every stage reads passages of the learner's own ready
+ * materials (server/ragService.js retrieveContext: the materials attached to the conversation
+ * first, then the learner's others; at most MATERIAL_CHUNKS chunks), each with its place
+ * (tools/core/ragSearch.js chunkPassages: the material's name and PDF page). The passages go into
+ * the user turn as data, and the prompts ask the model to write from them and cite their places
+ * (aiPrompts.js). Without a database, or when reading fails, a stage runs without materials.
+ *
  * Every stage is one gateway call (server/llm/index.js). The task runs on the cheap Claude tier
  * by default (server/llm/models.config.js); an owner can move it with
  * LLM_TASK_COURSE_GENERATE=anthropic:<model id>. Claude has no JSON mode for free-form replies
@@ -13,17 +20,23 @@
  * Gateway failures are thrown as LlmError (server/llm/errors.js); the route maps them.
  *
  * Minors (Phase 0.5): with `{ audience: 'minor' }` each stage screens its learner text first (the
- * topic message, revision feedback and the retrieved upload excerpts; server/safety/moderation.js)
- * and its result before returning it, so nothing unscreened reaches the database (the route saves
- * only what a stage returns). A block or failed check is thrown as SafetyError; its `direction`
- * ('input' before the model ran, 'output' after) tells the route whether to give the unit back.
+ * topic message, revision feedback and the material passages as the model gets them, names
+ * included; server/safety/moderation.js) and its result before returning it, so nothing
+ * unscreened reaches the database (the route saves only what a stage returns). A block or failed
+ * check is thrown as SafetyError; its `direction` ('input' before the model ran, 'output' after)
+ * tells the route whether to give the unit back.
  * The gateway call carries the audience, which adds the child-safety system part.
  */
 import { retrieveContext } from '../ragService.js';
+import { chunkPassages } from '../../tools/core/ragSearch.js';
 import {
   buildRequirementsPrompt,
   buildRoadmapPrompt,
   buildCurriculumPrompt,
+  curriculumMessage,
+  materialBlocks,
+  requirementsMessage,
+  roadmapMessage,
 } from './aiPrompts.js';
 import { getGateway } from '../llm/index.js';
 import { outputParts, screenForMinor } from '../safety/moderation.js';
@@ -51,6 +64,56 @@ async function screenStage(direction, parts, userId, { audience, ip, signal } = 
 
 /** Gateway task for every stage (server/llm/models.config.js TASKS). */
 export const COURSE_GENERATE_TASK = 'course.generate';
+
+/**
+ * Most chunks of the learner's materials each stage reads (a chunk is at most 1,000 characters):
+ * the curriculum stage writes every lesson in one call, so it reads the most.
+ */
+export const MATERIAL_CHUNKS = Object.freeze({ requirements: 3, roadmap: 4, curriculum: 8 });
+
+/** @param {unknown} value */
+const textOf = (value) => (typeof value === 'string' ? value : '');
+/** A roadmap title ({ jp, en } or a string) as text. @param {any} title */
+const titleText = (title) => (typeof title === 'string' ? title : textOf(title?.jp) || textOf(title?.en));
+
+/**
+ * What the roadmap stage searches the learner's materials for: the goal, the constraints and the
+ * learner's revision feedback.
+ * @param {any} intake
+ */
+export function roadmapQuery(intake) {
+  return [intake?.goal, intake?.constraints, intake?.revision_feedback].map(textOf).filter(Boolean).join('\n');
+}
+
+/**
+ * What the curriculum stage searches the learner's materials for: the goal, then each module's
+ * title followed by its lessons' titles (the keyword search keeps the first words: ragSearch.js keywordPlan).
+ * @param {any} intake
+ * @param {any} modules
+ */
+export function curriculumQuery(intake, modules) {
+  const titles = (Array.isArray(modules) ? modules : []).flatMap((module) => [
+    titleText(module?.title),
+    ...(Array.isArray(module?.lessons) ? module.lessons : []).map((lesson) => titleText(lesson?.title)),
+  ]);
+  return [textOf(intake?.goal), ...titles].filter(Boolean).join('\n');
+}
+
+/**
+ * The passages of the learner's own materials a stage grounds in, the attached ones first, each with
+ * the place to cite it. [] without a database or a learner, or when reading fails (logged).
+ * @param {string} query @param {number} limit @param {string | undefined} userId @param {unknown} materialIds
+ * @returns {Promise<Array<{ text: string, page: number | null, location: string }>>}
+ */
+async function readMaterials(query, limit, userId, materialIds) {
+  try {
+    const chunks = await retrieveContext(query, limit, /** @type {string} */ (userId), { materialIds: Array.isArray(materialIds) ? materialIds : [] });
+    return chunks.flatMap(chunkPassages);
+  } catch (e) {
+    console.warn('[AI Generator] Reading the learner\'s materials failed, continuing without:', e instanceof Error ? e.message : e);
+    return [];
+  }
+}
 
 // --- Kit Cache (5 min TTL, LRU max 100) ---
 const kitCache = new Map();
@@ -215,25 +278,18 @@ export function isStageReply(stage, value) {
 /**
  * @param {string} message @param {string} userId @param {any} kit
  * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: files attached to the
- *   message, read before the learner's other materials
+ *   conversation, read before the learner's other materials
  */
 export async function generateRequirements(message, userId, kit, options = {}) {
   const { signal, audience = 'adult', materialIds = [] } = options;
   // RAG: the learner's own uploaded materials, the attached ones first
-  let ragContext = '';
-  try {
-    const chunks = await retrieveContext(message, 3, userId, { materialIds });
-    if (chunks.length > 0) {
-      ragContext = chunks.join('\n---\n');
-    }
-  } catch (e) {
-    console.warn('[AI Generator] RAG retrieval failed, continuing without:', e.message);
-  }
+  const passages = await readMaterials(message, MATERIAL_CHUNKS.requirements, userId, materialIds);
 
-  await screenStage('input', [...textPart('learner topic', message), ...materialPart('uploaded material excerpts', ragContext)], userId, options);
+  await screenStage('input', [...textPart('learner topic', message), ...materialPart('uploaded material excerpts', materialBlocks(passages))], userId, options);
 
-  const system = buildRequirementsPrompt(kit, ragContext);
-  const result = await callCourseModel({ stage: 'requirements', system, userMessage: message, userId, input: { message }, signal, audience });
+  const system = buildRequirementsPrompt(kit);
+  const userMessage = requirementsMessage(message, passages);
+  const result = await callCourseModel({ stage: 'requirements', system, userMessage, userId, input: { message }, signal, audience });
 
   const reply = result.structuredData
     ? { message: result.structuredData.message || result.text, intake: result.structuredData.intake }
@@ -244,14 +300,16 @@ export async function generateRequirements(message, userId, kit, options = {}) {
 
 /**
  * The intake is an earlier, already screened stage result; a revision adds the learner's
- * feedback as intake.revision_feedback, which a minor's call screens as input.
- * @param {any} intake @param {string} userId @param {any} kit @param {StageOptions} [options]
+ * feedback as intake.revision_feedback, which a minor's call screens as input with the passages.
+ * @param {any} intake @param {string} userId @param {any} kit
+ * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: the draft's attached files
  */
 export async function generateRoadmap(intake, userId, kit, options = {}) {
-  const { signal, audience = 'adult' } = options;
-  await screenStage('input', textPart('revision feedback', intake?.revision_feedback), userId, options);
+  const { signal, audience = 'adult', materialIds = [] } = options;
+  const passages = await readMaterials(roadmapQuery(intake), MATERIAL_CHUNKS.roadmap, userId, materialIds);
+  await screenStage('input', [...textPart('revision feedback', intake?.revision_feedback), ...materialPart('uploaded material excerpts', materialBlocks(passages))], userId, options);
   const system = buildRoadmapPrompt(kit);
-  const userMessage = `以下の学習要件に基づきロードマップを作成してください:\n\n${JSON.stringify(intake, null, 2)}`;
+  const userMessage = roadmapMessage(intake, passages);
   const result = await callCourseModel({ stage: 'roadmap', system, userMessage, userId, input: { intake }, signal, audience });
 
   const reply = result.structuredData
@@ -261,11 +319,18 @@ export async function generateRoadmap(intake, userId, kit, options = {}) {
   return reply;
 }
 
-/** @param {any} intake @param {any} modules @param {string} userId @param {any} kit @param {StageOptions} [options] */
+/**
+ * A minor's call screens the material passages as input (the intake and roadmap are earlier,
+ * already screened stage results).
+ * @param {any} intake @param {any} modules @param {string} userId @param {any} kit
+ * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: the draft's attached files
+ */
 export async function generateCurriculum(intake, modules, userId, kit, options = {}) {
-  const { signal, audience = 'adult' } = options;
+  const { signal, audience = 'adult', materialIds = [] } = options;
+  const passages = await readMaterials(curriculumQuery(intake, modules), MATERIAL_CHUNKS.curriculum, userId, materialIds);
+  await screenStage('input', materialPart('uploaded material excerpts', materialBlocks(passages)), userId, options);
   const system = buildCurriculumPrompt(kit);
-  const userMessage = `以下の要件とロードマップに基づき、完全なカリキュラムを生成してください:\n\n## 要件\n${JSON.stringify(intake, null, 2)}\n\n## モジュール構成\n${JSON.stringify(modules, null, 2)}`;
+  const userMessage = curriculumMessage(intake, modules, passages);
   const result = await callCourseModel({ stage: 'curriculum', system, userMessage, userId, input: { intake, modules }, signal, audience });
 
   if (!result.structuredData) {

@@ -8,9 +8,11 @@ import {
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
     REEMBED_COMMAND,
+    citeColumns,
     embedTexts,
     isEmbeddingConfigured,
     learnerChunkScope,
+    pageNumber,
     queryEmbedder,
     searchChunks,
 } from '../tools/core/ragSearch.js';
@@ -335,11 +337,14 @@ const withMaterials = (scope, ids, { without = false } = {}) => {
     return { conditions: [...scope.conditions, without ? `m.id <> ALL(${list})` : `m.id = ANY(${list})`], params };
 };
 
+/** What retrieveContext reads with each chunk, to cite it: the material's name and the chunk's PDF pages. */
+const RETRIEVE_CITE = Object.freeze({ title: true, page: true });
+
 /** The opening chunks of the materials in `scope`: chunk 0 of each, then chunk 1, and so on. */
 const openingChunks = async (pool, scope, limit) => {
     const params = [...scope.params, limit];
     const result = await pool.query(
-        `SELECT c.content, c.chunk_index, m.id AS material_id
+        `SELECT c.content, c.chunk_index, m.id AS material_id${citeColumns(RETRIEVE_CITE)}
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
          WHERE ${scope.conditions.join(' AND ')}
@@ -351,17 +356,24 @@ const openingChunks = async (pool, scope, limit) => {
 };
 
 /**
- * Up to `limit` chunk texts from the learner's own ready materials, for the course generator. The
- * attached materials come first: their best matches, then their opening chunks, so a file attached
- * to "make a course from this" is read even when no word of the message is in it. Then the
+ * A chunk the course generator reads, with what cites it: the material's name (materials.title) and
+ * the chunk's PDF pages (material_chunks.metadata: the page it starts on, where the next pages start
+ * in it; tools/core/ragSearch.js chunkPassages splits it into one passage per page).
+ * @typedef {{ content: string, title: string | null, page: number | null, breaks: unknown[] | null }} RetrievedChunk
+ */
+
+/**
+ * Up to `limit` chunks from the learner's own ready materials, for the course generator's stages.
+ * The attached materials come first: their best matches, then their opening chunks, so a file
+ * attached to "make a course from this" is read even when no word of the query is in it. Then the
  * learner's other materials. Matching is tools/core/ragSearch.js searchChunks: by vector when
  * embeddings are on, by keyword when they are off or embedding the query fails.
  * @param {string} query
  * @param {number} [limit]
  * @param {string} userId
- * @param {{ materialIds?: unknown[] }} [options] materials attached to the message; ids that are not
- *   UUIDs are ignored, and another learner's material matches nothing
- * @returns {Promise<string[]>} [] without a database, or when reading fails (logged)
+ * @param {{ materialIds?: unknown[] }} [options] materials attached to the conversation; ids that
+ *   are not UUIDs are ignored, and another learner's material matches nothing
+ * @returns {Promise<RetrievedChunk[]>} [] without a database, or when reading fails (logged)
  */
 export const retrieveContext = async (query, limit = 3, userId, { materialIds = [] } = {}) => {
     const pool = getPool();
@@ -372,11 +384,11 @@ export const retrieveContext = async (query, limit = 3, userId, { materialIds = 
         const attached = [...new Set(materialIds.filter(isUuid))].slice(0, MAX_ATTACHED_MATERIALS);
         // One query embedding (and at most one logged failure) for both searches below.
         const embedQuery = queryEmbedder(query);
-        /** @type {Array<{ content: string, chunk_index: number, material_id: string }>} */
+        /** @type {Array<{ content: string, chunk_index: number, material_id: string, material_title?: string | null, page?: unknown, page_breaks?: unknown }>} */
         let rows = [];
         if (attached.length > 0) {
             const scope = withMaterials(own, attached);
-            rows = (await searchChunks(pool, { query, scope, limit, embedQuery })).rows;
+            rows = (await searchChunks(pool, { query, scope, limit, embedQuery, cite: RETRIEVE_CITE })).rows;
             if (rows.length < limit) {
                 const taken = new Set(rows.map((row) => `${row.material_id}:${row.chunk_index}`));
                 const opening = (await openingChunks(pool, scope, limit))
@@ -386,10 +398,15 @@ export const retrieveContext = async (query, limit = 3, userId, { materialIds = 
         }
         if (rows.length < limit) {
             const others = attached.length > 0 ? withMaterials(own, attached, { without: true }) : own;
-            rows = [...rows, ...(await searchChunks(pool, { query, scope: others, limit: limit - rows.length, embedQuery })).rows];
+            rows = [...rows, ...(await searchChunks(pool, { query, scope: others, limit: limit - rows.length, embedQuery, cite: RETRIEVE_CITE })).rows];
         }
         console.log(`   [RAG] Found ${rows.length} relevant chunks${attached.length > 0 ? ` (attached material first)` : ''}.`);
-        return rows.map((row) => row.content);
+        return rows.map((row) => ({
+            content: row.content,
+            title: typeof row.material_title === 'string' ? row.material_title : null,
+            page: pageNumber(row.page),
+            breaks: Array.isArray(row.page_breaks) ? row.page_breaks : null,
+        }));
     } catch (e) {
         // Name, code and message only: a pg error's detail holds values (Phase 4).
         console.error(`   [RAG] Retrieval failed: ${describeError(e)}`);
