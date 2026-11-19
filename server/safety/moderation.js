@@ -48,7 +48,9 @@ const CHUNK_CHARS = 40_000;
  * schemas accept, so a request is never split: the tutor (server/llm/schemas.js TutorRequest) is
  * 60,240 characters at most (message 2,000, 12 history turns of 4,000, 12 objectives of
  * 500, excerpt and context 1,500 each, title and ids), writing feedback about 8,200 and a course
- * generation stage about 7,000 (topic 4,000 + 3 material chunks). A larger input fails closed.
+ * generation stage about 9,000 (the curriculum stage's 8 material chunks of 1,000 with their tags,
+ * or a topic or feedback of 4,000 with 3 or 4 chunks: server/services/aiGenerator.js
+ * MATERIAL_CHUNKS). A larger input fails closed.
  */
 export const INPUT_SCREEN_MAX_CHARS = 80_000;
 const ALLOW_CACHE_TTL_MS = 60 * 60 * 1000;

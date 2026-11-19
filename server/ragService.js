@@ -327,20 +327,24 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
 export const MAX_ATTACHED_MATERIALS = 5;
 
 /**
- * `scope` with only the materials in `ids`, or (`without`) all but them.
+ * `scope` with only the materials in `ids`, or (`without`) all but them. `list` is the placeholder
+ * of the ids, for an ORDER BY that keeps their order.
  * @param {import('../tools/core/ragSearch.js').ChunkScope} scope
  * @param {string[]} ids
  */
 const withMaterials = (scope, ids, { without = false } = {}) => {
     const params = [...scope.params, ids];
     const list = `$${params.length}::uuid[]`;
-    return { conditions: [...scope.conditions, without ? `m.id <> ALL(${list})` : `m.id = ANY(${list})`], params };
+    return { conditions: [...scope.conditions, without ? `m.id <> ALL(${list})` : `m.id = ANY(${list})`], params, list };
 };
 
 /** What retrieveContext reads with each chunk, to cite it: the material's name and the chunk's PDF pages. */
 const RETRIEVE_CITE = Object.freeze({ title: true, page: true });
 
-/** The opening chunks of the materials in `scope`: chunk 0 of each, then chunk 1, and so on. */
+/**
+ * The opening chunks of the materials in `scope` (withMaterials): chunk 0 of each, then chunk 1, and
+ * so on, each round in the order of the ids.
+ */
 const openingChunks = async (pool, scope, limit) => {
     const params = [...scope.params, limit];
     const result = await pool.query(
@@ -348,7 +352,7 @@ const openingChunks = async (pool, scope, limit) => {
          FROM material_chunks c
          JOIN materials m ON c.material_id = m.id
          WHERE ${scope.conditions.join(' AND ')}
-         ORDER BY c.chunk_index, m.id
+         ORDER BY c.chunk_index, array_position(${scope.list}, m.id)
          LIMIT $${params.length}`,
         params
     );
@@ -358,54 +362,66 @@ const openingChunks = async (pool, scope, limit) => {
 /**
  * A chunk the course generator reads, with what cites it: the material's name (materials.title) and
  * the chunk's PDF pages (material_chunks.metadata: the page it starts on, where the next pages start
- * in it; tools/core/ragSearch.js chunkPassages splits it into one passage per page).
- * @typedef {{ content: string, title: string | null, page: number | null, breaks: unknown[] | null }} RetrievedChunk
+ * in it, as stored; tools/core/ragSearch.js chunkPassages splits it into one passage per page).
+ * @typedef {{ content: string, title: string | null, page: number | null, breaks: unknown }} RetrievedChunk
  */
 
 /**
  * Up to `limit` chunks from the learner's own ready materials, for the course generator's stages.
- * The attached materials come first: their best matches, then their opening chunks, so a file
- * attached to "make a course from this" is read even when no word of the query is in it. Then the
+ * The files attached to the conversation come first, in two rounds: those sent with this message
+ * (newMaterialIds), then the others the draft keeps. Each round takes its files' best matches, then
+ * their opening chunks, so a file attached to "make a course from this" is read even when no word of
+ * the query is in it, and a file just sent is read even when a kept one matches better. Then the
  * learner's other materials. Matching is tools/core/ragSearch.js searchChunks: by vector when
  * embeddings are on, by keyword when they are off or embedding the query fails.
  * @param {string} query
  * @param {number} [limit]
  * @param {string} userId
- * @param {{ materialIds?: unknown[] }} [options] materials attached to the conversation; ids that
- *   are not UUIDs are ignored, and another learner's material matches nothing
+ * @param {{ materialIds?: unknown[], newMaterialIds?: unknown[] }} [options] materialIds: the files
+ *   attached to the conversation, the newest first; newMaterialIds: those of them sent with this
+ *   message. Ids that are not UUIDs are ignored, and another learner's material matches nothing.
  * @returns {Promise<RetrievedChunk[]>} [] without a database, or when reading fails (logged)
  */
-export const retrieveContext = async (query, limit = 3, userId, { materialIds = [] } = {}) => {
+export const retrieveContext = async (query, limit = 3, userId, { materialIds = [], newMaterialIds = [] } = {}) => {
     const pool = getPool();
     if (!pool || typeof userId !== 'string') return [];
 
     try {
         const own = learnerChunkScope(userId);
         const attached = [...new Set(materialIds.filter(isUuid))].slice(0, MAX_ATTACHED_MATERIALS);
-        // One query embedding (and at most one logged failure) for both searches below.
+        const sent = new Set(Array.isArray(newMaterialIds) ? newMaterialIds : []);
+        const rounds = [attached.filter((id) => sent.has(id)), attached.filter((id) => !sent.has(id))].filter((ids) => ids.length > 0);
+        // One query embedding (and at most one logged failure) for every search below.
         const embedQuery = queryEmbedder(query);
         /** @type {Array<{ content: string, chunk_index: number, material_id: string, material_title?: string | null, page?: unknown, page_breaks?: unknown }>} */
-        let rows = [];
-        if (attached.length > 0) {
-            const scope = withMaterials(own, attached);
-            rows = (await searchChunks(pool, { query, scope, limit, embedQuery, cite: RETRIEVE_CITE })).rows;
-            if (rows.length < limit) {
-                const taken = new Set(rows.map((row) => `${row.material_id}:${row.chunk_index}`));
-                const opening = (await openingChunks(pool, scope, limit))
-                    .filter((row) => !taken.has(`${row.material_id}:${row.chunk_index}`));
-                rows = [...rows, ...opening].slice(0, limit);
+        const rows = [];
+        const taken = new Set();
+        // A chunk found twice in a round (a match that is also an opening chunk) is read once.
+        const take = (found) => {
+            for (const row of found) {
+                const key = row.material_id != null && row.chunk_index != null ? `${row.material_id}:${row.chunk_index}` : null;
+                if (rows.length >= limit || (key && taken.has(key))) continue;
+                if (key) taken.add(key);
+                rows.push(row);
             }
+        };
+        for (const ids of rounds) {
+            if (rows.length >= limit) break;
+            const scope = withMaterials(own, ids);
+            take((await searchChunks(pool, { query, scope, limit: limit - rows.length, embedQuery, cite: RETRIEVE_CITE })).rows);
+            if (rows.length < limit) take(await openingChunks(pool, scope, limit));
         }
         if (rows.length < limit) {
             const others = attached.length > 0 ? withMaterials(own, attached, { without: true }) : own;
-            rows = [...rows, ...(await searchChunks(pool, { query, scope: others, limit: limit - rows.length, embedQuery, cite: RETRIEVE_CITE })).rows];
+            take((await searchChunks(pool, { query, scope: others, limit: limit - rows.length, embedQuery, cite: RETRIEVE_CITE })).rows);
         }
         console.log(`   [RAG] Found ${rows.length} relevant chunks${attached.length > 0 ? ` (attached material first)` : ''}.`);
         return rows.map((row) => ({
             content: row.content,
             title: typeof row.material_title === 'string' ? row.material_title : null,
             page: pageNumber(row.page),
-            breaks: Array.isArray(row.page_breaks) ? row.page_breaks : null,
+            // As stored: chunkPassages cites no page for breaks that do not fit, like citedPassage.
+            breaks: row.page_breaks ?? null,
         }));
     } catch (e) {
         // Name, code and message only: a pg error's detail holds values (Phase 4).

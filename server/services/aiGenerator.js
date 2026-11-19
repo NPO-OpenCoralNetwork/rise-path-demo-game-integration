@@ -20,11 +20,13 @@
  * Gateway failures are thrown as LlmError (server/llm/errors.js); the route maps them.
  *
  * Minors (Phase 0.5): with `{ audience: 'minor' }` each stage screens its learner text first (the
- * topic message, revision feedback and the material passages as the model gets them, names
- * included; server/safety/moderation.js) and its result before returning it, so nothing
- * unscreened reaches the database (the route saves only what a stage returns). A block or failed
- * check is thrown as SafetyError; its `direction` ('input' before the model ran, 'output' after)
- * tells the route whether to give the unit back.
+ * topic message and revision feedback as the model gets them, and the material passages;
+ * server/safety/moderation.js) and its result before returning it, so nothing unscreened reaches
+ * the database (the route saves only what a stage returns). A block or failed check is thrown as
+ * SafetyError; its `direction` ('input' before the model ran, 'output' after) tells the route
+ * whether to give the unit back. A minor's passages carry no file name (あなたの教材・3 ページ目):
+ * a name is text the learner chose, and the pre-filter that keeps phone numbers and addresses away
+ * from the model reads only what the learner wrote in the message.
  * The gateway call carries the audience, which adds the child-safety system part.
  */
 import { retrieveContext } from '../ragService.js';
@@ -33,6 +35,7 @@ import {
   buildRequirementsPrompt,
   buildRoadmapPrompt,
   buildCurriculumPrompt,
+  courseText,
   curriculumMessage,
   materialBlocks,
   requirementsMessage,
@@ -47,10 +50,18 @@ import { outputParts, screenForMinor } from '../safety/moderation.js';
 
 const SURFACE = 'course_generation';
 
-/** @param {string} label @param {unknown} text */
-const textPart = (label, text) => (typeof text === 'string' && text.trim() ? [{ label, text }] : []);
-/** Text the learner did not write (uploaded material): the classifier screens it, the local pre-filter does not. @param {string} label @param {unknown} text */
-const materialPart = (label, text) => textPart(label, text).map((p) => ({ ...p, prefilter: false }));
+/**
+ * Text the learner wrote, as the model gets it (aiPrompts.js courseText: no tag left in it), so the
+ * pre-filter sees what the model will see.
+ * @param {string} label @param {unknown} text
+ */
+const textPart = (label, text) => (typeof text === 'string' && text.trim() ? [{ label, text: courseText(text) }] : []);
+/**
+ * Text the learner did not write (the material blocks, as the model gets them): the classifier
+ * screens it, the local pre-filter does not.
+ * @param {string} label @param {unknown} text
+ */
+const materialPart = (label, text) => (typeof text === 'string' && text.trim() ? [{ label, text, prefilter: false }] : []);
 
 /**
  * Screen a minor's stage input or output (no-op for adults). Throws SafetyError.
@@ -73,42 +84,50 @@ export const MATERIAL_CHUNKS = Object.freeze({ requirements: 3, roadmap: 4, curr
 
 /** @param {unknown} value */
 const textOf = (value) => (typeof value === 'string' ? value : '');
-/** A roadmap title ({ jp, en } or a string) as text. @param {any} title */
-const titleText = (title) => (typeof title === 'string' ? title : textOf(title?.jp) || textOf(title?.en));
+/** A roadmap title ({ jp, en } with `ja` as an alias of `jp`, or a string) as text. @param {any} title */
+const titleText = (title) => (typeof title === 'string' ? title : textOf(title?.jp) || textOf(title?.ja) || textOf(title?.en));
 
 /**
- * What the roadmap stage searches the learner's materials for: the goal, the constraints and the
- * learner's revision feedback.
+ * What the roadmap stage searches the learner's materials for: the learner's revision feedback
+ * first, then the goal and the constraints (the keyword search keeps the first 8 words:
+ * tools/core/ragSearch.js keywordPlan).
  * @param {any} intake
  */
 export function roadmapQuery(intake) {
-  return [intake?.goal, intake?.constraints, intake?.revision_feedback].map(textOf).filter(Boolean).join('\n');
+  return [intake?.revision_feedback, intake?.goal, intake?.constraints].map(textOf).filter(Boolean).join('\n');
 }
 
 /**
- * What the curriculum stage searches the learner's materials for: the goal, then each module's
- * title followed by its lessons' titles (the keyword search keeps the first words: ragSearch.js keywordPlan).
+ * What the curriculum stage searches the learner's materials for: every module's title, then the
+ * lessons' titles one module at a time (each module's first lesson, then each one's second, …), then
+ * the goal, so the first 8 words the keyword search keeps cover the whole course, not the goal alone.
  * @param {any} intake
  * @param {any} modules
  */
 export function curriculumQuery(intake, modules) {
-  const titles = (Array.isArray(modules) ? modules : []).flatMap((module) => [
-    titleText(module?.title),
-    ...(Array.isArray(module?.lessons) ? module.lessons : []).map((lesson) => titleText(lesson?.title)),
-  ]);
-  return [textOf(intake?.goal), ...titles].filter(Boolean).join('\n');
+  const list = Array.isArray(modules) ? modules : [];
+  const lessons = list.map((module) => (Array.isArray(module?.lessons) ? module.lessons : []).map((lesson) => titleText(lesson?.title)));
+  const rounds = Math.max(0, ...lessons.map((titles) => titles.length));
+  const lessonTitles = Array.from({ length: rounds }, (_, i) => lessons.map((titles) => titles[i] ?? '')).flat();
+  return [...list.map((module) => titleText(module?.title)), ...lessonTitles, textOf(intake?.goal)].filter(Boolean).join('\n');
 }
 
 /**
- * The passages of the learner's own materials a stage grounds in, the attached ones first, each with
- * the place to cite it. [] without a database or a learner, or when reading fails (logged).
- * @param {string} query @param {number} limit @param {string | undefined} userId @param {unknown} materialIds
+ * The passages of the learner's own materials a stage grounds in, the files attached to the
+ * conversation first (those sent with this message before the kept ones), each with the place to
+ * cite it; a minor's passages carry no file name. [] without a database or a learner, or when
+ * reading fails (logged).
+ * @param {string} query @param {number} limit @param {string | undefined} userId
+ * @param {{ materialIds?: unknown, newMaterialIds?: unknown, audience?: 'adult'|'minor' }} options
  * @returns {Promise<Array<{ text: string, page: number | null, location: string }>>}
  */
-async function readMaterials(query, limit, userId, materialIds) {
+async function readMaterials(query, limit, userId, { materialIds, newMaterialIds, audience }) {
   try {
-    const chunks = await retrieveContext(query, limit, /** @type {string} */ (userId), { materialIds: Array.isArray(materialIds) ? materialIds : [] });
-    return chunks.flatMap(chunkPassages);
+    const chunks = await retrieveContext(query, limit, /** @type {string} */ (userId), {
+      materialIds: Array.isArray(materialIds) ? materialIds : [],
+      newMaterialIds: Array.isArray(newMaterialIds) ? newMaterialIds : [],
+    });
+    return chunks.flatMap((chunk) => chunkPassages(audience === 'minor' ? { ...chunk, title: null } : chunk));
   } catch (e) {
     console.warn('[AI Generator] Reading the learner\'s materials failed, continuing without:', e instanceof Error ? e.message : e);
     return [];
@@ -276,14 +295,19 @@ export function isStageReply(stage, value) {
 // --- Stage Handlers ---
 
 /**
+ * @typedef {{ materialIds?: string[], newMaterialIds?: string[] }} MaterialOptions materialIds: the
+ *   files attached to the conversation, the newest first, read before the learner's other
+ *   materials; newMaterialIds: those of them sent with this message, read before the rest
+ */
+
+/**
  * @param {string} message @param {string} userId @param {any} kit
- * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: files attached to the
- *   conversation, read before the learner's other materials
+ * @param {StageOptions & MaterialOptions} [options]
  */
 export async function generateRequirements(message, userId, kit, options = {}) {
-  const { signal, audience = 'adult', materialIds = [] } = options;
+  const { signal, audience = 'adult', materialIds = [], newMaterialIds = [] } = options;
   // RAG: the learner's own uploaded materials, the attached ones first
-  const passages = await readMaterials(message, MATERIAL_CHUNKS.requirements, userId, materialIds);
+  const passages = await readMaterials(message, MATERIAL_CHUNKS.requirements, userId, { materialIds, newMaterialIds, audience });
 
   await screenStage('input', [...textPart('learner topic', message), ...materialPart('uploaded material excerpts', materialBlocks(passages))], userId, options);
 
@@ -302,11 +326,11 @@ export async function generateRequirements(message, userId, kit, options = {}) {
  * The intake is an earlier, already screened stage result; a revision adds the learner's
  * feedback as intake.revision_feedback, which a minor's call screens as input with the passages.
  * @param {any} intake @param {string} userId @param {any} kit
- * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: the draft's attached files
+ * @param {StageOptions & MaterialOptions} [options]
  */
 export async function generateRoadmap(intake, userId, kit, options = {}) {
-  const { signal, audience = 'adult', materialIds = [] } = options;
-  const passages = await readMaterials(roadmapQuery(intake), MATERIAL_CHUNKS.roadmap, userId, materialIds);
+  const { signal, audience = 'adult', materialIds = [], newMaterialIds = [] } = options;
+  const passages = await readMaterials(roadmapQuery(intake), MATERIAL_CHUNKS.roadmap, userId, { materialIds, newMaterialIds, audience });
   await screenStage('input', [...textPart('revision feedback', intake?.revision_feedback), ...materialPart('uploaded material excerpts', materialBlocks(passages))], userId, options);
   const system = buildRoadmapPrompt(kit);
   const userMessage = roadmapMessage(intake, passages);
@@ -323,11 +347,11 @@ export async function generateRoadmap(intake, userId, kit, options = {}) {
  * A minor's call screens the material passages as input (the intake and roadmap are earlier,
  * already screened stage results).
  * @param {any} intake @param {any} modules @param {string} userId @param {any} kit
- * @param {StageOptions & { materialIds?: string[] }} [options] materialIds: the draft's attached files
+ * @param {StageOptions & MaterialOptions} [options]
  */
 export async function generateCurriculum(intake, modules, userId, kit, options = {}) {
-  const { signal, audience = 'adult', materialIds = [] } = options;
-  const passages = await readMaterials(curriculumQuery(intake, modules), MATERIAL_CHUNKS.curriculum, userId, materialIds);
+  const { signal, audience = 'adult', materialIds = [], newMaterialIds = [] } = options;
+  const passages = await readMaterials(curriculumQuery(intake, modules), MATERIAL_CHUNKS.curriculum, userId, { materialIds, newMaterialIds, audience });
   await screenStage('input', materialPart('uploaded material excerpts', materialBlocks(passages)), userId, options);
   const system = buildCurriculumPrompt(kit);
   const userMessage = curriculumMessage(intake, modules, passages);

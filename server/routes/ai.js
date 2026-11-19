@@ -400,7 +400,8 @@ router.post('/generate', async (req, res) => {
     // Who the stages are for (the access gate decided); minors' stages are screened.
     const stageOptions = { audience: res.locals?.aiAudience === 'minor' ? 'minor' : 'adult', ip: req.ip ?? null };
     // Files sent with this message. Every stage reads the conversation's files first: these, then
-    // the ones the draft keeps (ATTACHED_MATERIALS_KEY).
+    // the ones the draft keeps (ATTACHED_MATERIALS_KEY; ragService.js retrieveContext reads them in
+    // that order, so a file just sent is read even when a kept one matches better).
     const sentIds = asArray(attachments).map((item) => item.material_id);
 
     // --- Stage Router ---
@@ -411,7 +412,7 @@ router.post('/generate', async (req, res) => {
 
       const earlier = curriculum_id ? await draftMaterialIds(pool, curriculum_id, userId) : [];
       const materialIds = attachedIds([...sentIds, ...earlier]);
-      const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds });
+      const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds, newMaterialIds: sentIds });
       const title = result.intake?.goal || message.slice(0, 100);
       const intakeJson = JSON.stringify(withAttachedMaterials(result.intake, materialIds));
 
@@ -542,7 +543,7 @@ router.post('/generate', async (req, res) => {
       if (stage === 'requirements') {
         const earlier = curriculum_id ? await draftMaterialIds(pool, curriculum_id, userId) : [];
         const materialIds = attachedIds([...sentIds, ...earlier]);
-        const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds });
+        const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds, newMaterialIds: sentIds });
         if (curriculum_id) {
           await pool.query(
             `UPDATE curricula SET intake_json = $1, updated_at = NOW()
@@ -570,15 +571,23 @@ router.post('/generate', async (req, res) => {
         if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
         const stored = attachedMaterials(draft.rows[0].intake_json);
         // Files sent with the feedback come first, and the draft keeps them for the curriculum.
+        // (The composer offers files only at the requirements step; another client may send them.)
         const materialIds = attachedIds([...sentIds, ...stored.materialIds]);
         // Append feedback to intake for re-generation
         const modifiedIntake = { ...stored.intake, revision_feedback: message };
-        const result = await generateRoadmap(modifiedIntake, userId, kit, { ...stageOptions, materialIds });
-        if (curriculum_id) {
+        const result = await generateRoadmap(modifiedIntake, userId, kit, { ...stageOptions, materialIds, newMaterialIds: sentIds });
+        if (curriculum_id && sentIds.length > 0) {
           await pool.query(
             `UPDATE curricula SET modules_json = $1, intake_json = $2, updated_at = NOW()
              WHERE id = $3 AND user_id = CAST($4 AS uuid)`,
             [JSON.stringify(result.modules), JSON.stringify(withAttachedMaterials(stored.intake, materialIds)), curriculum_id, userId]
+          );
+        } else if (curriculum_id) {
+          // No new file: the intake is left as it is (it was read before the model ran).
+          await pool.query(
+            `UPDATE curricula SET modules_json = $1, updated_at = NOW()
+             WHERE id = $2 AND user_id = CAST($3 AS uuid)`,
+            [JSON.stringify(result.modules), curriculum_id, userId]
           );
         }
         return res.json({
