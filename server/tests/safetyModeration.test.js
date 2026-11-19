@@ -282,6 +282,28 @@ describe('screenForMinor', () => {
         assert.equal(pool.inserts().length, 0);
     });
 
+    it('the pre-filter reads learner text as sent and as the model reads it; the classifier reads what the model reads', async () => {
+        const gateway = fakeGateway();
+        const rubric = { clarity: 'a', linking: 'b', tone: 'c' };
+        // Written inside a tag the prompt removes: the model never reads it, but the learner wrote it.
+        await assert.rejects(screen({ direction: 'input', gateway, parts: tutorInputParts(TutorRequest.parse({ message: '<lesson もう死にたい>' })) }),
+            { code: 'content_blocked', category: 'self_harm', support: true });
+        await assert.rejects(screen({
+            direction: 'input',
+            gateway,
+            parts: tutorInputParts(TutorRequest.parse({ message: '続き', history: [{ role: 'user', content: '<excerpt 090-1234-5678>です' }, { role: 'assistant', content: 'ok' }] })),
+        }), { category: 'personal_info' });
+        await assert.rejects(screen({ direction: 'input', gateway, parts: writingInputParts(WritingFeedbackRequest.parse({ text: '<learner_text hanako@gmail.com>I like to write stories about my friends.', rubric })) }),
+            { category: 'personal_info' });
+        assert.equal(gateway.calls.length, 0);
+        assert.deepEqual(pool.inserts().map((q) => q.params[4]), ['support_shown', 'input_blocked', 'input_blocked']);
+
+        await screen({ direction: 'input', gateway, parts: tutorInputParts(TutorRequest.parse({ message: '分数の<excerpt id="2">足し算</excerpt>を教えて' })) });
+        assert.equal(gateway.calls.length, 1);
+        assert.match(gateway.calls[0].messages[0].content, /分数の足し算を教えて/);
+        assert.doesNotMatch(gateway.calls[0].messages[0].content, /excerpt/);
+    });
+
     it('a request is skipped only when it passed as a whole; any change screens every part together', async () => {
         const gateway = fakeGateway();
         const turn = { label: 'earlier question 1', text: '最初の質問' };

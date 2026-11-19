@@ -4,8 +4,8 @@
  *
  *   await screenForMinor({ direction: 'input', surface: 'tutor', parts, userId, ip });
  *
- * Input: the local pre-filter first on the text the learner wrote, as the prompt carries it
- * (prefilter.js: distress phrases and personal information, no model call), then the Claude classifier on every part (task 'safety.screen', cheap tier, zod verdict). Output:
+ * Input: the local pre-filter first on the text the learner wrote, as sent and as the prompt carries
+ * it (prefilter.js: distress phrases and personal information, no model call), then the Claude classifier on every part (task 'safety.screen', cheap tier, zod verdict). Output:
  * the classifier only. Adults are never screened; routes call this only when
  * res.locals.aiAudience === 'minor' (server/middleware/aiAccessGate.js).
  *
@@ -145,7 +145,9 @@ export function safetyErrorResponse(error) {
  * - prefilter: false for text the learner did not write (lesson text, earlier AI answers,
  *   uploaded material). The local pre-filter would match sample phone numbers or addresses in it
  *   and count them as the learner's blocked input; the classifier still screens it. Default true.
- * @typedef {{ label: string, text: string, prefilter?: boolean }} ScreenPart
+ * - raw: text the learner wrote as it was sent, when the prompt carries it changed (`text` is what
+ *   the model reads; learnerPart). The pre-filter checks both; the classifier reads `text` only.
+ * @typedef {{ label: string, text: string, prefilter?: boolean, raw?: string }} ScreenPart
  */
 
 /**
@@ -156,12 +158,17 @@ const part = (label, text, flags = {}) => (typeof text === 'string' && text.trim
 
 /**
  * Text the learner wrote (the pre-filter checks it), as the prompt carries it: `asPrompted` is the
- * prompt's own tag removal. Checked as sent, a tag the prompt removes could split a phone number
- * or a distress phrase that the model then reads whole ("090<excerpt>1234<excerpt>5678").
+ * prompt's own tag removal. Checked only as sent, a tag the prompt removes could split a phone
+ * number or a distress phrase that the model then reads whole ("090<excerpt>1234<excerpt>5678").
+ * The text as sent stays in `raw`, so what was written inside a removed tag is still pre-filtered.
  * @param {string} label @param {unknown} text @param {(text: string) => string} asPrompted
  * @returns {ScreenPart[]}
  */
-const learnerPart = (label, text, asPrompted) => (typeof text === 'string' ? part(label, asPrompted(text)) : []);
+const learnerPart = (label, text, asPrompted) => {
+  if (typeof text !== 'string' || !text.trim()) return [];
+  const prompted = asPrompted(text);
+  return [prompted === text ? { label, text } : { label, text: prompted, raw: text }];
+};
 
 /**
  * Every client-sent text of a tutor request that reaches the prompt: the message, every history
@@ -337,8 +344,8 @@ export async function screenForMinor({
   gateway = getGateway(),
   now = () => Date.now(),
 }) {
-  const texts = (parts || []).filter((p) => p && typeof p.text === 'string' && p.text.trim());
-  if (!texts.length) return;
+  const all = (parts || []).filter(Boolean);
+  const texts = all.filter((p) => typeof p.text === 'string' && p.text.trim());
   const base = { userId, ip, audience, surface };
 
   /** @param {string} category @param {boolean} support @param {boolean} classifierRan */
@@ -355,10 +362,12 @@ export async function screenForMinor({
   };
 
   if (direction === 'input') {
-    // Only text the learner wrote: a sample number in an earlier AI answer is not their input.
-    const hit = prefilterParts(texts.filter((p) => p.prefilter !== false).map((p) => p.text));
+    // Only text the learner wrote (a sample number in an earlier AI answer is not their input), as
+    // the model reads it and as it was sent: a part may be empty once the prompt removes its tags.
+    const hit = prefilterParts(all.filter((p) => p.prefilter !== false).flatMap((p) => [p.text, p.raw]));
     if (hit) throw await blocked(hit.category, hit.support, false);
   }
+  if (!texts.length) return;
 
   // Skip only a request that passed as a whole. Parts that passed alone are screened again with
   // the rest in the same call: a request split across turns or fields is judged together.
