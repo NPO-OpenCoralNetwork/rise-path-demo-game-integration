@@ -181,7 +181,7 @@ describe('ingestMaterial: a failed embedding still leaves the material searchabl
         assert.equal(client.calls.length, 1, 'one embedding call was tried');
         const inserts = pool.queries.filter((q) => /INSERT INTO material_chunks/.test(q.sql));
         assert.equal(inserts.length, 3);
-        for (const insert of inserts) assert.match(insert.sql, /VALUES \(\$1, \$2, \$3, NULL, \$4, NULL, NULL\)/, 'no vector, no model: reembed.mjs picks them up');
+        for (const insert of inserts) assert.match(insert.sql, /VALUES \(\$1, \$2, \$3, NULL, \$4, NULL, NULL, \$5::jsonb\)/, 'no vector, no model: reembed.mjs picks them up');
         const ready = statusUpdate(pool);
         assert.deepEqual(ready.params, ['ready', MATERIAL, '{"embedding":"failed"}']);
         assert.match(ready.sql, /meta = \(COALESCE\(meta, '\{\}'::jsonb\) - '\{error,embedding,truncated\}'::text\[\]\) \|\| \$3::jsonb/);

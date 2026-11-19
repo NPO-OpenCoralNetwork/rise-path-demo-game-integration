@@ -523,7 +523,7 @@ describe('daily caps on the API routes', () => {
             }
             const chunks = pool.queries.filter((q) => q.sql.startsWith('insert into material_chunks'));
             assert.ok(chunks.length > 0);
-            assert.ok(chunks.every((q) => /values \(\$1, \$2, \$3, null, \$4, null, null\)/.test(q.sql)), 'no vector, no model');
+            assert.ok(chunks.every((q) => /values \(\$1, \$2, \$3, null, \$4, null, null, \$5::jsonb\)/.test(q.sql)), 'no vector, no model');
             assert.ok(pool.queries.some((q) => q.sql.startsWith('update materials set status') && q.params[0] === 'ready'));
         });
 

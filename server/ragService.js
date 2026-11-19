@@ -46,23 +46,70 @@ export const unreadableReason = (error) => {
     return reason === 'no_text' || reason === 'extract_failed' ? reason : null;
 };
 
+/**
+ * One page's text as pdf-parse's own renderer (lib/pdf-parse.js render_page) reads it: the page's
+ * text items in order, with a new line where the text moves to another line.
+ * @param {any} pageData a pdf.js page (PDFPageProxy)
+ * @returns {Promise<string>}
+ */
+const pageText = async (pageData) => {
+    const { items } = await pageData.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false });
+    let lastY;
+    let text = '';
+    for (const item of items) {
+        text += lastY === item.transform[5] || !lastY ? item.str : `\n${item.str}`;
+        lastY = item.transform[5];
+    }
+    return text;
+};
+
+/**
+ * The text of a stored file, and for a PDF where each page starts in it. The text is pdf-parse's,
+ * as before: "\n\n" and the page's text for every page, '' for a page pdf.js cannot read. Page
+ * numbers count the file's pages from 1 (not the numbers printed on them). `pageStarts` is null
+ * for a file without pages, and when the pages do not add up to the text (then no page is stored
+ * rather than a wrong one).
+ * @returns {Promise<{ text: string, pageStarts: number[] | null }>} pageStarts[i]: where page i + 1's
+ *   text starts in `text`
+ */
 const extractText = async (filePath, mimeType) => {
     const data = await fs.readFile(filePath);
-    if (mimeType !== 'application/pdf') return data.toString('utf8');
+    if (mimeType !== 'application/pdf') return { text: data.toString('utf8'), pageStarts: null };
+    /** @type {string[]} page i + 1's text at i */
+    const pages = [];
+    let parsed;
     try {
         // A Uint8Array, not the Buffer: pdf.js copies its input with `new input.constructor(input)`,
         // a copied Buffer under 4 KB lies inside Node's shared pool, and pdf.js then reads it from the
         // wrong offset (a valid small PDF failed with "bad XRef entry").
-        const parsed = await pdf(new Uint8Array(data));
-        return parsed.text;
+        parsed = await pdf(new Uint8Array(data), {
+            pagerender: async (pageData) => {
+                const text = await pageText(pageData);
+                pages[pageData.pageNumber - 1] = text;
+                return text;
+            },
+        });
     } catch (error) {
         throw unreadable('extract_failed', error);
     }
+    const pageStarts = [];
+    let at = 0;
+    for (let i = 0; i < parsed.numrender; i += 1) {
+        at += 2;
+        pageStarts.push(at);
+        at += (pages[i] ?? '').length;
+    }
+    return { text: parsed.text, pageStarts: at === parsed.text.length ? pageStarts : null };
 };
 
 /** Whether extracted text has anything to search: a letter (page numbers alone are not text). */
 const hasText = (text) => /\p{L}/u.test(text);
 
+/**
+ * The chunks of a text (1,000 characters with 200 overlapping, cut at a paragraph or sentence when
+ * one is near): each with `start`, where its trimmed text starts in `text`.
+ * @returns {Promise<Array<{ content: string, start: number }>>}
+ */
 const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
     const chunks = [];
     let start = 0;
@@ -79,12 +126,33 @@ const chunkText = async (text, chunkSize = 1000, overlap = 200) => {
                 : lastPeriod > chunkSize * 0.5 ? lastPeriod : -1;
             if (bp > 0) end = start + bp + 1;
         }
-        chunks.push(text.slice(start, end).trim());
+        const raw = text.slice(start, end);
+        const content = raw.trim();
+        if (content.length > 0) chunks.push({ content, start: start + raw.length - raw.trimStart().length });
         // Stop at the end of the text; stepping back by `overlap` here re-emitted ~overlap tail chunks.
         if (end >= text.length) break;
         start = Math.max(start + 1, end - overlap);
     }
-    return chunks.filter(c => c.length > 0);
+    return chunks;
+};
+
+/**
+ * material_chunks.metadata of a chunk: for a PDF, `page`, the page its text starts on, and
+ * `breaks`, where the next pages start in its text (page + 1 at breaks[0], and so on; left out when
+ * the chunk stays on one page). rag-search cites the page of the passage it quotes. NULL without
+ * pages.
+ * @param {{ content: string, start: number }} chunk
+ * @param {number[] | null} pageStarts
+ */
+const pageMetadata = ({ content, start }, pageStarts) => {
+    if (!pageStarts || pageStarts.length === 0) return null;
+    let index = 0;
+    while (index + 1 < pageStarts.length && pageStarts[index + 1] <= start) index += 1;
+    const breaks = [];
+    for (let next = index + 1; next < pageStarts.length && pageStarts[next] < start + content.length; next += 1) {
+        breaks.push(pageStarts[next] - start);
+    }
+    return JSON.stringify(breaks.length > 0 ? { page: index + 1, breaks } : { page: index + 1 });
 };
 
 /**
@@ -115,6 +183,11 @@ const markUnreadable = (pool, materialId, reason) => pool.query(
 
 /**
  * Read, chunk, embed and store one material, and mark it 'ready'.
+ * - A PDF's chunks are cut as before, from pdf-parse's text, and each records its pages in metadata
+ *   (pageMetadata: the page it starts on and where the next pages start), which rag-search cites.
+ *   Other files have no page (metadata NULL). Each run replaces the chunks, so indexing a material
+ *   again (POST /api/v2/rag/index) gives an older PDF its pages, unless its stored vectors are kept
+ *   (below).
  * - Embeddings off (Gemini not allowed, or no key: tools/core/ragSearch.js isEmbeddingConfigured):
  *   the chunks are stored without a vector or model (embedding_model NULL), keyword search finds
  *   them, and scripts/rag/reembed.mjs can embed them later. A material that already has chunks
@@ -149,7 +222,7 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
         }
 
         stage = 'extract';
-        const text = await extractText(filePath, mimeType);
+        const { text, pageStarts } = await extractText(filePath, mimeType);
         if (!hasText(text)) throw unreadable('no_text');
         const allChunks = await chunkText(text);
         const chunks = allChunks.slice(0, MAX_CHUNKS_PER_MATERIAL);
@@ -163,7 +236,7 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
         let embeddingFailed = false;
         if (isEmbeddingConfigured()) {
             try {
-                vectors = await embedTexts(chunks);
+                vectors = await embedTexts(chunks.map((chunk) => chunk.content));
             } catch (e) {
                 const embedded = await embeddedChunks(pool, materialId);
                 if (embedded > 0) {
@@ -189,33 +262,34 @@ export const ingestMaterial = async (materialId, filePath, mimeType, userId) => 
             const hasVector = typeCheck.rowCount > 0;
 
             for (let i = 0; i < chunks.length; i++) {
-                const chunk = chunks[i];
+                const { content } = chunks[i];
+                const metadata = pageMetadata(chunks[i], pageStarts);
 
                 if (!vectors) {
                     // Embeddings off or failed: text only. The NULL model marks the row for reembed.mjs.
                     await client.query(
-                        `INSERT INTO material_chunks 
-                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
-                        VALUES ($1, $2, $3, NULL, $4, NULL, NULL)`,
-                        [materialId, i, chunk, chunk.length]
+                        `INSERT INTO material_chunks
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata)
+                        VALUES ($1, $2, $3, NULL, $4, NULL, NULL, $5::jsonb)`,
+                        [materialId, i, content, content.length, metadata]
                     );
                     continue;
                 }
                 const vector = vectors[i];
-                
+
                 if (hasVector) {
                     await client.query(
-                        `INSERT INTO material_chunks 
-                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
-                        VALUES ($1, $2, $3, $4::vector, $5, $6, $7)`,
-                        [materialId, i, chunk, JSON.stringify(vector), chunk.length, EMBEDDING_MODEL, EMBEDDING_DIM]
+                        `INSERT INTO material_chunks
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata)
+                        VALUES ($1, $2, $3, $4::vector, $5, $6, $7, $8::jsonb)`,
+                        [materialId, i, content, JSON.stringify(vector), content.length, EMBEDDING_MODEL, EMBEDDING_DIM, metadata]
                     );
                 } else {
                     await client.query(
-                        `INSERT INTO material_chunks 
-                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        [materialId, i, chunk, vector, chunk.length, EMBEDDING_MODEL, EMBEDDING_DIM]
+                        `INSERT INTO material_chunks
+                        (material_id, chunk_index, content, embedding, token_count, embedding_model, embedding_dim, metadata)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+                        [materialId, i, content, vector, content.length, EMBEDDING_MODEL, EMBEDDING_DIM, metadata]
                     );
                 }
             }

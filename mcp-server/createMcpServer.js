@@ -10,8 +10,9 @@
  * - Every tools/call, resources/read and prompts/get first passes remote.gate (adults only,
  *   tools/core/mcpAiAccess.js); every tools/call is charged to the daily caps (remote.charge).
  * - Per-session call counters (policy.js) are not used: a stateless endpoint has no session.
- * - rag-search returns at most REMOTE_RAG_MAX_RESULTS results; learner-state-update accepts only a
- *   known domain (tools/core/domains.js).
+ * - rag-search returns at most REMOTE_RAG_MAX_RESULTS results and cites a passage by its place, never
+ *   by the material's name or page (remote.ragCite: mcp-server/remotePolicy.js REMOTE_RAG_CITE);
+ *   learner-state-update accepts only a known domain (tools/core/domains.js).
  *
  * The course-* tools (course-list, course-lesson-get, course-quiz-check, course-progress-get,
  * course-progress-update) teach the published risepath.lesson/v1 lessons: lessons are read without
@@ -34,7 +35,7 @@ import { checkPolicy, auditLog, hasCallLimit } from './policy.js';
 
 import { getProgress, updateProgress } from '../tools/core/learnerState.js';
 import { logEntry, getSummary, getRecent, getAdaptationSignals } from '../tools/core/journal.js';
-import { searchContent, MAX_SEARCH_RESULTS } from '../tools/core/ragSearch.js';
+import { searchContent, LOCAL_RAG_CITE, MAX_SEARCH_RESULTS } from '../tools/core/ragSearch.js';
 import { getKit, validateIntake, saveDraft } from '../tools/core/curriculum.js';
 import {
     SAFE_SLUG,
@@ -147,6 +148,8 @@ const USER_ID_DESC = 'ユーザーID。指定しても無視されます。学�
  *   the token's user when they may use the endpoint now (adult, ready), else the tool error
  * @property {(userId: string, toolName: string) => Promise<Record<string, unknown> | null>} charge
  *   charge one tools/call to the daily caps; a tool error when a cap refuses it
+ * @property {{ title?: boolean, page?: boolean }} [ragCite] what rag-search reads and returns to cite
+ *   a passage (tools/core/ragSearch.js searchContent `cite`); each one left out is off
  */
 
 /**
@@ -418,10 +421,18 @@ policyTool(
 );
 
 // --- rag-search ---
-// Searches only the acting learner's own uploaded materials (there is no shared material).
+// Searches only the acting learner's own uploaded materials (there is no shared material). Each
+// result cites its passage (searchContent): stdio and SSE name the material and its PDF page; the
+// remote endpoint names neither (remote.ragCite), only where the passage sits in the material.
+const ragCite = remote
+    ? { title: remote.ragCite?.title === true, page: remote.ragCite?.page === true }
+    : LOCAL_RAG_CITE;
+const ragPlace = ragCite.title || ragCite.page
+    ? '教材の名前とページ（ページはファイルの先頭から数える）など'
+    : '教材の中で何番目の部分か';
 policyTool(
     'rag-search',
-    '学習者本人がアップロードした教材から関連箇所を検索する（他の学習者の教材やコース教材は対象外） / Searches the learner\'s own uploaded materials only',
+    `学習者本人がアップロードした教材から関連箇所を検索する（他の学習者の教材やコース教材は対象外）。各結果の location は引用する場所（${ragPlace}）で、引用するときはそれを示す / Searches the learner's own uploaded materials only; cite each passage by its location`,
     {
         query: z.string().describe('検索クエリ'),
         domain: z.string().optional().describe('結果にそのまま付けるラベル。絞り込みには使わない / Label echoed in the results; not a filter'),
@@ -437,7 +448,7 @@ policyTool(
             if (typeof userId !== 'string') return userId;
 
             const maxResults = isRemote ? remoteRagResults(max_results) : max_results;
-            return toolResult(await searchContent({ query, domain, maxResults, userId }), { toolName: 'rag-search', startTime: t });
+            return toolResult(await searchContent({ query, domain, maxResults, userId, cite: ragCite }), { toolName: 'rag-search', startTime: t });
         } catch (err) {
             return toolError(err, { toolName: 'rag-search', startTime: t });
         }
