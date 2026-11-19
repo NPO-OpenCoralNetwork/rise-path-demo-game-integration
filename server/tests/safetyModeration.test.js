@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { LlmError } from '../llm/errors.js';
 import { createGateway, withAudienceRules } from '../llm/index.js';
 import { MINOR_SAFETY } from '../llm/prompts/shared.js';
+import { buildTutorPrompt } from '../llm/prompts/tutor.js';
+import { buildWritingFeedbackPrompt } from '../llm/prompts/writingFeedback.js';
 import { anthropicUserId } from '../llm/providers/anthropic.js';
 import { createMockProvider } from '../llm/providers/mock.js';
 import { SafetyScreen, TutorRequest, WritingFeedbackRequest } from '../llm/schemas.js';
@@ -20,6 +22,7 @@ import {
     writingInputParts,
 } from '../safety/moderation.js';
 import { resetSafetyEventsForTests } from '../safety/events.js';
+import { prefilterText } from '../safety/prefilter.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 
 const USER = '11111111-1111-4111-8111-111111111111';
@@ -362,10 +365,48 @@ describe('what is screened', () => {
         assert.deepEqual(parts.map((p) => p.text), ['M', ...history.map((h) => h.content)]);
     });
 
+    it("tutor: the learner's text is screened as the prompt carries it, so tutor tags cannot split a hit past the pre-filter", () => {
+        // Each text passes the pre-filter as sent. The prompt removes the tags (tutorData), and the
+        // model would read a phone number, an email address and a distress phrase.
+        const body = TutorRequest.parse({
+            message: '電話は090<excerpt>1234<excerpt>5678です',
+            history: [
+                { role: 'user', content: 'メールは taro<LESSON id="1">@gmail.com です' },
+                { role: 'assistant', content: 'ok' },
+                { role: 'user', content: 'もう死に< /learner_question >たい' },
+                { role: 'assistant', content: 'ok' },
+            ],
+            learner: { chosenOptionId: 'call 090<learner_state>1234</learner_state>5678' },
+        });
+        const learner = tutorInputParts(body).filter((p) => p.prefilter !== false);
+        assert.deepEqual(learner.map((p) => p.label), ['learner message', 'earlier question 1', 'earlier question 3', 'chosen option id']);
+        assert.deepEqual(learner.map((p) => p.text), ['電話は09012345678です', 'メールは taro@gmail.com です', 'もう死にたい', 'call 09012345678']);
+        assert.deepEqual(learner.map((p) => prefilterText(p.text)?.rule), ['mobile_number', 'email', 'distress_ja', 'mobile_number']);
+
+        // What the model reads: the questions fenced in learner_question, and the learner state.
+        const prompt = buildTutorPrompt(body, { mode: 'explain', locale: 'ja' });
+        const questions = prompt.messages.flatMap((m) => [...m.content.matchAll(/<learner_question>\n([\s\S]*?)\n<\/learner_question>/g)].map((match) => match[1]));
+        assert.deepEqual(questions, [learner[1].text, learner[2].text, learner[0].text], 'the model reads exactly the text the pre-filter checked');
+        assert.ok(prompt.messages.at(-1).content.includes(`\nlast chosen option: ${learner[3].text}\n`));
+    });
+
     it('writing feedback: text, goal, lesson title and the rubric (pre-filter on the learner text only)', () => {
         const parts = writingInputParts({ text: 'X', goal: 'G', lessonTitle: 'L', rubric: { clarity: 'a', linking: 'b', tone: 'c' } });
         assert.deepEqual(parts.map((p) => p.text), ['X', 'G', 'L', 'a', 'b', 'c']);
         assert.deepEqual(parts.filter((p) => p.prefilter !== false).map((p) => p.text), ['X']);
+    });
+
+    it('writing feedback: the learner text is screened as the prompt carries it, so a learner_text tag cannot split a phone number past the pre-filter', () => {
+        const body = WritingFeedbackRequest.parse({
+            text: 'My phone is 090<learner_text>1234</LEARNER_TEXT>5678, so please call me after school.',
+            rubric: { clarity: 'a', linking: 'b', tone: 'c' },
+        });
+        const [learner] = writingInputParts(body);
+        assert.equal(learner.label, 'learner text');
+        assert.equal(learner.text, 'My phone is 09012345678, so please call me after school.');
+        assert.equal(prefilterText(learner.text)?.rule, 'mobile_number');
+        const prompt = buildWritingFeedbackPrompt(body);
+        assert.equal(prompt.messages[0].content.match(/<learner_text>\n([\s\S]*?)\n<\/learner_text>/)?.[1], learner.text, 'the model reads exactly the text the pre-filter checked');
     });
 
     it('structured output: every string value, keys and numbers skipped', () => {
