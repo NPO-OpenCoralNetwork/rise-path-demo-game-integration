@@ -590,10 +590,11 @@ function firstMatch(text, words) {
 }
 
 /**
- * Whether a sentence ends at text[i]: 。！？, . ! ? before a space, or a blank line. A single line
- * break is not one: PDF text breaks wherever the printed line ends.
+ * Whether a sentence ends at text[i]: 。！？．｡ (the full-width and half-width full stops too), . ! ?
+ * before a space, or a blank line. A single line break is not one: PDF text breaks wherever the
+ * printed line ends.
  */
-const sentenceEndsAt = (text, i) => '。！？'.includes(text[i])
+const sentenceEndsAt = (text, i) => '。！？．｡'.includes(text[i])
     || ('.!?'.includes(text[i]) && /\s/.test(text[i + 1] ?? ''))
     || (text[i] === '\n' && text[i + 1] === '\n');
 
@@ -619,13 +620,16 @@ function quoteStart(text, from, to, which) {
 
 const isHighSurrogate = (unit) => unit >= 0xd800 && unit <= 0xdbff;
 const isLowSurrogate = (unit) => unit >= 0xdc00 && unit <= 0xdfff;
+/** A combining mark (U+3099 voiced sound mark, a combining accent): it belongs to the letter before it. */
+const COMBINING_MARK = /^\p{M}$/u;
 
 /**
  * The part of a chunk a search result quotes: EXCERPT_CHARS units from the sentence that holds the
  * first of `words` (when it starts at most EXCERPT_LEAD units before the word); near the end of the
  * chunk, from the first sentence that starts in its last EXCERPT_CHARS units, so the quote may be
  * shorter; the first EXCERPT_CHARS when no word occurs (a vector match may hold none). A verbatim
- * slice of the chunk that never splits a character outside the BMP.
+ * slice of the chunk that never splits a character outside the BMP, nor a letter from its combining
+ * marks (か and U+3099 in NFD text, which PDFs made on macOS often hold).
  * @param {string} text
  * @param {string[]} words
  */
@@ -642,8 +646,14 @@ export function excerptAround(text, words) {
         while (start < hit && /[\s」』）)\]】〕]/.test(value[start])) start += 1;
     }
     if (isLowSurrogate(value.charCodeAt(start))) start += 1;
+    while (start < value.length && COMBINING_MARK.test(value[start])) start += 1;
     let end = Math.min(value.length, start + EXCERPT_CHARS);
     if (end < value.length && isHighSurrogate(value.charCodeAt(end - 1))) end -= 1;
+    // A mark right after the cut belongs to the letter before it: leave both out.
+    if (end < value.length && COMBINING_MARK.test(value[end])) {
+        while (end > start && COMBINING_MARK.test(value[end])) end -= 1;
+        if (end > start && isLowSurrogate(value.charCodeAt(end)) && isHighSurrogate(value.charCodeAt(end - 1))) end -= 1;
+    }
     return value.slice(start, end).trimEnd();
 }
 
@@ -653,9 +663,11 @@ const folded = (text) => Array.from(graphemes.segment(text), ({ segment }) => se
 /**
  * The passage a result quotes and the page it is on.
  * - With the chunk's PDF pages (`page` it starts on, `breaks` where the next pages start:
- *   server/ragService.js pageMetadata), the quote stays on one page: the page whose words weigh most,
- *   weighed like the keyword search ranks chunks (keywordSearchChunks), the earliest on a tie; with
- *   no word of the query in the chunk (a vector match), its longest page.
+ *   server/ragService.js pageMetadata), the quote stays on one page, chosen as the keyword search
+ *   finds and ranks chunks (keywordSearchChunks): among the pages with a selecting word, the one whose
+ *   words weigh most, the earliest on a tie (a page with only generic words such as 使い方 or 手順 is
+ *   not cited over one with the subject); with no selecting word on any page, the page whose words
+ *   weigh most; with no word of the query in the chunk (a vector match), its longest page.
  * - A chunk on one page (no breaks) quotes the chunk, on its page.
  * - Breaks that do not fit the chunk cite no page: the quote may not be on the one the chunk starts on.
  * The quote starts at the sentence of the first selecting word (excerptAround).
@@ -674,15 +686,19 @@ export function citedPassage(text, plan, page, breaks) {
     const fits = Array.isArray(breaks)
         && breaks.every((at, i) => Number.isInteger(at) && at > (i === 0 ? 0 : breaks[i - 1]) && at < value.length);
     if (!fits) return { quote: excerptAround(value, anchors), page: null };
-    const needles = keywords.map(({ word, weight }) => ({ needle: folded(word), weight: Number(weight) || 1 }));
+    const someSelect = keywords.some(({ selects }) => selects);
+    const needles = keywords.map(({ word, weight, selects }) => ({ needle: folded(word), weight: Number(weight) || 1, selects: !someSelect || Boolean(selects) }));
     const bounds = [0, ...breaks, value.length];
     const pages = bounds.slice(0, -1).map((from, i) => {
         const body = value.slice(from, bounds[i + 1]);
         const words = folded(body);
         const score = needles.reduce((sum, { needle, weight }) => sum + (words.includes(needle) ? weight : 0), 0);
-        return { body: body.trim(), page: page + i, score };
+        const selected = needles.some(({ needle, selects }) => selects && words.includes(needle));
+        return { body: body.trim(), page: page + i, score, selected };
     });
-    const best = pages.reduce((top, p) => (p.score > top.score || (p.score === 0 && top.score === 0 && p.body.length > top.body.length) ? p : top));
+    // As the keyword search finds a chunk only by a selecting word, a page is a candidate only with one.
+    const candidates = pages.some(({ selected }) => selected) ? pages.filter(({ selected }) => selected) : pages;
+    const best = candidates.reduce((top, p) => (p.score > top.score || (p.score === 0 && top.score === 0 && p.body.length > top.body.length) ? p : top));
     return { quote: excerptAround(best.body, anchors), page: best.page };
 }
 
@@ -693,7 +709,7 @@ const OWN_MATERIAL = 'あなたの教材';
  * The place of a passage, to cite it (searchContent `location`): the material, 「by its name」 or
  * あなたの教材 without one (always on the remote endpoint), then the page, counted from the file's
  * first page (not the number printed on it), else which of its parts: 「Blender入門.pdf」3 ページ目,
- * あなたの教材・4 つの部分のうち 2 番目. A material in one part, or with an unknown or stale count,
+ * あなたの教材・全 4 か所のうち 2 番目. A material in one part, or with an unknown or stale count,
  * is named alone.
  * @param {{ title?: string | null, page?: number | null, part?: number, parts?: number | null }} place
  */
@@ -701,7 +717,8 @@ export function locationLabel({ title, page, part, parts }) {
     const name = title ? `「${title}」` : OWN_MATERIAL;
     const joiner = title ? '' : '・';
     if (page) return `${name}${joiner}${page} ページ目`;
-    if (parts > 1 && part >= 1 && part <= parts) return `${name}${joiner}${parts} つの部分のうち ${part} 番目`;
+    // 「全 N か所」: the つ counter does not go past 9 (「120 つ」 reads wrong), か所 counts any number.
+    if (parts > 1 && part >= 1 && part <= parts) return `${name}${joiner}全 ${parts} か所のうち ${part} 番目`;
     return name;
 }
 

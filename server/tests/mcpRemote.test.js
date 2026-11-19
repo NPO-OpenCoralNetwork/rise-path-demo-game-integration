@@ -279,7 +279,7 @@ describe('remote MCP endpoint (in process)', () => {
         const result = await client.callTool({ name: 'rag-search', arguments: { query: 'mirror modifier' } });
         assert.ok(!result.isError, result.content[0].text);
         const [hit] = parse(result).results;
-        assert.equal(hit.location, 'あなたの教材・4 つの部分のうち 2 番目');
+        assert.equal(hit.location, 'あなたの教材・全 4 か所のうち 2 番目');
         assert.ok(!('title' in hit) && !('page' in hit), JSON.stringify(hit));
         const search = db.pool.queries.filter((q) => q.sql.includes('material_chunks'));
         assert.ok(search.some((q) => q.sql.includes(' ilike ') && q.params[0] === user), 'the token user\'s own materials');

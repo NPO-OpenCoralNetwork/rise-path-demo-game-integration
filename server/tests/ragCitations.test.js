@@ -7,7 +7,8 @@
 //   pages when it is read again (POST /api/v2/rag/index runs the same ingestMaterial).
 // - searchContent results name the material (its title: stdio and SSE only), the page of the quote,
 //   the part of the material the chunk is (part of parts) and a label to cite (location), and quote up
-//   to 500 characters from the sentence of the first matched word, on that word's page.
+//   to 500 characters from the sentence of the first matched word, on one page: among the pages with a
+//   word that selects (as the keyword search finds chunks), the one whose words weigh most.
 // - searchContent reads neither the title nor the page unless asked. The remote endpoint never asks
 //   (mcp-server/remotePolicy.js REMOTE_RAG_CITE): the owner chose that AI apps see where a passage is,
 //   not the file's name, and the remote role (deploy/risepath-vm/sql/mcp_remote_role.sql) grants
@@ -386,11 +387,42 @@ describe('excerptAround, citedPassage and locationLabel', () => {
         assert.deepEqual(citedPassage(chunk, keywordPlan('ミラーの面'), 3, breaks).page, 5, 'no Japanese word here: the longest page');
     });
 
+    it('a page with only the query\'s generic words (使い方・手順・方法・教え, a single kanji) is not cited over one with a word that selects', () => {
+        const cite = (/** @type {string[]} */ pages, /** @type {string} */ query) => {
+            const chunk = pages.join('\n\n');
+            const breaks = pages.slice(1).map((_, i) => pages.slice(0, i + 1).join('\n\n').length + 2);
+            return citedPassage(chunk, keywordPlan(query), 11, breaks);
+        };
+        const slides = ['このスライドの使い方と、演習の手順を説明します。', 'ミラーモディファイアは、片側の形をもう片側に写します。'];
+        assert.deepEqual(cite(slides, 'ミラーモディファイアの使い方の手順を教えて'), { quote: slides[1], page: 12 }, 'a tie on generic words alone must not win');
+        const blender = ['Blender のショートカット一覧。', '画面の右にあるパネルで方法を選びます。詳しくは講師が教えます。'];
+        assert.deepEqual(cite(blender, 'Blenderで面を押し出す方法を教えて'), { quote: blender[0], page: 11 }, 'more generic words do not outweigh the subject');
+        // With no selecting word on any page, the generic words still choose (else the longest page).
+        assert.equal(cite(['短い。', '使い方の手順はこのページです。'], '使い方の手順').page, 12);
+    });
+
+    it('the full-width and half-width full stops (．｡) end a sentence, so the quote starts after them', () => {
+        for (const stop of ['．', '｡']) {
+            const text = `${'あ'.repeat(600)}${stop}ミラーは形を写します${'い'.repeat(600)}`;
+            assert.ok(excerptAround(text, ['ミラー']).startsWith('ミラーは形を写します'), stop);
+        }
+    });
+
+    it('never cuts a letter from its combining mark (NFD text such as か + U+3099, from PDFs made on macOS)', () => {
+        const nfd = 'が';
+        const text = `mirror ${'a'.repeat(EXCERPT_CHARS - 'mirror '.length - 1)}${nfd}${'b'.repeat(100)}`;
+        const excerpt = excerptAround(text, ['mirror']);
+        assert.ok(!excerpt.endsWith('か'), 'the letter is not left without its mark');
+        assert.ok(excerpt.endsWith('a'), JSON.stringify(excerpt.slice(-3)));
+        const whole = `mirror ${'a'.repeat(EXCERPT_CHARS - 'mirror '.length - 2)}${nfd}${'b'.repeat(100)}`;
+        assert.ok(excerptAround(whole, ['mirror']).endsWith(nfd), 'a letter that fits keeps its mark');
+    });
+
     it('names the place: the page counted from the file\'s start, or the part; 「あなたの教材」 without a name', () => {
         assert.equal(locationLabel({ title: 'Blender入門.pdf', page: 3, part: 5, parts: 12 }), '「Blender入門.pdf」3 ページ目');
         assert.equal(locationLabel({ title: null, page: 3, part: 5, parts: 12 }), 'あなたの教材・3 ページ目');
-        assert.equal(locationLabel({ title: 'メモ.md', part: 2, parts: 4 }), '「メモ.md」4 つの部分のうち 2 番目');
-        assert.equal(locationLabel({ part: 2, parts: 4 }), 'あなたの教材・4 つの部分のうち 2 番目');
+        assert.equal(locationLabel({ title: 'メモ.md', part: 2, parts: 4 }), '「メモ.md」全 4 か所のうち 2 番目');
+        assert.equal(locationLabel({ part: 2, parts: 4 }), 'あなたの教材・全 4 か所のうち 2 番目');
         assert.equal(locationLabel({ title: 'メモ.md', part: 1, parts: 1 }), '「メモ.md」');
         assert.equal(locationLabel({ part: 1, parts: 1 }), 'あなたの教材');
         assert.equal(locationLabel({ title: 'メモ.md', part: 2 }), '「メモ.md」', 'no count: no part');
@@ -447,7 +479,7 @@ describe('searchContent: results that can be cited (stdio and SSE: LOCAL_RAG_CIT
 
         assert.equal(result.search_type, 'vector');
         const [hit] = result.results;
-        assert.equal(hit.location, '「メモ.md」4 つの部分のうち 2 番目');
+        assert.equal(hit.location, '「メモ.md」全 4 か所のうち 2 番目');
         assert.ok(!('page' in hit), 'a text file has no page');
         assert.ok(hit.content.startsWith('The mirror modifier copies'), hit.content.slice(0, 40));
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
@@ -470,9 +502,9 @@ describe('searchContent: results that can be cited (stdio and SSE: LOCAL_RAG_CIT
         const { results } = await searchContent({ query: 'mirror', userId: LEARNER, cite: LOCAL_RAG_CITE });
         assert.deepEqual(partsQuery(pool).params, [LEARNER, [MATERIAL, OTHER]]);
         assert.deepEqual(results.map((r) => [r.part, r.parts, r.location]), [
-            [1, 2, 'あなたの教材・2 つの部分のうち 1 番目'],
-            [3, 3, 'あなたの教材・3 つの部分のうち 3 番目'],
-            [2, 2, 'あなたの教材・2 つの部分のうち 2 番目'],
+            [1, 2, 'あなたの教材・全 2 か所のうち 1 番目'],
+            [3, 3, 'あなたの教材・全 3 か所のうち 3 番目'],
+            [2, 2, 'あなたの教材・全 2 か所のうち 2 番目'],
         ]);
 
         const empty = mockPool({ hasVector: false });
@@ -508,7 +540,7 @@ describe('searchContent: results that can be cited (stdio and SSE: LOCAL_RAG_CIT
 
         assert.deepEqual(results.map((r) => [r.title, r.page, r.location]), [
             [undefined, 2, 'あなたの教材・2 ページ目'],
-            [undefined, undefined, 'あなたの教材・3 つの部分のうち 2 番目'],
+            [undefined, undefined, 'あなたの教材・全 3 か所のうち 2 番目'],
         ]);
     });
 
@@ -516,8 +548,36 @@ describe('searchContent: results that can be cited (stdio and SSE: LOCAL_RAG_CIT
         const pool = mockPool({ hasVector: false, keywordRows: [{ content: 'The mirror modifier.', chunk_index: 0, material_id: MATERIAL }], parts: { [MATERIAL]: 2 } });
         setPoolForTests(pool);
         const { results: [hit] } = await searchContent({ query: 'mirror', userId: LEARNER });
-        assert.equal(hit.location, 'あなたの教材・2 つの部分のうち 1 番目');
+        assert.equal(hit.location, 'あなたの教材・全 2 か所のうち 1 番目');
         for (const { sql } of pool.queries) assert.doesNotMatch(sql, /title|metadata/, sql);
+    });
+
+    it('on every search path, each statement that reads chunks also reads the name and the page (the mock pool cannot show a lost `cite`)', async () => {
+        const searches = [
+            { label: 'no_pgvector', pool: { hasVector: false }, env: false },
+            { label: 'embeddings_off (production)', pool: {}, env: false },
+            { label: 'reembed_required', pool: { coverage: { current: false, legacy: true } }, env: true },
+            { label: 'vector + older chunks by keyword', pool: { coverage: { current: true, legacy: true } }, env: true },
+        ];
+        for (const search of searches) {
+            if (search.env) {
+                process.env.GEMINI_ALLOWED = 'true';
+                setEmbeddingClientForTests(embeddingClient());
+            } else {
+                delete process.env.GEMINI_ALLOWED;
+            }
+            const found = [{ content: 'Blender mirror', chunk_index: 0, material_id: MATERIAL, distance: 0.1 }];
+            const pool = mockPool({ ...search.pool, keywordRows: found, vectorRows: found, parts: { [MATERIAL]: 2 } });
+            setPoolForTests(pool);
+            await quietly(() => searchContent({ query: 'Blender の押し出し mirror', userId: LEARNER, cite: LOCAL_RAG_CITE }));
+            const reads = pool.queries.map((q) => q.sql).filter((sql) => /SELECT c\.content/.test(sql));
+            assert.ok(reads.length > 0, `${search.label}: a statement read chunks`);
+            for (const sql of reads) {
+                assert.match(sql, /m\.title AS material_title/, `${search.label}: the name\n${sql}`);
+                assert.match(sql, /c\.metadata->>'page' AS page/, `${search.label}: the page\n${sql}`);
+                assert.match(sql, /c\.metadata->'breaks' AS page_breaks/, `${search.label}: the breaks\n${sql}`);
+            }
+        }
     });
 });
 
@@ -528,7 +588,7 @@ describe('searchContent on the remote endpoint (REMOTE_RAG_CITE)', () => {
         const result = await searchContent({ query: 'mirror modifier', userId: LEARNER, cite: REMOTE_RAG_CITE });
 
         const [hit] = result.results;
-        assert.equal(hit.location, 'あなたの教材・4 つの部分のうち 2 番目');
+        assert.equal(hit.location, 'あなたの教材・全 4 か所のうち 2 番目');
         assert.deepEqual([hit.part, hit.parts], [2, 4]);
         assert.ok(!('title' in hit) && !('page' in hit), JSON.stringify(hit));
         assert.ok(hit.content.startsWith('The mirror modifier copies'));
@@ -560,7 +620,7 @@ describe('searchContent on the remote endpoint (REMOTE_RAG_CITE)', () => {
             const pool = mockPool({ ...search.pool, keywordRows: found, vectorRows: found, parts: { [MATERIAL]: 2 } });
             setPoolForTests(pool);
             const { value: result } = await quietly(() => searchContent({ query: 'Blender の押し出し mirror', userId: LEARNER, cite: REMOTE_RAG_CITE }));
-            assert.equal(result.results[0]?.location, 'あなたの教材・2 つの部分のうち 1 番目', JSON.stringify(result));
+            assert.equal(result.results[0]?.location, 'あなたの教材・全 2 か所のうち 1 番目', JSON.stringify(result));
             statements.push(...pool.queries.map((q) => q.sql));
         }
         assert.ok(statements.some((sql) => /ILIKE/.test(sql)) && statements.some((sql) => /<=>/.test(sql)), 'keyword and vector searches ran');
