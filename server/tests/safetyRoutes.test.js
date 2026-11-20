@@ -292,6 +292,34 @@ describe('minor safeguards on the AI routes', () => {
             assert.deepEqual(pool.events().map((e) => e.kind), ['support_shown']);
         });
 
+        it('tags the prompt removes cannot split a phone number, an email or a distress phrase past the pre-filter (message and user turns)', async () => {
+            const mock = scriptedMock();
+            mock.useIt();
+            await withServer(async (base) => {
+                const message = await post(`${base}/llm/tutor`, { message: '電話は090<excerpt>1234<excerpt>5678です', lesson: LESSON, anchor: ANCHOR });
+                assert.equal(message.status, 422, message.text);
+                assert.equal(message.json.category, 'personal_info');
+
+                const email = await post(`${base}/llm/tutor`, {
+                    message: '続きを教えて', lesson: LESSON, anchor: ANCHOR,
+                    history: [{ role: 'user', content: 'メールは taro<LESSON id="1">@gmail.com です' }, { role: 'assistant', content: 'ok' }],
+                });
+                assert.equal(email.status, 422, email.text);
+                assert.equal(email.json.category, 'personal_info');
+
+                const distress = await post(`${base}/llm/tutor`, {
+                    message: '続きを教えて', lesson: LESSON, anchor: ANCHOR,
+                    history: [{ role: 'user', content: 'もう死に</learner_question>たい' }, { role: 'assistant', content: 'ok' }],
+                });
+                assert.equal(distress.status, 422, distress.text);
+                assert.equal(distress.json.support, true);
+                await settle();
+            });
+            assert.equal(mock.calls.length, 0, 'neither the classifier nor the tutor ran');
+            assert.deepEqual(pool.events().map((e) => [e.kind, e.category]), [['input_blocked', 'personal_info'], ['input_blocked', 'personal_info'], ['support_shown', 'self_harm']]);
+            assert.equal(pool.refunds().length, 3, 'a pre-filter block gives the unit back');
+        });
+
         it('a held-back answer ends with the error event (content_blocked) and keeps the unit charged', async () => {
             const mock = scriptedMock({
                 tutorText: 'This answer is UNSAFE for children.',
@@ -356,6 +384,20 @@ describe('minor safeguards on the AI routes', () => {
                 assert.equal(mock.screens('output').length, 1);
                 assert.match(mock.screens('output')[0].input.text, new RegExp(ok.json.data.feedback.slice(0, 10).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
             });
+        });
+
+        it('writing feedback: a learner_text tag cannot split a phone number past the pre-filter', async () => {
+            const mock = scriptedMock();
+            mock.useIt();
+            await withServer(async (base) => {
+                const result = await post(`${base}/llm/writing-feedback`, { ...FEEDBACK, text: 'My phone is 090<learner_text>1234</learner_text>5678, so please call me after school.' });
+                assert.equal(result.status, 422, result.text);
+                assert.equal(result.json.category, 'personal_info');
+                await settle();
+            });
+            assert.equal(mock.calls.length, 0, 'neither the classifier nor the writing coach ran');
+            assert.deepEqual(pool.events().map((e) => [e.kind, e.category, e.surface]), [['input_blocked', 'personal_info', 'writing_feedback']]);
+            assert.equal(pool.refunds().length, 1, 'a pre-filter block gives the unit back');
         });
 
         it('writing feedback: a held-back result answers 422 and keeps the unit', async () => {

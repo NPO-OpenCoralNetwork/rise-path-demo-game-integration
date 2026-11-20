@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Sparkles, Zap, BrainCircuit, Loader2, Brain, CheckCircle, ArrowRight, Send, Infinity, User, Bot, RefreshCw, ThumbsUp, ThumbsDown, Paperclip, X as CloseIcon, Palette, LogIn, CloudOff, BookOpen, CalendarClock } from 'lucide-react';
+import { ArrowLeft, Sparkles, Zap, BrainCircuit, Loader2, Brain, CheckCircle, ArrowRight, Send, Infinity, User, Bot, RefreshCw, ThumbsUp, ThumbsDown, Paperclip, X as CloseIcon, Palette, LogIn, CloudOff, BookOpen, CalendarClock, Plus } from 'lucide-react';
 import { GeneratedCourse, ViewState, Message } from '../../../types';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -147,7 +147,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       analysisActive: 'Analysis Active',
       generating: 'Thinking...',
       resetChat: 'Reset Chat',
-      resetMessage: 'Plan reset. Where should we begin?',
+      newCourse: 'Start a new course',
+      newCourseLead: 'Want a course on another topic?',
+      // A draft found on the way in (fetchAiDrafts): continue it, or start a new course (startNewCourse).
+      restoredDraft: (title: string, stage: 'requirements' | 'roadmap') => `📋 Restored your previous session: "${title}". The ${stage} stage is pending approval.\n\nTo continue, approve it below or type the changes you want. For a course on another topic, choose "Start a new course".`,
       errorChat: 'Communication failed.',
       approve: 'Approve & Continue',
       revise: 'Request Changes',
@@ -208,7 +211,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       analysisActive: '分析中',
       generating: '思考中...',
       resetChat: 'チャットをリセット',
-      resetMessage: 'プランをリセットしました。何から始めましょうか？',
+      newCourse: '新しく始める',
+      newCourseLead: '別のテーマで作りますか？',
+      restoredDraft: (title: string, stage: 'requirements' | 'roadmap') => `📋 前回の作業を復元しました。「${title}」の${stage === 'requirements' ? '要件定義' : 'ロードマップ'}が承認待ちです。\n\n続けるときは、下で承認するか、修正点を入力してください。別のテーマで作るときは「新しく始める」を押してください。`,
       errorChat: '通信に失敗しました。',
       approve: '承認して進む',
       revise: '修正を依頼',
@@ -287,28 +292,28 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   }, [isGenerating]);
 
   // --- Draft Restore: check for in-progress drafts on mount ---
+  // The latest draft comes back pending its stage: approving it or typing a change continues it
+  // (handleApprove, handleSendMessage revise it), and 「新しく始める」 (startNewCourse) leaves it for
+  // a new course, so a new topic is never sent as a revision of the old draft.
   const draftChecked = useRef(false);
+  // Set when the learner sends a message or starts a new course: a draft that loads after that is
+  // not put over their conversation.
+  const conversationStartedRef = useRef(false);
   useEffect(() => {
     if (draftChecked.current) return;
     draftChecked.current = true;
 
     fetchAiDrafts().then(({ drafts }) => {
-      if (drafts.length > 0) {
+      if (drafts.length > 0 && !conversationStartedRef.current) {
         const latest = drafts[0];
-        const stageMap: Record<string, string> = {
-          'draft_requirements': 'requirements',
-          'draft_roadmap': 'roadmap',
-        };
-        const stage = stageMap[latest.status] || 'requirements';
+        const stage = latest.status === 'draft_roadmap' ? 'roadmap' : 'requirements';
         setCurriculumId(latest.id);
         setSessionId(latest.id);
         setPendingApproval(stage);
         setMessages([{
           id: 'restored-draft',
           role: 'model',
-          text: language === 'jp'
-            ? `📋 前回の作業を復元しました。「${latest.title}」の${stage === 'requirements' ? '要件定義' : 'ロードマップ'}が承認待ちです。\n\n続行するか、新しいテーマを入力してください。`
-            : `📋 Restored your previous session: "${latest.title}". The ${stage} stage is pending approval.\n\nContinue or type a new topic.`,
+          text: t.restoredDraft(latest.title, stage),
           timestamp: new Date(),
         }]);
       }
@@ -365,13 +370,14 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     return () => clearTimeout(timer);
   }, [aiBlocked, blockedUntil, t.availableAgain]);
 
-  // Focus requested above (or by a refused upload) once the target is on screen and enabled.
+  // Focus requested above (or by a refused upload, or by starting a new course, which changes only
+  // the messages when nothing was blocked) once the target is on screen and enabled.
   useEffect(() => {
     if (!focusAfterRef.current || isGenerating || composerLocked) return;
     const target = focusAfterRef.current === 'file' ? removeFileRef.current ?? inputRef.current : inputRef.current;
     focusAfterRef.current = null;
     target?.focus();
-  }, [aiBlocked, isGenerating, uploadNotice, composerLocked]);
+  }, [aiBlocked, isGenerating, uploadNotice, composerLocked, messages]);
 
   const handleSendMessage = async (text?: string) => {
     if (composerLocked) return;
@@ -410,6 +416,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         text: fileName ? `${sentText} (Attached: ${fileName})`.trim() : sentText,
         timestamp: new Date()
     };
+    conversationStartedRef.current = true;
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
     setIsGenerating(true);
@@ -517,6 +524,34 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     } catch (err) {
         handleAiFailure(err);
     }
+  };
+
+  /**
+   * 「新しく始める」 (the approval card) and the reset button: back to the start screen for a new
+   * course. The conversation, the draft it was continuing (a restored one too) and any attached file
+   * are let go, so the next message starts a new draft (sendAiChat without a session) instead of
+   * revising the old one, whose requirements or roadmap the new topic would rewrite. The old draft
+   * stays on the server and is offered again on the way in while it is the latest one. A notice
+   * about the last call goes; an access refusal stays (it is about the learner, not this course).
+   * What is typed in the composer stays, to send as the new topic.
+   */
+  const startNewCourse = () => {
+    if (isGenerating) return;
+    conversationStartedRef.current = true;
+    setMessages([{ id: 'init', role: 'model', text: t.initialMessage, timestamp: new Date() }]);
+    setSessionId(null);
+    setCurriculumId(null);
+    setPendingApproval(null);
+    setSelectedFile(null);
+    setUploadedFile(null);
+    setUploadNotice(null);
+    setError(null);
+    setAiBlocked(null);
+    setBlockedUntil(null);
+    setAiRefusal((refusal) => (refusal?.type === 'access' ? refusal : null));
+    setStatusMessage('');
+    // The button that was pressed may be gone (the approval card closes): the composer takes focus.
+    focusAfterRef.current = 'input';
   };
 
   const handleApiResponse = async (data: any) => {
@@ -696,8 +731,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/30">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                    {/* Demo Starter Grid */}
-                    {messages.length === 1 && !isGenerating && !composerLocked && (
+                    {/* Demo Starter Grid: on the start screen only. Under a restored draft a topic picked
+                        here would be sent as a revision of that draft; 「新しく始める」 brings it back. */}
+                    {messages.length === 1 && messages[0].id === 'init' && !isGenerating && !composerLocked && (
                         <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in zoom-in duration-500">
                             <div className="text-center max-w-lg">
                                 <p className="text-slate-600 text-sm mb-8 font-medium">
@@ -998,6 +1034,21 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                         <ThumbsDown size={14} /> {t.revise}
                                     </button>
                                 </div>
+                                {/* Another topic is a new course, never a change to this draft (startNewCourse).
+                                    Off while generation is locked, like the buttons above: nothing could be sent,
+                                    and the draft is kept for later. */}
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-line pt-4">
+                                    <p className="text-small text-fg-2">{t.newCourseLead}</p>
+                                    <button
+                                        type="button"
+                                        onClick={startNewCourse}
+                                        disabled={composerLocked}
+                                        className="inline-flex items-center gap-2 rounded-control border border-line bg-surface px-4 py-2 text-small font-bold text-fg-2 hover:bg-sunken transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                    >
+                                        <Plus size={16} aria-hidden="true" />
+                                        {t.newCourse}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1161,20 +1212,12 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                 </div>
 
                 <div className="md:mt-auto md:pt-10 text-center">
-                    <button 
+                    {/* Off while a stage runs: its answer would land in the new conversation. */}
+                    <button
                         type="button"
-                        onClick={() => {
-                            setMessages([{ id: 'reset', role: 'model', text: t.resetMessage, timestamp: new Date() }]);
-                            setSessionId(null);
-                            setCurriculumId(null);
-                            setPendingApproval(null);
-                            setAiBlocked(null);
-                            setBlockedUntil(null);
-                            setUploadNotice(null);
-                            setUploadedFile(null);
-                            setStatusMessage('');
-                        }}
-                        className="text-fg-3 hover:text-indigo-600 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mx-auto transition-colors"
+                        onClick={startNewCourse}
+                        disabled={isGenerating}
+                        className="text-fg-3 hover:text-indigo-600 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mx-auto transition-colors disabled:opacity-50 disabled:pointer-events-none"
                     >
                         <RefreshCw size={12} aria-hidden="true" /> {t.resetChat}
                     </button>

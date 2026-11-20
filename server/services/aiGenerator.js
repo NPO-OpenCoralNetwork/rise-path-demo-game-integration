@@ -51,11 +51,18 @@ import { outputParts, screenForMinor } from '../safety/moderation.js';
 const SURFACE = 'course_generation';
 
 /**
- * Text the learner wrote, as the model gets it (aiPrompts.js courseText: no tag left in it), so the
- * pre-filter sees what the model will see.
+ * Text the learner wrote, as the model gets it (aiPrompts.js courseText: no tag left in it), with
+ * the text as sent in `raw` when they differ (server/safety/moderation.js ScreenPart). The pre-filter
+ * checks both, so neither a tag that splits a phone number (the model reads it whole) nor what was
+ * written inside a removed tag (<material もう死にたい>) gets past it; the classifier reads `text`.
  * @param {string} label @param {unknown} text
+ * @returns {import('../safety/moderation.js').ScreenPart[]}
  */
-const textPart = (label, text) => (typeof text === 'string' && text.trim() ? [{ label, text: courseText(text) }] : []);
+const textPart = (label, text) => {
+  if (typeof text !== 'string' || !text.trim()) return [];
+  const prompted = courseText(text);
+  return [prompted === text ? { label, text } : { label, text: prompted, raw: text }];
+};
 /**
  * Text the learner did not write (the material blocks, as the model gets them): the classifier
  * screens it, the local pre-filter does not.

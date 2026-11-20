@@ -36,13 +36,21 @@ export function stripTags(text, pattern) {
 }
 
 /**
+ * The content without any opening or closing `tag`: what fence(tag, content) puts between its tags.
+ * @param {string} tag
+ * @param {string} content
+ */
+export function withoutTag(tag, content) {
+  return stripTags(content, new RegExp(`<\\s*/?\\s*${tag}\\b[^>]*>`, 'gi'));
+}
+
+/**
  * Wrap untrusted text in a tag; a closing tag inside the text cannot end the block early.
  * @param {string} tag
  * @param {string} content
  */
 export function fence(tag, content) {
-  const safe = stripTags(content, new RegExp(`<\\s*/?\\s*${tag}\\b[^>]*>`, 'gi'));
-  return `<${tag}>\n${safe}\n</${tag}>`;
+  return `<${tag}>\n${withoutTag(tag, content)}\n</${tag}>`;
 }
 
 /**

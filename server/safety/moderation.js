@@ -4,8 +4,8 @@
  *
  *   await screenForMinor({ direction: 'input', surface: 'tutor', parts, userId, ip });
  *
- * Input: the local pre-filter first on the text the learner wrote (prefilter.js: distress phrases
- * and personal information, no model call), then the Claude classifier on every part (task 'safety.screen', cheap tier, zod verdict). Output:
+ * Input: the local pre-filter first on the text the learner wrote, as sent and as the prompt carries
+ * it (prefilter.js: distress phrases and personal information, no model call), then the Claude classifier on every part (task 'safety.screen', cheap tier, zod verdict). Output:
  * the classifier only. Adults are never screened; routes call this only when
  * res.locals.aiAudience === 'minor' (server/middleware/aiAccessGate.js).
  *
@@ -36,6 +36,8 @@ import { getGateway } from '../llm/index.js';
 import { isLlmError } from '../llm/errors.js';
 import { SafetyScreen } from '../llm/schemas.js';
 import { fence } from '../llm/prompts/shared.js';
+import { tutorText } from '../llm/prompts/tutor.js';
+import { writingText } from '../llm/prompts/writingFeedback.js';
 import { prefilterParts } from './prefilter.js';
 import { recordSafetyEvent } from './events.js';
 
@@ -48,9 +50,7 @@ const CHUNK_CHARS = 40_000;
  * schemas accept, so a request is never split: the tutor (server/llm/schemas.js TutorRequest) is
  * 60,240 characters at most (message 2,000, 12 history turns of 4,000, 12 objectives of
  * 500, excerpt and context 1,500 each, title and ids), writing feedback about 8,200 and a course
- * generation stage about 9,000 (the curriculum stage's 8 material chunks of 1,000 with their tags,
- * or a topic or feedback of 4,000 with 3 or 4 chunks: server/services/aiGenerator.js
- * MATERIAL_CHUNKS). A larger input fails closed.
+ * generation stage about 9,000 (8 material chunks: aiGenerator.js MATERIAL_CHUNKS). A larger input fails closed.
  */
 export const INPUT_SCREEN_MAX_CHARS = 80_000;
 const ALLOW_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -145,7 +145,9 @@ export function safetyErrorResponse(error) {
  * - prefilter: false for text the learner did not write (lesson text, earlier AI answers,
  *   uploaded material). The local pre-filter would match sample phone numbers or addresses in it
  *   and count them as the learner's blocked input; the classifier still screens it. Default true.
- * @typedef {{ label: string, text: string, prefilter?: boolean }} ScreenPart
+ * - raw: text the learner wrote as it was sent, when the prompt carries it changed (`text` is what
+ *   the model reads; learnerPart). The pre-filter checks both; the classifier reads `text` only.
+ * @typedef {{ label: string, text: string, prefilter?: boolean, raw?: string }} ScreenPart
  */
 
 /**
@@ -155,44 +157,61 @@ export function safetyErrorResponse(error) {
 const part = (label, text, flags = {}) => (typeof text === 'string' && text.trim() ? [{ label, text, ...flags }] : []);
 
 /**
+ * Text the learner wrote (the pre-filter checks it), as the prompt carries it: `asPrompted` is the
+ * prompt's own tag removal. Checked only as sent, a tag the prompt removes could split a phone
+ * number or a distress phrase that the model then reads whole ("090<excerpt>1234<excerpt>5678").
+ * The text as sent stays in `raw`, so what was written inside a removed tag is still pre-filtered.
+ * @param {string} label @param {unknown} text @param {(text: string) => string} asPrompted
+ * @returns {ScreenPart[]}
+ */
+const learnerPart = (label, text, asPrompted) => {
+  if (typeof text !== 'string' || !text.trim()) return [];
+  const prompted = asPrompted(text);
+  return [prompted === text ? { label, text } : { label, text: prompted, raw: text }];
+};
+
+/**
  * Every client-sent text of a tutor request that reaches the prompt: the message, every history
  * turn (both roles: a caller can forge "assistant" turns), the lesson title, level and
  * objectives, the anchor ids, block type, code language and excerpt, the learner's question and
  * option ids, and the legacy context. The ids are free strings in TutorRequest, so they are
- * screened like learner text.
+ * screened like learner text. Learner text is screened without tutor tags (tutorText), field by
+ * field: the prompt removes tags from the lesson, anchor and learner-state lines together, so a
+ * tag there could also span two fields, none of which the learner types.
  * @param {any} body  a parsed TutorRequest
  * @returns {ScreenPart[]}
  */
 export function tutorInputParts(body) {
   const history = Array.isArray(body?.history) ? body.history : [];
+  /** @param {string} label @param {unknown} text */
+  const learner = (label, text) => learnerPart(label, text, tutorText);
   return [
-    ...part('learner message', body?.message),
-    ...history.flatMap((turn, i) => {
-      const fromTutor = turn?.role === 'assistant';
-      return part(`earlier ${fromTutor ? 'answer' : 'question'} ${i + 1}`, turn?.content, { prefilter: !fromTutor });
-    }),
+    ...learner('learner message', body?.message),
+    ...history.flatMap((turn, i) => (turn?.role === 'assistant'
+      ? part(`earlier answer ${i + 1}`, turn?.content, { prefilter: false })
+      : learner(`earlier question ${i + 1}`, turn?.content))),
     ...part('lesson title', body?.lesson?.title, { prefilter: false }),
-    ...part('lesson level', body?.lesson?.level),
+    ...learner('lesson level', body?.lesson?.level),
     ...(Array.isArray(body?.lesson?.objectives) ? body.lesson.objectives.flatMap((o, i) => part(`lesson objective ${i + 1}`, o, { prefilter: false })) : []),
-    ...part('section id', body?.anchor?.sectionId),
-    ...part('block id', body?.anchor?.blockId),
-    ...part('block type', body?.anchor?.blockType),
-    ...part('code language', body?.anchor?.codeLang),
+    ...learner('section id', body?.anchor?.sectionId),
+    ...learner('block id', body?.anchor?.blockId),
+    ...learner('block type', body?.anchor?.blockType),
+    ...learner('code language', body?.anchor?.codeLang),
     ...part('lesson excerpt', body?.anchor?.excerpt, { prefilter: false }),
-    ...part('question id', body?.learner?.questionId),
-    ...part('chosen option id', body?.learner?.chosenOptionId),
+    ...learner('question id', body?.learner?.questionId),
+    ...learner('chosen option id', body?.learner?.chosenOptionId),
     ...part('context', body?.context, { prefilter: false }),
   ];
 }
 
 /**
- * Every text of a writing-feedback request.
+ * Every text of a writing-feedback request; the learner text as the prompt carries it (writingText).
  * @param {any} body  a parsed WritingFeedbackRequest
  * @returns {ScreenPart[]}
  */
 export function writingInputParts(body) {
   return [
-    ...part('learner text', body?.text),
+    ...learnerPart('learner text', body?.text, writingText),
     ...part('goal', body?.goal, { prefilter: false }),
     ...part('lesson title', body?.lessonTitle, { prefilter: false }),
     ...part('rubric clarity', body?.rubric?.clarity, { prefilter: false }),
@@ -325,8 +344,8 @@ export async function screenForMinor({
   gateway = getGateway(),
   now = () => Date.now(),
 }) {
-  const texts = (parts || []).filter((p) => p && typeof p.text === 'string' && p.text.trim());
-  if (!texts.length) return;
+  const all = (parts || []).filter(Boolean);
+  const texts = all.filter((p) => typeof p.text === 'string' && p.text.trim());
   const base = { userId, ip, audience, surface };
 
   /** @param {string} category @param {boolean} support @param {boolean} classifierRan */
@@ -343,10 +362,12 @@ export async function screenForMinor({
   };
 
   if (direction === 'input') {
-    // Only text the learner wrote: a sample number in an earlier AI answer is not their input.
-    const hit = prefilterParts(texts.filter((p) => p.prefilter !== false).map((p) => p.text));
+    // Only text the learner wrote (a sample number in an earlier AI answer is not their input), as
+    // the model reads it and as it was sent: a part may be empty once the prompt removes its tags.
+    const hit = prefilterParts(all.filter((p) => p.prefilter !== false).flatMap((p) => [p.text, p.raw]));
     if (hit) throw await blocked(hit.category, hit.support, false);
   }
+  if (!texts.length) return;
 
   // Skip only a request that passed as a whole. Parts that passed alone are screened again with
   // the rest in the same call: a request split across turns or fields is judged together.

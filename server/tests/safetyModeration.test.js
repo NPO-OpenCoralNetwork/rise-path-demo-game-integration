@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { LlmError } from '../llm/errors.js';
 import { createGateway, withAudienceRules } from '../llm/index.js';
 import { MINOR_SAFETY } from '../llm/prompts/shared.js';
+import { buildTutorPrompt } from '../llm/prompts/tutor.js';
+import { buildWritingFeedbackPrompt } from '../llm/prompts/writingFeedback.js';
 import { anthropicUserId } from '../llm/providers/anthropic.js';
 import { createMockProvider } from '../llm/providers/mock.js';
 import { SafetyScreen, TutorRequest, WritingFeedbackRequest } from '../llm/schemas.js';
@@ -20,6 +22,7 @@ import {
     writingInputParts,
 } from '../safety/moderation.js';
 import { resetSafetyEventsForTests } from '../safety/events.js';
+import { prefilterText } from '../safety/prefilter.js';
 import { setPoolForTests, resetPoolForTests } from '../db.js';
 
 const USER = '11111111-1111-4111-8111-111111111111';
@@ -279,6 +282,28 @@ describe('screenForMinor', () => {
         assert.equal(pool.inserts().length, 0);
     });
 
+    it('the pre-filter reads learner text as sent and as the model reads it; the classifier reads what the model reads', async () => {
+        const gateway = fakeGateway();
+        const rubric = { clarity: 'a', linking: 'b', tone: 'c' };
+        // Written inside a tag the prompt removes: the model never reads it, but the learner wrote it.
+        await assert.rejects(screen({ direction: 'input', gateway, parts: tutorInputParts(TutorRequest.parse({ message: '<lesson もう死にたい>' })) }),
+            { code: 'content_blocked', category: 'self_harm', support: true });
+        await assert.rejects(screen({
+            direction: 'input',
+            gateway,
+            parts: tutorInputParts(TutorRequest.parse({ message: '続き', history: [{ role: 'user', content: '<excerpt 090-1234-5678>です' }, { role: 'assistant', content: 'ok' }] })),
+        }), { category: 'personal_info' });
+        await assert.rejects(screen({ direction: 'input', gateway, parts: writingInputParts(WritingFeedbackRequest.parse({ text: '<learner_text hanako@gmail.com>I like to write stories about my friends.', rubric })) }),
+            { category: 'personal_info' });
+        assert.equal(gateway.calls.length, 0);
+        assert.deepEqual(pool.inserts().map((q) => q.params[4]), ['support_shown', 'input_blocked', 'input_blocked']);
+
+        await screen({ direction: 'input', gateway, parts: tutorInputParts(TutorRequest.parse({ message: '分数の<excerpt id="2">足し算</excerpt>を教えて' })) });
+        assert.equal(gateway.calls.length, 1);
+        assert.match(gateway.calls[0].messages[0].content, /分数の足し算を教えて/);
+        assert.doesNotMatch(gateway.calls[0].messages[0].content, /excerpt/);
+    });
+
     it('a request is skipped only when it passed as a whole; any change screens every part together', async () => {
         const gateway = fakeGateway();
         const turn = { label: 'earlier question 1', text: '最初の質問' };
@@ -362,10 +387,64 @@ describe('what is screened', () => {
         assert.deepEqual(parts.map((p) => p.text), ['M', ...history.map((h) => h.content)]);
     });
 
+    it("tutor: the learner's text is screened as the prompt carries it, so tutor tags cannot split a hit past the pre-filter", () => {
+        // Each text passes the pre-filter as sent. The prompt removes the tags (tutorData), and the
+        // model would read a phone number, an email address and a distress phrase.
+        const body = TutorRequest.parse({
+            message: '電話は090<excerpt>1234<excerpt>5678です',
+            history: [
+                { role: 'user', content: 'メールは taro<LESSON id="1">@gmail.com です' },
+                { role: 'assistant', content: 'ok' },
+                { role: 'user', content: 'もう死に< /learner_question >たい' },
+                { role: 'assistant', content: 'ok' },
+            ],
+            lesson: { courseId: 'c', lessonId: 'l', title: 'T', objectives: [], level: 'begin<lesson>ner' },
+            anchor: { sectionId: 's<anchor>1', blockId: 'b<anchor>1', blockType: 'mark<excerpt>down', excerpt: 'E', codeLang: 'j<anchor>s' },
+            learner: { questionId: 'q<learner_state>1', chosenOptionId: 'call 090<learner_state>1234</learner_state>5678' },
+        });
+        const learner = tutorInputParts(body).filter((p) => p.prefilter !== false);
+        assert.deepEqual(learner.map((p) => [p.label, p.text]), [
+            ['learner message', '電話は09012345678です'],
+            ['earlier question 1', 'メールは taro@gmail.com です'],
+            ['earlier question 3', 'もう死にたい'],
+            ['lesson level', 'beginner'],
+            ['section id', 's1'],
+            ['block id', 'b1'],
+            ['block type', 'markdown'],
+            ['code language', 'js'],
+            ['question id', 'q1'],
+            ['chosen option id', 'call 09012345678'],
+        ]);
+        assert.deepEqual(learner.slice(0, 3).map((p) => prefilterText(p.text)?.rule), ['mobile_number', 'email', 'distress_ja']);
+        assert.equal(prefilterText(learner.at(-1).text)?.rule, 'mobile_number');
+
+        // What the model reads: the questions fenced in learner_question, and the anchor and learner state.
+        const prompt = buildTutorPrompt(body, { mode: 'explain', locale: 'ja' });
+        const questions = prompt.messages.flatMap((m) => [...m.content.matchAll(/<learner_question>\n([\s\S]*?)\n<\/learner_question>/g)].map((match) => match[1]));
+        assert.deepEqual(questions, [learner[1].text, learner[2].text, learner[0].text], 'the model reads exactly the text the pre-filter checked');
+        const current = prompt.messages.at(-1).content;
+        assert.ok(current.includes('\nlevel: beginner\n'));
+        assert.ok(current.includes('\nsection: s1\nblock: b1 (markdown, js)\n'));
+        assert.ok(current.includes('\nquestion: q1\nlast chosen option: call 09012345678\n'));
+    });
+
     it('writing feedback: text, goal, lesson title and the rubric (pre-filter on the learner text only)', () => {
         const parts = writingInputParts({ text: 'X', goal: 'G', lessonTitle: 'L', rubric: { clarity: 'a', linking: 'b', tone: 'c' } });
         assert.deepEqual(parts.map((p) => p.text), ['X', 'G', 'L', 'a', 'b', 'c']);
         assert.deepEqual(parts.filter((p) => p.prefilter !== false).map((p) => p.text), ['X']);
+    });
+
+    it('writing feedback: the learner text is screened as the prompt carries it, so a learner_text tag cannot split a phone number past the pre-filter', () => {
+        const body = WritingFeedbackRequest.parse({
+            text: 'My phone is 090<learner_text>1234</LEARNER_TEXT>5678, so please call me after school.',
+            rubric: { clarity: 'a', linking: 'b', tone: 'c' },
+        });
+        const [learner] = writingInputParts(body);
+        assert.equal(learner.label, 'learner text');
+        assert.equal(learner.text, 'My phone is 09012345678, so please call me after school.');
+        assert.equal(prefilterText(learner.text)?.rule, 'mobile_number');
+        const prompt = buildWritingFeedbackPrompt(body);
+        assert.equal(prompt.messages[0].content.match(/<learner_text>\n([\s\S]*?)\n<\/learner_text>/)?.[1], learner.text, 'the model reads exactly the text the pre-filter checked');
     });
 
     it('structured output: every string value, keys and numbers skipped', () => {
