@@ -2113,6 +2113,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* Publisher, host and date each move to the next line as a whole. */
+  .rp-sources-meta-part {
+    display: inline-block;
+    max-width: 100%;
+  }
+
   .rp-sources-back {
     margin-top: 2px;
   }

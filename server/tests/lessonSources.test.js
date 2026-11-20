@@ -417,6 +417,8 @@ describe('LessonSources: the folded list at the end of the lesson', () => {
     const items = elements(renderList().tree).filter((el) => el.type === 'li');
     const meta = (/** @type {any} */ li) => textOf(elements(li).find((el) => classesOf(el).includes('rp-sources-meta')));
     assert.equal(meta(items[0]), 'Anthropic · code.claude.com · 2026年10月20日に確認');
+    const parts = (/** @type {any} */ li) => elements(li).filter((el) => classesOf(el).includes('rp-sources-meta-part')).map(textOf);
+    assert.deepEqual(parts(items[0]), ['Anthropic ·', 'code.claude.com ·', '2026年10月20日に確認'], 'each part wraps as a whole; the dot ends the line before');
     assert.equal(meta(items[1]), 'Nobody', 'no host for a URL that is not linked');
     assert.equal(meta(items[2]), '確認：last week', 'a date that is not ISO is shown as written');
     assert.equal(elements(items[3]).some((el) => classesOf(el).includes('rp-sources-meta')), false);

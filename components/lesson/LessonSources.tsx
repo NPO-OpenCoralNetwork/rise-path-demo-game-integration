@@ -122,7 +122,7 @@ export function LessonSources({ sources, open, onToggle, target, onBack }: Lesso
             const checked = date
               ? text.checked(date.year, date.month, date.day)
               : source.checkedAt ? text.checkedRaw(source.checkedAt) : null;
-            const meta = [source.publisher, host, checked].filter(Boolean).join(' · ');
+            const meta = [source.publisher, host, checked].filter((part): part is string => Boolean(part));
             const targeted = target !== null && target.sourceId === source.id;
             return (
               <li
@@ -143,7 +143,18 @@ export function LessonSources({ sources, open, onToggle, target, onBack }: Lesso
                   ) : (
                     <span className="rp-sources-title">{source.title}</span>
                   )}
-                  {meta ? <span className="rp-sources-meta">{meta}</span> : null}
+                  {meta.length > 0 ? (
+                    <span className="rp-sources-meta">
+                      {/* Each part wraps as a whole (a phone broke 「2026年10月20日｜に確認」), and the
+                          dot stays at the end of the line before. */}
+                      {meta.map((part, index) => (
+                        <React.Fragment key={index}>
+                          {index > 0 ? ' ' : null}
+                          <span className="rp-sources-meta-part">{index < meta.length - 1 ? `${part} ·` : part}</span>
+                        </React.Fragment>
+                      ))}
+                    </span>
+                  ) : null}
                   {targeted ? (
                     <button type="button" className="rp-link-btn rp-sources-back" onClick={() => onBack(target)}>
                       <CornerUpLeft size={14} aria-hidden="true" />
