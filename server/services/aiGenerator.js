@@ -39,6 +39,7 @@ import {
   curriculumMessage,
   materialBlocks,
   requirementsMessage,
+  requirementsRevisionMessage,
   roadmapMessage,
 } from './aiPrompts.js';
 import { getGateway } from '../llm/index.js';
@@ -308,19 +309,28 @@ export function isStageReply(stage, value) {
  */
 
 /**
- * @param {string} message @param {string} userId @param {any} kit
- * @param {StageOptions & MaterialOptions} [options]
+ * A topic, or a revision: with `intake` (the draft's stored intake, the earlier proposal) the message
+ * is the learner's feedback on it, and the model gets both (aiPrompts.js requirementsRevisionMessage),
+ * so the revision stays on the draft's course. The stored intake is an earlier, already screened
+ * stage result; a minor's call screens the message as input with the passages either way.
+ * @param {string} message the learner's topic, or their feedback on `options.intake`
+ * @param {string} userId @param {any} kit
+ * @param {StageOptions & MaterialOptions & { intake?: unknown }} [options]
  */
 export async function generateRequirements(message, userId, kit, options = {}) {
-  const { signal, audience = 'adult', materialIds = [], newMaterialIds = [] } = options;
-  // RAG: the learner's own uploaded materials, the attached ones first
-  const passages = await readMaterials(message, MATERIAL_CHUNKS.requirements, userId, { materialIds, newMaterialIds, audience });
+  const { signal, audience = 'adult', materialIds = [], newMaterialIds = [], intake } = options;
+  const revising = intake !== undefined;
+  // RAG: the learner's own uploaded materials, the attached ones first. A revision searches by the
+  // feedback first, then the stored goal and constraints, as the roadmap stage does.
+  const query = revising ? roadmapQuery({ ...(isPlainObject(intake) ? intake : {}), revision_feedback: message }) : message;
+  const passages = await readMaterials(query, MATERIAL_CHUNKS.requirements, userId, { materialIds, newMaterialIds, audience });
 
-  await screenStage('input', [...textPart('learner topic', message), ...materialPart('uploaded material excerpts', materialBlocks(passages))], userId, options);
+  await screenStage('input', [...textPart(revising ? 'revision feedback' : 'learner topic', message), ...materialPart('uploaded material excerpts', materialBlocks(passages))], userId, options);
 
   const system = buildRequirementsPrompt(kit);
-  const userMessage = requirementsMessage(message, passages);
-  const result = await callCourseModel({ stage: 'requirements', system, userMessage, userId, input: { message }, signal, audience });
+  const userMessage = revising ? requirementsRevisionMessage(intake, message, passages) : requirementsMessage(message, passages);
+  const input = revising ? { message, intake } : { message };
+  const result = await callCourseModel({ stage: 'requirements', system, userMessage, userId, input, signal, audience });
 
   const reply = result.structuredData
     ? { message: result.structuredData.message || result.text, intake: result.structuredData.intake }

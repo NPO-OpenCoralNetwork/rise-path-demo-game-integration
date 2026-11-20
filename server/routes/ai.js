@@ -406,7 +406,7 @@ router.post('/generate', async (req, res) => {
 
     // --- Stage Router ---
 
-    // STAGE: requirements (initial message or revise)
+    // STAGE: requirements (a topic, for a new draft or an existing one; a revision is below)
     if (!decision && (!stage || stage === 'requirements')) {
       if (!message) return res.status(400).json({ error: 'message is required for requirements stage' });
 
@@ -541,16 +541,25 @@ router.post('/generate', async (req, res) => {
 
       // Re-generate the current stage with the feedback
       if (stage === 'requirements') {
-        const earlier = curriculum_id ? await draftMaterialIds(pool, curriculum_id, userId) : [];
-        const materialIds = attachedIds([...sentIds, ...earlier]);
-        const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds, newMaterialIds: sentIds });
-        if (curriculum_id) {
-          await pool.query(
-            `UPDATE curricula SET intake_json = $1, updated_at = NOW()
-             WHERE id = $2 AND user_id = CAST($3 AS uuid)`,
-            [JSON.stringify(withAttachedMaterials(result.intake, materialIds)), curriculum_id, userId]
-          );
-        }
+        // The feedback revises the draft's stored intake, so the model gets both (a revision such as
+        // 「初心者向けにしてください」 is not a new topic). The learner's own draft only: 404 before the
+        // model otherwise, which gives the unit back.
+        if (!curriculum_id) return res.status(404).json({ error: 'Draft not found' });
+        const draft = await pool.query(
+          'SELECT intake_json FROM curricula WHERE id = $1 AND user_id = CAST($2 AS uuid)',
+          [curriculum_id, userId]
+        );
+        if (!draft.rows[0]) return res.status(404).json({ error: 'Draft not found' });
+        const stored = attachedMaterials(draft.rows[0].intake_json);
+        const materialIds = attachedIds([...sentIds, ...stored.materialIds]);
+        const result = await generateRequirements(message, userId, kit, { ...stageOptions, materialIds, newMaterialIds: sentIds, intake: stored.intake });
+        // A reply without requirements (a question back, say) keeps the stored ones. The title follows
+        // the revised goal, as it does for a new topic; without a goal it stays as it is.
+        await pool.query(
+          `UPDATE curricula SET intake_json = $1, title = COALESCE($2, title), updated_at = NOW()
+           WHERE id = $3 AND user_id = CAST($4 AS uuid)`,
+          [JSON.stringify(withAttachedMaterials(result.intake ?? stored.intake, materialIds)), pickText(result.intake?.goal) || null, curriculum_id, userId]
+        );
         return res.json({
           session_id, curriculum_id,
           message: result.message,
