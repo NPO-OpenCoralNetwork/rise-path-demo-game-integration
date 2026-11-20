@@ -435,6 +435,20 @@ describe('minors: the passages are screened before the model, without the file n
         );
         assert.equal(gateway.requests.length, 0, 'neither the classifier nor the model got it');
     });
+
+    it('the pre-filter also reads the text as sent: words inside a tag the prompt removes still bring up the support lines', async () => {
+        const gateway = screeningGateway('{"message":"plan","intake":{"goal":"x"}}');
+        setGatewayForTests(gateway);
+        assert.equal(courseText('Blender<material もう死にたい>を学びたい'), 'Blenderを学びたい', 'the model would not see the words');
+        for (const run of [
+            () => generateRequirements('Blender<material もう死にたい>を学びたい', LEARNER, {}, { audience: 'minor' }),
+            () => generateRequirements('<learner_request もう死にたい>', LEARNER, {}, { audience: 'minor' }),
+            () => generateRoadmap({ goal: 'x', revision_feedback: '短くして<intake もう死にたい>' }, LEARNER, {}, { audience: 'minor' }),
+        ]) {
+            await assert.rejects(quiet(run), (error) => isSafetyError(error) && error.direction === 'input' && error.category === 'self_harm' && error.support === true);
+        }
+        assert.equal(gateway.requests.length, 0, 'stopped by the pre-filter, before the classifier and the model');
+    });
 });
 
 describe('the draft keeps the attached files (server/routes/ai.js)', () => {
