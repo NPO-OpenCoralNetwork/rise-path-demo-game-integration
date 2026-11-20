@@ -260,7 +260,7 @@ describe('server/ragService ingest + retrieve', () => {
         } finally {
             console.log = log;
         }
-        assert.deepEqual(chunks, ['chunk A']);
+        assert.deepEqual(chunks.map((chunk) => chunk.content), ['chunk A']);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
         assert.match(search.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND c\.embedding_model = \$3/);
         assert.equal(search.params[0], 'user-1');
@@ -324,7 +324,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
             return first;
         });
 
-        assert.deepEqual(chunks, ['モディファイアは形状を非破壊で変えます。']);
+        assert.deepEqual(chunks.map((chunk) => chunk.content), ['モディファイアは形状を非破壊で変えます。']);
         assert.equal(client.log.length, 0, 'no query embedding: there is nothing comparable to search');
         assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)), 'no vector comparison against older-model rows');
 
@@ -355,7 +355,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setPoolForTests(pool);
 
         const { value: chunks, warnings } = await captureWarnings(() => retrieveContext('Blenderのモディファイアとは？', 3, 'user-1'));
-        assert.deepEqual(chunks, ['Blenderのモディファイアは形状を非破壊で変えます。', 'Godot scenes are trees of nodes.'],
+        assert.deepEqual(chunks.map((chunk) => chunk.content), ['Blenderのモディファイアは形状を非破壊で変えます。', 'Godot scenes are trees of nodes.'],
             'the older material does not disappear once one material uses the current model');
         assert.equal(client.log.length, 1);
         const search = pool.queries.find((q) => /<=>/.test(q.sql));
@@ -374,7 +374,7 @@ describe('legacy chunks (older or no embedding model) are never compared with cu
         setEmbeddingClientForTests(fakeEmbeddingClient());
         setPoolForTests(pool);
         const { value: chunks, warnings } = await captureWarnings(() => retrieveContext('modifiers', 3, 'user-1'));
-        assert.deepEqual(chunks, ['chunk C']);
+        assert.deepEqual(chunks.map((chunk) => chunk.content), ['chunk C']);
         assert.deepEqual(warnings, []);
         assert.ok(!pool.queries.some((q) => /ILIKE/.test(q.sql)));
     });
@@ -535,7 +535,7 @@ describe('embeddings off unless GEMINI_ALLOWED is exactly "true"', () => {
 
         const { value: chunks, warnings } = await captureWarnings(() => retrieveContext('Blenderのモディファイアとは？', 3, 'user-1'));
 
-        assert.deepEqual(chunks, ['モディファイアは形状を非破壊で変えます。']);
+        assert.deepEqual(chunks.map((chunk) => chunk.content), ['モディファイアは形状を非破壊で変えます。']);
         assert.equal(client.log.length, 0);
         assert.ok(!pool.queries.some((q) => /<=>/.test(q.sql)), 'no vector search');
         assert.ok(!pool.queries.some((q) => /AS has_current/.test(q.sql)), 'no coverage probe');

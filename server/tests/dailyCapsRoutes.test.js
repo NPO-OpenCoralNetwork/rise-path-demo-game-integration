@@ -673,7 +673,8 @@ describe('daily caps on the API routes', () => {
             assert.equal(gateway.calls.length, 1);
             assert.equal(gateway.calls[0].task, 'course.generate');
             assert.equal(gateway.calls[0].userId, DEV_USER);
-            assert.deepEqual(gateway.calls[0].messages, [{ role: 'user', content: 'Teach me SQL' }]);
+            // The request is fenced as data (courseGrounding.test.js).
+            assert.deepEqual(gateway.calls[0].messages, [{ role: 'user', content: '<learner_request>\nTeach me SQL\n</learner_request>' }]);
             // Not cancelled when the client goes away: the stage finishes and saves the draft.
             assert.equal(gateway.calls[0].signal, undefined);
         });

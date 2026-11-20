@@ -81,7 +81,7 @@
 **安いモデルへの切り替え**
 
 - `tutor.chat`（AI チューター）と `writing.feedback`（作文フィードバック）を `cheap`（Claude Haiku 5.5）にしました（`server/llm/models.config.js:93-94`）。
-- 新しいタスク `course.generate`（`cheap`、`anthropic`、effort `low`、最大 32,000 トークン、ストリーム）を作り、コース生成の Gemini 直接呼び出しを置き換えました（`server/llm/models.config.js:102`、`server/services/aiGenerator.js:53`、`:179-194`）。プロンプトは JSON を 1 つだけ返すよう直しました（`server/services/aiPrompts.js`）。
+- 新しいタスク `course.generate`（`cheap`、`anthropic`、effort `low`、最大 32,000 トークン、ストリーム）を作り、コース生成の Gemini 直接呼び出しを置き換えました（`server/llm/models.config.js:102`、`server/services/aiGenerator.js:84`、`:268-283`）。プロンプトは JSON を 1 つだけ返すよう直しました（`server/services/aiPrompts.js`）。
 - コース生成の失敗の扱いを、AI の窓口（ゲートウェイ）のエラーの種類で決めるようにしました。モデルが動く前の失敗なら、1 日の回数を返します（`server/routes/ai.js`）。
 
 **共有 Hermes を出さない**
@@ -156,7 +156,7 @@
 
 - 18 歳未満の呼び出しには、子どもの安全の指示（`MINOR_SAFETY`）を最後に足します。キャッシュ（同じ指示文を安く再利用する仕組み）の対象にはしません（`server/llm/prompts/shared.js:63`、`server/llm/index.js:110-117`）。
 - 入力の確認: まずサーバーの中で、つらい気持ちの言葉と、携帯電話の番号・メールアドレス・住所を探します（`server/safety/prefilter.js`）。学習者が書いた文章は、送られてきたままの形と、プロンプトがデータを囲むタグ（チューターの 5 種類と、作文の `learner_text`）を外して AI に届く形の両方を調べます。そのため、これらのタグで電話番号や言葉を区切っても、タグの中に書いても見つけます（`server/safety/moderation.js:159-171`、`:364-370`）。ほかのタグや見えない文字、漢数字などで区切った書き方と、ブロックや問題の ID・レベルの 2 つの欄にまたがるタグ（学習者が入力する欄ではありません）は、Claude の確認に任せます。つらい気持ちの言葉は、本人のことと読める書き方（「死にたい」「虐待されていると思う」「I want to die」など）だけを探します。ほかの人のことや授業の話題として書いた文（「虐待されている子どもを助ける仕組み」「自殺を考える若者が増えている理由」など）や、ふだんのけが（「I cut myself while cooking」など）はここでは止めず、Claude の確認に任せます。住所は、丁目・番地・番か「1-2-3」の形、または「1-2」のあとに建物や部屋の言葉（「のマンション」「号室」など）や「に住んでいます」が続くときだけ止めます。「気温は20-25℃」「2-1で勝った」「第1-2問」のような範囲や点数は Claude に任せます。次に Claude の新しいタスク `safety.screen`（安いモデル、effort `low`、最大 2,048 トークン）で確かめます（`server/llm/models.config.js:99`、`server/safety/moderation.js:291-315`、`:335-407`）。チューターは、会話の履歴（12 件まで全部）やレッスンの本文もふくめ、送られてくる文章を全部まとめて、1 回の確認で確かめます（`server/safety/moderation.js:184-205`）。1 回の確認で読める長さ（8 万字）は、受け付けるいちばん長いリクエスト（チューターで約 6 万字）より長くしてあり、入力を分けて確かめることはしません。それより長い入力は、確認できないときと同じく止めます（`server/safety/moderation.js:48-55`、`:382-387`）。前に確認を通ったのとまったく同じリクエストだけは、もう一度は確かめません。一部でもちがえば、全部をまとめて確かめ直します（`server/safety/moderation.js:372-376`）。
-- 答えの確認: チューターの答えは、18 歳未満には確認が終わってからまとめて届けます。作文フィードバック、性格インサイト、コース生成は、返す前・保存する前に確かめます（`server/routes/llm.js:107-159`、`:267-283`、`server/services/aiGenerator.js:47-50`）。
+- 答えの確認: チューターの答えは、18 歳未満には確認が終わってからまとめて届けます。作文フィードバック、性格インサイト、コース生成は、返す前・保存する前に確かめます（`server/routes/llm.js:107-159`、`:267-283`、`server/services/aiGenerator.js:78-81`）。
 - 確認できないとき（エラー、確認の AI が断った、本番で模擬の AI に回った、1 回の確認に入らないほど長い入力）は、18 歳未満の AI を止めます（`server/safety/moderation.js:291-315`、`:378-396`）。
 - 止めたとき: 422 `content_blocked`（`category`、`support`）。つらい気持ちのときは `support: true` で、画面が相談窓口を出します（`components/safety/SupportLines.tsx`）。
 - その日のお休み: 入力を止められた回数が 1 日に `SAFETY_BLOCKS_BEFORE_PAUSE`（既定 10）に達すると、日本時間の 0 時まで AI を止めます。相談窓口を出した回と、個人情報（分類 `personal_info`。電話番号やメールアドレスを書いた、など）で止めた回は数えません。個人情報の分類は、サーバーの中のチェックで止めた回にも、Claude の確認で止めた回にも当てはまります（`server/safety/access.js:184-199`、`:217-223`、`server/safety/events.js:191-204`）。

@@ -76,6 +76,9 @@ const mockPool = ({ hasVector = true, coverage = { current: true, legacy: false 
     return { queries, query: run, async connect() { return { query: run, release() {} }; } };
 };
 
+/** The chunk texts retrieveContext returned (each chunk also names its material and pages: courseGrounding.test.js). */
+const contents = (chunks) => chunks.map((chunk) => chunk.content);
+
 /** The statement that set a material's status, with its parameters. */
 const statusUpdate = (pool) => pool.queries.find((q) => /UPDATE materials SET status/.test(q.sql));
 
@@ -376,7 +379,7 @@ describe('retrieveContext (course generator): the learner\'s ready materials, at
         const pool = mockPool({ keywordRows: [{ content: 'ready chunk', chunk_index: 0, material_id: MATERIAL }] });
         setPoolForTests(pool);
         const { value } = await capture(() => retrieveContext('Blenderのモディファイア', 3, LEARNER));
-        assert.deepEqual(value, ['ready chunk']);
+        assert.deepEqual(value, [{ content: 'ready chunk', title: null, page: null, breaks: null }]);
         const keyword = pool.queries.find((q) => /ILIKE/.test(q.sql));
         assert.match(keyword.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND \(n\.text ILIKE/);
         assert.equal(keyword.params[0], LEARNER);
@@ -387,7 +390,7 @@ describe('retrieveContext (course generator): the learner\'s ready materials, at
         const pool = mockPool({ keywordRows: [{ content: 'keyword chunk', chunk_index: 0, material_id: MATERIAL }] });
         setPoolForTests(pool);
         const { value, logs } = await capture(() => retrieveContext('Blenderのモディファイア', 3, LEARNER));
-        assert.deepEqual(value, ['keyword chunk']);
+        assert.deepEqual(contents(value), ['keyword chunk']);
         assert.ok(logs.some((line) => line.includes('Resource has been exhausted')), logs.join('\n'));
         assert.ok(!logs.some((line) => line.includes('モディファイア')), 'the learner\'s message is not logged');
     });
@@ -396,7 +399,7 @@ describe('retrieveContext (course generator): the learner\'s ready materials, at
         const pool = mockPool({ hasVector: false, keywordRows: [{ content: 'keyword chunk', chunk_index: 0, material_id: MATERIAL }] });
         setPoolForTests(pool);
         const { value } = await capture(() => retrieveContext('Blenderのモディファイア', 3, LEARNER));
-        assert.deepEqual(value, ['keyword chunk']);
+        assert.deepEqual(contents(value), ['keyword chunk']);
         assert.ok(!pool.queries.some((q) => /ORDER BY c\.created_at DESC\s+LIMIT/.test(q.sql) && !/ILIKE/.test(q.sql)), 'no "latest chunks" query');
     });
 
@@ -417,7 +420,7 @@ describe('retrieveContext (course generator): the learner\'s ready materials, at
         const pool = attachedPool();
         setPoolForTests(pool);
         const { value } = await capture(() => retrieveContext('この資料でコースを作りたい', 3, LEARNER, { materialIds: [ATTACHED] }));
-        assert.deepEqual(value, ['attached: match', 'attached: opening', 'attached: second']);
+        assert.deepEqual(contents(value), ['attached: match', 'attached: opening', 'attached: second']);
         const search = pool.queries.find((q) => /ILIKE/.test(q.sql));
         assert.match(search.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND m\.id = ANY\(\$2::uuid\[\]\) AND/);
         assert.deepEqual(search.params.slice(0, 2), [LEARNER, [ATTACHED]]);
@@ -432,7 +435,7 @@ describe('retrieveContext (course generator): the learner\'s ready materials, at
         const pool = attachedPool();
         setPoolForTests(pool);
         const { value } = await capture(() => retrieveContext('この資料でコースを作りたい', 4, LEARNER, { materialIds: [ATTACHED] }));
-        assert.deepEqual(value, ['attached: match', 'attached: opening', 'attached: second', 'other: match']);
+        assert.deepEqual(contents(value), ['attached: match', 'attached: opening', 'attached: second', 'other: match']);
         const others = pool.queries.find((q) => /m\.id <> ALL/.test(q.sql));
         assert.match(others.sql, /WHERE m\.status = 'ready' AND m\.user_id = \$1 AND m\.id <> ALL\(\$2::uuid\[\]\) AND/);
         assert.deepEqual(others.params.slice(0, 2), [LEARNER, [ATTACHED]]);
@@ -445,7 +448,7 @@ describe('retrieveContext (course generator): the learner\'s ready materials, at
         const pool = attachedPool();
         setPoolForTests(pool);
         const { value, logs } = await capture(() => retrieveContext('この資料でコースを作りたい', 4, LEARNER, { materialIds: [ATTACHED] }));
-        assert.deepEqual(value, ['attached: match', 'attached: opening', 'attached: second', 'other: match']);
+        assert.deepEqual(contents(value), ['attached: match', 'attached: opening', 'attached: second', 'other: match']);
         assert.equal(client.calls.length, 1, 'one embedding call');
         assert.equal(logs.filter((line) => line.includes('Resource has been exhausted')).length, 1, logs.join('\n'));
     });

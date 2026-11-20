@@ -85,8 +85,8 @@ describe('aiGenerator stages call the gateway (task course.generate)', () => {
         const [req] = gateway.requests;
         assert.equal(req.task, COURSE_GENERATE_TASK);
         assert.equal(req.task, 'course.generate');
-        assert.deepEqual(req.messages, [{ role: 'user', content: 'Teach me SQL' }]);
-        assert.equal(req.system[0].text, buildRequirementsPrompt({}, ''));
+        assert.deepEqual(req.messages, [{ role: 'user', content: '<learner_request>\nTeach me SQL\n</learner_request>' }], 'the request is fenced as data (courseGrounding.test.js)');
+        assert.equal(req.system[0].text, buildRequirementsPrompt({}));
         assert.deepEqual(req.input, { stage: 'requirements', message: 'Teach me SQL' });
         assert.equal(req.signal, signal);
         assert.equal(req.schema, undefined, 'free-form JSON: no structured-output schema');
@@ -233,7 +233,7 @@ describe('aiGenerator stages for minors (screened input and output)', () => {
 });
 
 describe('course prompts ask for exactly one JSON object, no fences', () => {
-    for (const [name, build] of [['requirements', () => buildRequirementsPrompt({}, '')], ['roadmap', () => buildRoadmapPrompt({})], ['curriculum', () => buildCurriculumPrompt({})]]) {
+    for (const [name, build] of [['requirements', () => buildRequirementsPrompt({})], ['roadmap', () => buildRoadmapPrompt({})], ['curriculum', () => buildCurriculumPrompt({})]]) {
         it(name, () => {
             const prompt = build();
             assert.ok(prompt.trimEnd().endsWith(JSON_ONLY_RULE), 'ends with the JSON-only rule');

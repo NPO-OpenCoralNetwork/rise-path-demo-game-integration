@@ -132,8 +132,9 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   // A file already uploaded for a message that was then refused (a daily cap): it stays attached
   // and goes with that message when it is sent again, without a second upload.
   const [uploadedFile, setUploadedFile] = useState<{ name: string; materialId: string } | null>(null);
-  // The requirements step reads attached files first (server/routes/ai.js); the roadmap and
-  // curriculum steps read none, so no file is attached there.
+  // Files are attached while the requirements are defined. The draft keeps them, and every step,
+  // the roadmap and the curriculum included, reads them first (server/routes/ai.js); new files are
+  // not taken at the later steps.
   const filesRead = pendingApproval !== 'roadmap' && pendingApproval !== 'curriculum';
 
   const copy = {
@@ -395,7 +396,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
       setUploadNotice('unsupported');
       return;
     }
-    // A file still attached from the requirements step: this step would not read it.
+    // A file still attached from the requirements step but not sent: this step takes no new file.
     if (!filesRead && (selectedFile || uploadedFile)) {
       setSelectedFile(null);
       setUploadedFile(null);
@@ -1152,7 +1153,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                             type="button"
                             aria-label={t.attachFile}
                             onClick={() => {
-                                // The roadmap and curriculum steps read no file: say so instead of offering one.
+                                // The roadmap and curriculum steps take no new file (they read the ones kept from the requirements step): say so instead of offering one.
                                 if (!filesRead) {
                                     setUploadNotice('requirements_only');
                                     return;
