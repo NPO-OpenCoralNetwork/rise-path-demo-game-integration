@@ -290,6 +290,53 @@ export function isoDateParts(value: string | undefined): { year: number; month: 
   return { year, month, day };
 }
 
+// --- The tutor's 質問した場所 ---------------------------------------------------------------------
+
+/** Where a tutor question was asked: its section's number and title (for the chip) and the block. */
+export type AskedPlace = { n: string; title: string; block: Block };
+
+/**
+ * The place a tutor answer's question was asked about (「出典と検索」 step 6). The server echoes the
+ * question's anchor as the answer's `grounding`: it is where the learner asked, not evidence for
+ * the answer. Null without a block id, or when the lesson on screen has no such section, or no
+ * such block in it (the chip would then lead nowhere).
+ */
+export function askedPlace(
+  lesson: Lesson,
+  grounding: { sectionId?: string; blockId?: string } | null | undefined,
+  tx: (text: LText | null | undefined) => ResolvedText,
+): AskedPlace | null {
+  if (!grounding?.blockId) return null;
+  const index = lesson.sections.findIndex((s) => s.id === grounding.sectionId);
+  if (index < 0) return null;
+  const section = lesson.sections[index];
+  const block = section.blocks.find((b) => b.id === grounding.blockId);
+  if (!block) return null;
+  const title = splitSectionTitle(tx(section.title).value);
+  return { n: title.num ?? String(index + 1), title: title.title, block };
+}
+
+/**
+ * 「質問した場所」 in a tutor thread: the asked place of each finished answer (askedPlace), and the
+ * latest such answer, which alone lists the place's sources (one list, not one per answer).
+ */
+export function askedPlaces(
+  lesson: Lesson,
+  turns: readonly { id: string; role: string; status: string; grounding?: { sectionId?: string; blockId?: string } | null }[],
+  tx: (text: LText | null | undefined) => ResolvedText,
+): { byTurn: Map<string, AskedPlace>; sourcesTurnId: string | null } {
+  const byTurn = new Map<string, AskedPlace>();
+  let sourcesTurnId: string | null = null;
+  for (const turn of turns) {
+    if (turn.role !== 'assistant' || turn.status !== 'done') continue;
+    const place = askedPlace(lesson, turn.grounding, tx);
+    if (!place) continue;
+    byTurn.set(turn.id, place);
+    sourcesTurnId = turn.id;
+  }
+  return { byTurn, sourcesTurnId };
+}
+
 // --- Inline markdown helpers ------------------------------------------------------------------
 
 export const TERM_HREF_PREFIX = '#rp-term:';

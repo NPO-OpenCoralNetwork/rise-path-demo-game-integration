@@ -6,7 +6,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useReader } from './ReaderContext';
 import { Markdown } from './Md';
 import { ReaderSheet } from './ReaderSheet';
-import { splitSectionTitle } from './model';
+import { BlockSources } from './LessonSources';
+import { askedPlaces, citedSources, splitSectionTitle, type AskedPlace } from './model';
 import { AiNotice, AiRefusalNotice } from '../ui/AiNotice';
 import type { AiRefusal } from '../../services/safetyApi';
 import {
@@ -26,8 +27,10 @@ import {
 
 /**
  * Inline AI tutor (WP-11, PLAN §5.7): the quoted excerpt, a streamed answer, suggestion chips
- * (simpler / another example / quiz me / make a card), a follow-up field and a "根拠 §n" chip
- * that scrolls the text to the block the answer is grounded in.
+ * (simpler / another example / quiz me / make a card), a follow-up field and a 「質問した場所 §n」
+ * chip that scrolls the text to the block the question was asked about. Under the latest answer,
+ * the sources that block cites (「出典と検索」 step 6). The chip once read 「根拠」, but the server
+ * only echoes the question's anchor: it says where the learner asked, not what the answer rests on.
  *
  * Layouts: a card in the reader's right margin (≥1280px), a right drawer (1024–1279px) or a
  * bottom sheet (<1024px). Drawer and sheet are ReaderSheet dialogs (portal to <body>, focus
@@ -69,8 +72,8 @@ const copy = {
     stop: 'Stop',
     stopped: 'Stopped.',
     retry: 'Try again',
-    source: (n: string) => `Source §${n}`,
-    sourceLabel: (n: string, title: string) => `Show the source in the text: section ${n}, ${title}`,
+    asked: (n: string) => `Asked about §${n}`,
+    askedLabel: (n: string, title: string) => `Show the part you asked about in the text: section ${n}, ${title}`,
     demo: 'Demo answer (no AI key on the server)',
     truncated: 'The answer stopped at the length limit. Ask for the rest if you need it.',
     errors: {
@@ -139,8 +142,8 @@ const copy = {
     stop: '停止',
     stopped: '停止しました。',
     retry: 'もう一度',
-    source: (n: string) => `根拠 §${n}`,
-    sourceLabel: (n: string, title: string) => `根拠の §${n}「${title}」を本文で表示`,
+    asked: (n: string) => `質問した場所 §${n}`,
+    askedLabel: (n: string, title: string) => `質問した場所 §${n}「${title}」を本文で表示`,
     demo: 'デモ応答（AIキー未設定）',
     truncated: '回答は長さの上限でここまでになりました。続きが必要なら聞いてください。',
     errors: {
@@ -244,8 +247,8 @@ type TutorPanelProps = {
   scope: { theme: string; world?: string; lang: string };
   /** Where the learner is reading: the idle panel asks about this. */
   current: { block?: Block; section?: Section };
-  /** "根拠 §n": show that block in the text. */
-  onShowSource: (blockId: string) => void;
+  /** 「質問した場所 §n」: show the block the question was asked about in the text. */
+  onShowAsked: (blockId: string) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** The margin card, so the reader can move focus to it. */
   panelRef?: React.RefObject<HTMLElement | null>;
@@ -341,9 +344,9 @@ type BodyProps = TutorPanelProps & {
   setCardOpen: (open: boolean) => void;
 };
 
-function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardOpen, setCardOpen }: BodyProps) {
+function TutorBody({ tutor, layout, current, onShowAsked, inputRef, text, cardOpen, setCardOpen }: BodyProps) {
   const reader = useReader();
-  const { askTutor, tx, lesson, course } = reader;
+  const { askTutor, tx, lesson, course, sources } = reader;
   const { thread, busy } = tutor;
   const [draft, setDraft] = useState('');
   const [cardNotice, setCardNotice] = useState<{ ok: boolean; message: string } | null>(null);
@@ -482,25 +485,20 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
     }
   };
 
-  const sourceChip = (turn: TutorTurn) => {
-    const grounding = turn.grounding;
-    if (!grounding?.blockId) return null;
-    const index = lesson.sections.findIndex((s) => s.id === grounding.sectionId);
-    if (index < 0) return null;
-    const title = splitSectionTitle(tx(lesson.sections[index].title).value);
-    const n = title.num ?? String(index + 1);
-    return (
-      <button
-        type="button"
-        className="inline-flex min-h-7 items-center gap-1 rounded-full border border-line bg-surface px-2.5 text-caption font-semibold text-primary-text hover:border-primary hover:bg-primary-soft"
-        aria-label={text.sourceLabel(n, title.title)}
-        onClick={() => onShowSource(grounding.blockId)}
-      >
-        <CornerDownRight size={13} aria-hidden="true" />
-        {text.source(n)}
-      </button>
-    );
-  };
+  // Under every finished answer, 「質問した場所 §n」; under the latest one, the sources that place
+  // cites.
+  const asked = askedPlaces(lesson, turns, tx);
+  const askedChip = (place: AskedPlace) => (
+    <button
+      type="button"
+      className="inline-flex min-h-7 items-center gap-1 rounded-full border border-line bg-surface px-2.5 text-caption font-semibold text-primary-text hover:border-primary hover:bg-primary-soft"
+      aria-label={text.askedLabel(place.n, place.title)}
+      onClick={() => onShowAsked(place.block.id)}
+    >
+      <CornerDownRight size={13} aria-hidden="true" />
+      {text.asked(place.n)}
+    </button>
+  );
 
   // Screen readers hear the finished answer once, not every streamed piece.
   const announcement = limitNotice
@@ -545,22 +543,26 @@ function TutorBody({ tutor, layout, current, onShowSource, inputRef, text, cardO
           aria-busy={busy}
           data-rp-tutor-thread=""
         >
-          {turns.map((turn, index) => (
-            <TurnView
-              key={turn.id}
-              turn={turn}
-              text={text}
-              sourceChip={turn.role === 'assistant' && turn.status === 'done' ? sourceChip(turn) : null}
-              // No Retry while a daily cap holds: the hook would refuse it without a word.
-              onRetry={turn === turns[turns.length - 1] && !limited ? tutor.retry : undefined}
-              question={turn.role === 'assistant' && turns[index - 1]?.role === 'user' ? turns[index - 1].text : undefined}
-              reportContext={{
-                courseId: thread?.lesson?.courseId ?? course.id,
-                lessonId: thread?.lesson?.lessonId ?? lesson.id,
-                ...(thread?.anchor?.blockId ? { blockId: thread.anchor.blockId } : {}),
-              }}
-            />
-          ))}
+          {turns.map((turn, index) => {
+            const place = asked.byTurn.get(turn.id) ?? null;
+            return (
+              <TurnView
+                key={turn.id}
+                turn={turn}
+                text={text}
+                askedChip={place ? askedChip(place) : null}
+                askedSources={place && turn.id === asked.sourcesTurnId ? <BlockSources sources={citedSources(place.block, sources)} /> : null}
+                // No Retry while a daily cap holds: the hook would refuse it without a word.
+                onRetry={turn === turns[turns.length - 1] && !limited ? tutor.retry : undefined}
+                question={turn.role === 'assistant' && turns[index - 1]?.role === 'user' ? turns[index - 1].text : undefined}
+                reportContext={{
+                  courseId: thread?.lesson?.courseId ?? course.id,
+                  lessonId: thread?.lesson?.lessonId ?? lesson.id,
+                  ...(thread?.anchor?.blockId ? { blockId: thread.anchor.blockId } : {}),
+                }}
+              />
+            );
+          })}
         </div>
       )}
       {limitNotice && (
@@ -689,10 +691,13 @@ function refusalFor(turn: TutorTurn): AiRefusal | null {
   return null;
 }
 
-function TurnView({ turn, text, sourceChip, onRetry, question, reportContext }: {
+function TurnView({ turn, text, askedChip, askedSources, onRetry, question, reportContext }: {
   turn: TutorTurn;
   text: Copy;
-  sourceChip: React.ReactNode;
+  /** 「質問した場所 §n」 (finished answers). */
+  askedChip: React.ReactNode;
+  /** The sources the asked block cites (the latest finished answer only). */
+  askedSources: React.ReactNode;
   onRetry?: () => void;
   /** The learner's question this answer belongs to (sent with a report). */
   question?: string;
@@ -778,12 +783,13 @@ function TurnView({ turn, text, sourceChip, onRetry, question, reportContext }: 
         </p>
       )}
 
-      {(sourceChip || showDemo) && (
+      {(askedChip || showDemo) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {sourceChip}
+          {askedChip}
           {showDemo && <span className="text-caption text-fg-3">{text.demo}</span>}
         </div>
       )}
+      {askedSources}
 
       {answered && (
         <AiNotice

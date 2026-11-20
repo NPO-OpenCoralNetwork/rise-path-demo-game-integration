@@ -95,6 +95,19 @@ export function restoreOffsetInContainer(
 }
 
 /**
+ * Focuses an element that takes no focus of its own (a block frame), for this visit only: it gets
+ * tabindex="-1" until it loses the focus again, so it never joins the Tab order and later clicks
+ * inside it do not focus it. An element that already has a tabindex keeps it.
+ */
+export function focusForVisit(el: HTMLElement): void {
+  if (!el.hasAttribute('tabindex')) {
+    el.setAttribute('tabindex', '-1');
+    el.addEventListener('blur', () => el.removeAttribute('tabindex'), { once: true });
+  }
+  el.focus({ preventScroll: true });
+}
+
+/**
  * Resolves the scroll container for a mounted element. Returns null on the first render.
  */
 export function useScrollContainer(ref: RefObject<HTMLElement | null>) {

@@ -9,7 +9,7 @@ import { streamTutor, toLlmLocale } from '../../services/llmApi';
 import type { LessonEntry } from '../../content';
 import { ReaderContext, type AskTutorArgs, type ReaderContextValue } from './ReaderContext';
 import { useLessonProgress } from './useLessonProgress';
-import { scrollElementIntoContainer, useScrollContainer, READER_SCROLL_OFFSET } from './useScrollContainer';
+import { focusForVisit, scrollElementIntoContainer, useScrollContainer, READER_SCROLL_OFFSET } from './useScrollContainer';
 import {
   blockPlainText,
   checkNumbers,
@@ -273,9 +273,12 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     if (!el) return;
     jumpedAt.current = Date.now();
     scrollToElement(el);
-    // Not the source numbers under the block (CiteMarks): the learner came to read the block.
+    // Not the source numbers under the block (CiteMarks): the learner came to read the block. A
+    // block with nothing else to focus (a definitions list) takes the focus itself, for this visit,
+    // instead of letting it fall to <body>.
     const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href]:not(.rp-cite-num), input');
-    focusable?.focus({ preventScroll: true });
+    if (focusable) focusable.focus({ preventScroll: true });
+    else focusForVisit(el);
   }, [scrollToElement]);
 
   useEffect(() => {
@@ -526,7 +529,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     }
   }, [tutorDismiss]);
 
-  const showTutorSource = useCallback((blockId: string) => {
+  // The tutor's 「質問した場所 §n」: the block the question was asked about.
+  const showAskedBlock = useCallback((blockId: string) => {
     if (tutorOpen) {
       setTutorOpen(false);
       // Let the sheet close (and return focus) before moving to the block.
@@ -662,7 +666,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     returnFocusRef: tutorReturnRef,
     scope,
     current: { block: activeBlock, section: activeSection },
-    onShowSource: showTutorSource,
+    onShowAsked: showAskedBlock,
     inputRef: tutorInputRef,
     panelRef: tutorPanelRef,
   };
