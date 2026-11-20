@@ -12,13 +12,23 @@ export const TUTOR_TAGS = /** @type {const} */ (['lesson', 'anchor', 'excerpt', 
 const TAG_PATTERN = new RegExp(`<\\s*/?\\s*(?:${TUTOR_TAGS.join('|')})\\b[^>]*>`, 'gi');
 
 /**
+ * Request text as the prompt carries it: without any tutor tag. Screening a minor's request uses
+ * this too (server/safety/moderation.js tutorInputParts), so the pre-filter checks what the model
+ * will read.
+ * @param {string} content
+ */
+export function tutorText(content) {
+  return stripTags(content, TAG_PATTERN);
+}
+
+/**
  * Fence request data: removes every tutor tag from the content (not only `tag`), so lesson or
  * learner text cannot close its block early or forge another block.
  * @param {string} tag
  * @param {string} content
  */
 export function tutorData(tag, content) {
-  return fence(tag, stripTags(content, TAG_PATTERN));
+  return fence(tag, tutorText(content));
 }
 
 /**
@@ -131,7 +141,7 @@ export function buildTutorPrompt(body, resolved) {
     if (last && last.role === turn.role) continue; // keep turns alternating
     history.push({
       role: turn.role,
-      content: turn.role === 'user' ? tutorData('learner_question', turn.content) : stripTags(turn.content, TAG_PATTERN),
+      content: turn.role === 'user' ? tutorData('learner_question', turn.content) : tutorText(turn.content),
     });
   }
   // The current question is a user turn, so the history must end with the tutor.

@@ -1,7 +1,20 @@
 // @ts-check
-import { DATA_NOT_INSTRUCTIONS, fence, languageName } from './shared.js';
+import { DATA_NOT_INSTRUCTIONS, fence, languageName, withoutTag } from './shared.js';
 
 /** @typedef {import('./shared.js').PromptSpec} PromptSpec */
+
+/** The tag the learner's text is fenced in. */
+const LEARNER_TEXT_TAG = 'learner_text';
+
+/**
+ * The learner's text as the prompt carries it: inside <learner_text>, without that tag. Screening
+ * a minor's request uses this too (server/safety/moderation.js writingInputParts), so the
+ * pre-filter checks what the model will read.
+ * @param {string} text
+ */
+export function writingText(text) {
+  return withoutTag(LEARNER_TEXT_TAG, text);
+}
 
 const STABLE = [
   'You are the writing coach inside Rise Path, a learning app for self-learners of many ages.',
@@ -40,7 +53,7 @@ export function buildWritingFeedbackPrompt(input) {
       content: [
         context ? fence('lesson', context) : '',
         fence('rubric', `clarity: ${input.rubric.clarity}\nlinking: ${input.rubric.linking}\ntone: ${input.rubric.tone}`),
-        fence('learner_text', input.text),
+        fence(LEARNER_TEXT_TAG, input.text),
       ].filter(Boolean).join('\n\n'),
     }],
     input,
