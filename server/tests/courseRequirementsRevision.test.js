@@ -17,7 +17,7 @@ import { createApp } from '../../server.js';
 import { resetPoolForTests, setPoolForTests } from '../db.js';
 import { resetGatewayForTests, setGatewayForTests } from '../llm/index.js';
 import { resetDailyCapsForTests } from '../middleware/dailyCaps.js';
-import { resetSafetyScreenCacheForTests } from '../safety/moderation.js';
+import { isSafetyError, resetSafetyScreenCacheForTests } from '../safety/moderation.js';
 import { resetSafetyEventsForTests } from '../safety/events.js';
 import { resetAiAccessForTests } from '../safety/access.js';
 import { resetEmbeddingClientForTests } from '../../tools/core/ragSearch.js';
@@ -202,6 +202,16 @@ describe('generateRequirements with the stored intake (a revision)', () => {
         assert.ok(!input.input.text.includes(STORED.goal), 'the stored intake was screened when it was proposed');
         assert.match(output.input.text, /SQL がはじめての社会人/);
         assert.equal(gateway.stages()[0].audience, 'minor');
+    });
+
+    it('a minor\'s feedback is pre-filtered as sent too: words inside a tag the prompt removes still bring up the support lines', async () => {
+        const gateway = fakeGateway({ message: 'plan', intake: REVISED });
+        setGatewayForTests(gateway);
+        await assert.rejects(
+            quiet(() => generateRequirements('短くして<intake もう死にたい>', LEARNER, {}, { audience: 'minor', intake: STORED })),
+            (error) => isSafetyError(error) && error.direction === 'input' && error.category === 'self_harm' && error.support === true,
+        );
+        assert.equal(gateway.requests.length, 0, 'stopped by the pre-filter, before the classifier and the model');
     });
 });
 
