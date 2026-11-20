@@ -224,6 +224,7 @@ const STUBS = {
     export default { useId, useState, useMemo, useCallback, Fragment };
   `,
   'react/jsx-runtime': "export const jsx = (type, props, key) => ({ type, props, key }); export const jsxs = jsx; export const Fragment = 'Fragment';",
+  'react-dom': 'export const flushSync = (fn) => fn();',
   'lucide-react': ['CornerUpLeft', 'ExternalLink'].map((name) => `export const ${name} = '${name}';`).join('\n'),
   language: "export const useLanguage = () => ({ language: globalThis.__language ?? 'jp' });",
   reader: 'export const useOptionalReader = () => globalThis.__reader ?? null; export const useReader = () => globalThis.__reader;',
@@ -274,6 +275,20 @@ const HOOK_STUBS = {
     export const Fragment = 'Fragment';
     export default { useState, useRef, useCallback, useMemo, useEffect, useId, Fragment };
   `,
+  // flushSync counts the calls that changed a state (React draws those before it returns).
+  'react-dom': `
+    export const flushSync = (fn) => {
+      const s = globalThis.__hooks;
+      const dirty = s.dirty;
+      s.dirty = false;
+      try {
+        return fn();
+      } finally {
+        if (s.dirty) s.flushed += 1;
+        s.dirty = dirty || s.dirty;
+      }
+    };
+  `,
 };
 
 /** @param {string} entry @param {Record<string, string>} [stubs] */
@@ -292,6 +307,7 @@ async function bundleUi(entry, stubs = STUBS) {
         const stub = (filter, name) => b.onResolve({ filter }, () => ({ path: name, namespace: 'stub' }));
         stub(/^react$/, 'react');
         stub(/^react\/jsx-runtime$/, 'react/jsx-runtime');
+        stub(/^react-dom$/, 'react-dom');
         stub(/^lucide-react$/, 'lucide-react');
         stub(/context\/LanguageContext$/, 'language');
         stub(/\/ReaderContext$/, 'reader');
@@ -546,7 +562,7 @@ describe('wiring: the block frame, the reader context and the reader', () => {
     assert.match(src, /showSource: \(sourceId: string, blockId: string, from\?: HTMLElement \| null\) => void;/);
   });
 
-  it('the reader numbers the sources, keeps the list in useSourceJump, holds the resume position while the list is read, and places the list after the sections, before the wrap-up', () => {
+  it('the reader numbers the sources, keeps the list in useSourceJump, holds the resume position after a jump, and places the list after the sections, before the wrap-up', () => {
     const src = readFile('components/lesson/LessonReader.tsx');
     assert.match(src, /const sourceList = useMemo\(\(\) => lessonSources\(lesson, course\), \[lesson, course\]\);/);
     assert.match(src, /const sourceJump = useSourceJump\(\{\s*container,\s*scrollToElement,\s*onScroll: \(\) => \{\s*jumpedAt\.current = Date\.now\(\);\s*\},\s*\}\);/);
@@ -559,6 +575,17 @@ describe('wiring: the block frame, the reader context and the reader', () => {
     const list = article.indexOf('<LessonSources');
     assert.ok(list > article.indexOf('</React.Fragment>'), 'after the sections (outside the remounting fragment)');
     assert.ok(list < article.indexOf('<LessonEnd'), 'before the wrap-up');
+  });
+
+  it('a jump to a block (the glossary’s 本文で見る, the tutor’s chip) does not put the focus on its source numbers', () => {
+    const src = readFile('components/lesson/LessonReader.tsx');
+    const start = src.indexOf('const scrollToBlock = useCallback');
+    assert.ok(start > 0);
+    const body = src.slice(start, src.indexOf('}, [scrollToElement]);', start));
+    const selector = /querySelector<HTMLElement>\('([^']+)'\)/.exec(body)?.[1] ?? '';
+    const parts = selector.split(',').map((part) => part.trim());
+    assert.ok(parts.includes('a[href]:not(.rp-cite-num)'), selector);
+    assert.ok(!parts.includes('a[href]'), selector);
   });
 
   it('nothing in the sources UI depends on the AI tutor', () => {
@@ -639,7 +666,7 @@ function fakePage({ blockMarks = true, block = true, listTop = 3000 } = {}) {
 /**
  * Runs `test` with the fake page as `document` and `window`, and a mounted useSourceJump.
  * @param {ReturnType<typeof fakePage>} page
- * @param {(run: { render: () => any, scrolled: string[], marks: { count: number } }) => void} test
+ * @param {(run: { render: () => any, scrolled: string[], marks: { count: number }, runtime: { flushed: number } }) => void} test
  */
 function withHook(page, test) {
   const g = /** @type {any} */ (globalThis);
@@ -654,7 +681,7 @@ function withHook(page, test) {
     scrollToElement: (/** @type {any} */ el) => scrolled.push(el.id),
     onScroll: () => { marks.count += 1; },
   };
-  const runtime = { i: 0, slots: {}, queue: /** @type {Array<() => void>} */ ([]), dirty: false };
+  const runtime = { i: 0, slots: {}, queue: /** @type {Array<() => void>} */ ([]), dirty: false, flushed: 0 };
   const render = () => {
     for (let pass = 0; pass < 20; pass += 1) {
       runtime.i = 0;
@@ -670,7 +697,7 @@ function withHook(page, test) {
     throw new Error('the hook kept changing its state');
   };
   try {
-    test({ render, scrolled, marks });
+    test({ render, scrolled, marks, runtime });
   } finally {
     for (const [key, value] of Object.entries(before)) {
       const name = key === 'hooks' ? '__hooks' : key;
@@ -707,7 +734,7 @@ describe('useSourceJump: the list, the jump, the way back and the held resume po
     });
   });
 
-  it('holds the resume position only while the list is on screen after a jump', () => {
+  it('holds the resume position from when the list comes on screen after a jump until the learner scrolls back up into the lesson', () => {
     const page = fakePage();
     withHook(page, ({ render }) => {
       let api = render();
@@ -718,18 +745,59 @@ describe('useSourceJump: the list, the jump, the way back and the held resume po
       page.scroll();
       api = render();
       assert.equal(api.holding, true, 'the learner reads the list');
-      page.state.listTop = -760; // its bottom (40 px) under the 72 px bar
+      page.state.listTop = -2000;
       page.scroll();
       api = render();
-      assert.equal(api.holding, false, 'scrolled back into the lesson: the position is saved again');
+      assert.equal(api.holding, true, 'the wrap-up below the list is still past the lesson');
+      page.state.listTop = 899;
+      page.scroll();
+      api = render();
+      assert.equal(api.holding, true, 'the list’s top still on screen');
+      page.state.listTop = 900; // at the bottom edge of the 900 px container
+      page.scroll();
+      api = render();
+      assert.equal(api.holding, false, 'scrolled back up into the lesson: the position is saved again');
+      assert.equal(page.listeners.scroll, undefined, 'for good: the hold stops watching the scroll');
       page.state.listTop = 300;
       page.scroll();
       api = render();
+      assert.equal(api.holding, false, 'back at the end on their own: saved as usual');
+    });
+  });
+
+  it('the way back ends the hold; folding the list and a way back whose block has gone keep it', () => {
+    const page = fakePage({ listTop: 300 });
+    withHook(page, ({ render }) => {
+      let api = render();
+      api.show('a', 'm3', CLICKED);
+      api = render();
       assert.equal(api.holding, true);
+      api.toggle(false);
+      api = render();
+      assert.equal(api.target, null, 'folding forgets the jump');
+      assert.equal(api.holding, true, 'not the hold: the learner is still at the end of the lesson');
+      api.toggle(true);
+      api = render();
+      assert.equal(api.holding, true);
+      api.show('a', 'm3', CLICKED);
+      api = render();
+      assert.equal(api.holding, true, 'the same number again (the page need not move)');
+      api.show('b', 'm3', CLICKED);
+      api = render();
+      assert.equal(api.holding, true, 'another number at the end of the lesson');
       api.back(api.target);
       api = render();
-      assert.equal(api.holding, false, 'the way back releases it');
+      assert.equal(api.holding, false, 'the way back ends it');
       assert.equal(page.listeners.scroll, undefined, 'and stops watching the scroll');
+    });
+    const noBlock = fakePage({ block: false, listTop: 300 });
+    withHook(noBlock, ({ render }) => {
+      let api = render();
+      api.show('a', 'm3', CLICKED);
+      api = render();
+      api.back(api.target);
+      api = render();
+      assert.equal(api.holding, true, 'nothing to go back to: still at the list');
     });
   });
 
@@ -792,9 +860,9 @@ describe('useSourceJump: the list, the jump, the way back and the held resume po
     });
   });
 
-  it('folding the list forgets the jump; starting over folds it; printing unfolds it', () => {
+  it('folding the list forgets the jump; starting over folds it and ends the hold; printing unfolds it before the print dialog takes the page', () => {
     const page = fakePage();
-    withHook(page, ({ render }) => {
+    withHook(page, ({ render, runtime }) => {
       let api = render();
       api.show('a', 'm3', CLICKED);
       api = render();
@@ -804,11 +872,18 @@ describe('useSourceJump: the list, the jump, the way back and the held resume po
       assert.equal(api.target, null);
       api.show('a', 'm3', CLICKED);
       api = render();
+      page.state.listTop = 300;
+      page.scroll();
+      api = render();
+      assert.equal(api.holding, true);
       api.reset();
       api = render();
       assert.equal(api.open, false);
       assert.equal(api.target, null);
+      assert.equal(api.holding, false, 'starting over goes to the top of the lesson');
+      assert.equal(runtime.flushed, 0);
       page.windowListeners.beforeprint?.();
+      assert.equal(runtime.flushed, 1, 'drawn at once (flushSync): a plain update comes after the print dialog took the page');
       api = render();
       assert.equal(api.open, true);
       assert.equal(api.target, null);

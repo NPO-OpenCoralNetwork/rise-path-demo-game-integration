@@ -93,8 +93,8 @@ Quality means what the learner can **do** after the lesson, not how many blocks 
   claim no source supports is left out (or asked about), never guessed.
 - Learners see the sources: the reader puts the numbers of the sources a block cites under that
   block and lists the lesson's sources at its end (title, publisher, the day checked, and a link
-  when `url` is http(s)); AI apps get the sources a section cites. Give each source the page's own
-  title and the URL of the page you read.
+  when `url` is http(s)); AI apps get the lesson's sources with each block's `cite`. Give each
+  source the page's own title and the URL of the page you read.
 - UI steps: name a menu, button, screen or keyboard shortcut only after checking it in the
   official documentation of that version, and cite the page (`checkedAt` is the day you read it).
   Only a page you actually read counts as checked. When you cannot check one, describe the goal

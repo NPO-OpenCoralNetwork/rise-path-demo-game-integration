@@ -204,8 +204,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const jumpedAt = useRef(0);
 
   const { container, scrollToElement, scrollToTop } = useScrollContainer(rootRef);
-  // The sources list (「出典と検索」 step 5). While the learner reads it after a number led there,
-  // the resume position stays where they were reading (not the end of the lesson).
+  // The sources list (「出典と検索」 step 5). After a number led there, the resume position stays
+  // where the learner was reading (not the end of the lesson) until they are back in the lesson.
   const sourceJump = useSourceJump({
     container,
     scrollToElement,
@@ -273,7 +273,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     if (!el) return;
     jumpedAt.current = Date.now();
     scrollToElement(el);
-    const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href], input');
+    // Not the source numbers under the block (CiteMarks): the learner came to read the block.
+    const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href]:not(.rp-cite-num), input');
     focusable?.focus({ preventScroll: true });
   }, [scrollToElement]);
 

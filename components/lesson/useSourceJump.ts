@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { sourceAnchorId } from './model';
-import { READER_SCROLL_OFFSET, barExtra, offsetInContainer, restoreOffsetInContainer } from './useScrollContainer';
+import { offsetInContainer, restoreOffsetInContainer } from './useScrollContainer';
 
 /**
  * The sources list's state (「出典と検索」 step 5): open or folded, the source a number led to, and
@@ -10,10 +11,12 @@ import { READER_SCROLL_OFFSET, barExtra, offsetInContainer, restoreOffsetInConta
  * - show: a number under a block (CiteMarks) unfolds the list; once it is open the page moves to
  *   that source below the sticky bar (and the offline notice's barExtra) and the focus goes to it.
  *   The same number again moves again (seq).
- * - holding: true while the learner reads the list after a jump. The reader then keeps the resume
- *   position where they were reading (useLessonProgress's trackPosition), instead of saving the
- *   end of the lesson and sending it to their other devices. Scrolling back into the lesson
- *   releases it.
+ * - holding: true from when the list comes on screen after a jump until the learner is back in the
+ *   lesson: the way back, or scrolling up until the list's top has left the bottom of the screen.
+ *   Meanwhile the reader keeps the resume position where they were reading (useLessonProgress's
+ *   trackPosition), instead of saving the end of the lesson and sending it to their other devices.
+ *   Folding the list, scrolling on to the wrap-up below it, or a way back whose block has gone
+ *   does not end it: the learner is still past the lesson's blocks.
  * - back: the number that was clicked returns to where it sat on screen and gets the focus again.
  * - The list unfolds before printing, so printed numbers have their list.
  */
@@ -23,18 +26,24 @@ export type SourceTarget = { sourceId: string; blockId: string };
 
 type Jump = SourceTarget & { markTop: number | null; seq: number };
 
+/**
+ * Since a jump (to `sourceId`), until the learner is back in the lesson. `past`: the list's top is
+ * above the bottom of the screen (the list, or the wrap-up below it, is what they see).
+ */
+type Away = { sourceId: string; past: boolean };
+
 export type SourceJump = {
   /** The list is unfolded. */
   open: boolean;
   /** The source the learner jumped to (marked in the list, with the way back), else null. */
   target: SourceTarget | null;
-  /** The learner reads the list after a jump: keep the resume position where they were reading. */
+  /** Since a jump the learner is at the list or below it: keep the resume position where they were reading. */
   holding: boolean;
   show: (sourceId: string, blockId: string, from?: HTMLElement | null) => void;
   back: (target: SourceTarget) => void;
-  /** The learner folded or unfolded the list (folding forgets the jump). */
+  /** The learner folded or unfolded the list (folding forgets the jump, not the hold). */
   toggle: (open: boolean) => void;
-  /** Fold the list and forget the jump (the lesson was started over). */
+  /** Fold the list and forget the jump and the hold (the lesson was started over). */
   reset: () => void;
 };
 
@@ -47,7 +56,7 @@ export function useSourceJump({ container, scrollToElement, onScroll }: {
 }): SourceJump {
   const [open, setOpen] = useState(false);
   const [jump, setJump] = useState<Jump | null>(null);
-  const [listInView, setListInView] = useState(false);
+  const [away, setAway] = useState<Away | null>(null);
   const notify = useRef(onScroll);
   notify.current = onScroll;
 
@@ -55,10 +64,13 @@ export function useSourceJump({ container, scrollToElement, onScroll }: {
     const markTop = from && container ? offsetInContainer(container, from) : null;
     setOpen(true);
     setJump((previous) => ({ sourceId, blockId, markTop, seq: (previous?.seq ?? 0) + 1 }));
+    // A number clicked during a hold (at the end of the lesson) keeps it: the list is the same.
+    setAway((current) => current ?? { sourceId, past: false });
   }, [container]);
 
   const seq = jump?.seq;
   const sourceId = jump?.sourceId;
+  const awayId = away?.sourceId;
 
   // After the list has opened: move to the source and focus it, so a screen reader reads it and
   // the next Tab reaches its link. Only a new jump (seq) moves the page.
@@ -72,22 +84,23 @@ export function useSourceJump({ container, scrollToElement, onScroll }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seq]);
 
-  // While a jump is open: is the list on screen (below the sticky bar)?
+  // Since a jump: is the list's top above the bottom of the screen? Once it has been, scrolling
+  // up until it leaves the screen is the way back into the lesson and ends the hold.
   useEffect(() => {
-    if (!sourceId || !container) {
-      setListInView(false);
-      return undefined;
-    }
-    const list = document.getElementById(sourceAnchorId(sourceId))?.closest('.rp-sources');
-    if (!list) return undefined;
+    const list = awayId && container ? document.getElementById(sourceAnchorId(awayId))?.closest('.rp-sources') : null;
+    if (!list || !container) return undefined;
     let frame = 0;
+    let reached = false;
     const measure = () => {
       frame = 0;
-      const box = container === document.documentElement
-        ? { top: 0, bottom: window.innerHeight }
-        : container.getBoundingClientRect();
-      const rect = list.getBoundingClientRect();
-      setListInView(rect.bottom > box.top + READER_SCROLL_OFFSET + barExtra(container) && rect.top < box.bottom);
+      const bottom = container === document.documentElement ? window.innerHeight : container.getBoundingClientRect().bottom;
+      const past = list.getBoundingClientRect().top < bottom;
+      if (past) reached = true;
+      else if (reached) {
+        setAway(null);
+        return;
+      }
+      setAway((current) => (current && current.past !== past ? { ...current, past } : current));
     };
     const onContainerScroll = () => {
       if (!frame) frame = window.requestAnimationFrame(measure);
@@ -98,17 +111,19 @@ export function useSourceJump({ container, scrollToElement, onScroll }: {
       container.removeEventListener('scroll', onContainerScroll);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [seq, sourceId, container]);
+  }, [awayId, container]);
 
   const back = useCallback((target: SourceTarget) => {
     const markTop = jump && jump.sourceId === target.sourceId && jump.blockId === target.blockId ? jump.markTop : null;
     setJump(null);
     const block = document.getElementById(`b-${target.blockId}`);
     if (!block) {
-      // Nothing to go back to (the block has gone): keep the focus in the list, not on <body>.
+      // Nothing to go back to (the block has gone): keep the focus in the list, not on <body>, and
+      // the hold, since the learner is still at the list.
       document.getElementById(sourceAnchorId(target.sourceId))?.focus({ preventScroll: true });
       return;
     }
+    setAway(null);
     const marks = Array.from(block.querySelectorAll<HTMLElement>('.rp-cite-num'));
     const mark = marks.find((el) => el.dataset.cite === target.sourceId) ?? marks[0] ?? null;
     notify.current?.();
@@ -125,10 +140,13 @@ export function useSourceJump({ container, scrollToElement, onScroll }: {
   const reset = useCallback(() => {
     setOpen(false);
     setJump(null);
+    setAway(null);
   }, []);
 
+  // flushSync: React does not treat beforeprint as a discrete event, so a plain update would be
+  // drawn only after the print dialog has taken the page (the folded list).
   useEffect(() => {
-    const unfold = () => setOpen(true);
+    const unfold = () => flushSync(() => setOpen(true));
     window.addEventListener('beforeprint', unfold);
     return () => window.removeEventListener('beforeprint', unfold);
   }, []);
@@ -136,7 +154,7 @@ export function useSourceJump({ container, scrollToElement, onScroll }: {
   return {
     open,
     target: jump ? { sourceId: jump.sourceId, blockId: jump.blockId } : null,
-    holding: jump !== null && listInView,
+    holding: away?.past === true,
     show,
     back,
     toggle,
