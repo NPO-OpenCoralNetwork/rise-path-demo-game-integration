@@ -1,7 +1,7 @@
 // 「出典と検索」 step 6: the AI tutor's chip under an answer says where the learner asked
 // (「質問した場所 §n」) instead of 「根拠」 (the server only echoes the question's anchor), and the
-// latest answer lists the sources that place cites. A jump to a block with nothing to focus gives
-// the block itself the focus, for that visit, instead of <body>.
+// first answer lists the sources that place cites. A jump to a block with nothing to focus gives
+// the block itself the focus instead of <body>, also from the glossary sheet.
 //
 // - askedPlace / askedPlaces (model.ts): the place of each finished answer, and the one answer that
 //   lists its sources;
@@ -32,7 +32,7 @@ const LESSON = {
   objectives: [],
   provenance: { author: 'human' },
   sections: [
-    { id: 's1', title: '1. はじめる', blocks: [md('m1'), md('m2', ['a'])] },
+    { id: 's1', title: '1-2. はじめる', blocks: [md('m1'), md('m2', ['a'])] },
     { id: 's2', title: { jp: '道具をそろえる', en: 'Get the tools' }, blocks: [md('m3')] },
   ],
 };
@@ -44,7 +44,7 @@ const tx = txIn('jp');
 describe('askedPlace: where the question of an answer was asked', () => {
   it('gives the section number from its title, the title without it, and the block', () => {
     const place = askedPlace(LESSON, { sectionId: 's1', blockId: 'm2' }, tx);
-    assert.deepEqual(place, { n: '1', title: 'はじめる', block: LESSON.sections[0].blocks[1] });
+    assert.deepEqual(place, { n: '1-2', title: 'はじめる', block: LESSON.sections[0].blocks[1] });
   });
 
   it('numbers a section whose title has no number by its place, and reads the title in the reader’s language', () => {
@@ -62,7 +62,7 @@ describe('askedPlace: where the question of an answer was asked', () => {
   });
 });
 
-describe('askedPlaces: the chip under each finished answer, the sources under the latest', () => {
+describe('askedPlaces: the chip under each finished answer, the sources under the first', () => {
   const at = (/** @type {string} */ sectionId, /** @type {string} */ blockId) => ({ sectionId, blockId });
   /** @type {any[]} */
   const TURNS = [
@@ -83,9 +83,11 @@ describe('askedPlaces: the chip under each finished answer, the sources under th
     assert.equal(byTurn.get('a6')?.n, '2');
   });
 
-  it('lists the sources once, under the latest answer that has a place', () => {
-    assert.equal(askedPlaces(LESSON, TURNS, tx).sourcesTurnId, 'a6');
-    assert.equal(askedPlaces(LESSON, TURNS.slice(0, 6), tx).sourcesTurnId, 'a1', 'later answers without a place do not take it');
+  it('lists the sources once, under the first answer that has a place, and keeps them there as answers follow', () => {
+    assert.equal(askedPlaces(LESSON, TURNS, tx).sourcesTurnId, 'a1');
+    assert.equal(askedPlaces(LESSON, TURNS.slice(0, 2), tx).sourcesTurnId, 'a1', 'the same answer before the follow-ups came');
+    const later = TURNS.filter((turn) => turn.id !== 'a1');
+    assert.equal(askedPlaces(LESSON, later, tx).sourcesTurnId, 'a6', 'answers without a place (failed, stopped, no anchor, a gone block) are skipped');
   });
 
   it('a thread without a place has no chip and no list', () => {
@@ -95,7 +97,7 @@ describe('askedPlaces: the chip under each finished answer, the sources under th
   });
 });
 
-describe('focusForVisit: a block with nothing to focus takes the focus itself, for this visit', () => {
+describe('focusForVisit: a block with nothing to focus takes the focus itself', () => {
   /** @param {Record<string, string>} [attrs] */
   function fakeElement(attrs = {}) {
     const attributes = new Map(Object.entries(attrs));
@@ -121,15 +123,14 @@ describe('focusForVisit: a block with nothing to focus takes the focus itself, f
     };
   }
 
-  it('gives it tabindex="-1" before focusing it (without scrolling) and takes it away on blur', () => {
+  it('gives it tabindex="-1" (never in the Tab order) before focusing it, without scrolling, and keeps it', () => {
     const el = fakeElement();
     focusForVisit(/** @type {any} */ (el));
     assert.deepEqual(el.log, [['set', 'tabindex', '-1'], ['focus', { preventScroll: true }]]);
-    assert.equal(el.listeners.length, 1);
-    assert.equal(el.listeners[0].type, 'blur');
-    assert.deepEqual(el.listeners[0].options, { once: true });
-    el.listeners[0].fn();
-    assert.equal(el.attributes.has('tabindex'), false, 'never in the Tab order, and later clicks do not focus it');
+    assert.equal(el.listeners.length, 0, 'nothing takes it away on blur');
+    assert.equal(el.attributes.get('tabindex'), '-1', 'so the browser (back from another window) or a closing dialog can focus it again');
+    focusForVisit(/** @type {any} */ (el));
+    assert.deepEqual(el.log.slice(2), [['focus', { preventScroll: true }]], 'a second visit only focuses it');
   });
 
   it('leaves a tabindex the element already has alone', () => {
@@ -145,15 +146,21 @@ describe('wiring: the tutor panel and the reader', () => {
   const panel = readFile('components/lesson/TutorPanel.tsx');
   const reader = readFile('components/lesson/LessonReader.tsx');
 
-  it('the chip says 「質問した場所 §n」 / "Asked about §n", never 「根拠」', () => {
+  it('the chip says 「質問した場所 §n」 / "Asked about §n", never 「根拠」; its name starts with what it shows (WCAG 2.5.3)', () => {
     assert.match(panel, /asked: \(n: string\) => `質問した場所 §\$\{n\}`,/);
     assert.match(panel, /askedLabel: \(n: string, title: string\) => `質問した場所 §\$\{n\}「\$\{title\}」を本文で表示`,/);
     assert.match(panel, /asked: \(n: string\) => `Asked about §\$\{n\}`,/);
-    assert.match(panel, /askedLabel: \(n: string, title: string\) => `Show the part you asked about in the text: section \$\{n\}, \$\{title\}`,/);
+    assert.match(panel, /askedLabel: \(n: string, title: string\) => `Asked about §\$\{n\}, \$\{title\}: show it in the text`,/);
     assert.doesNotMatch(panel, /`根拠|Source §/);
   });
 
-  it('places the chips with askedPlaces; the chip shows the asked block; the latest answer lists its sources', () => {
+  it('本文で見る in a sheet closes it first and moves to the block on the next frame, as the outline does', () => {
+    const margin = readFile('components/lesson/MarginPanel.tsx');
+    assert.match(margin, /if \(!onDone\) \{\s*scrollToBlock\(blockId\);\s*return;\s*\}/);
+    assert.match(margin, /onDone\(\);\s*window\.requestAnimationFrame\(\(\) => scrollToBlock\(blockId\)\);/);
+  });
+
+  it('places the chips with askedPlaces; the chip shows the asked block; one answer (askedPlaces picks it) lists its sources', () => {
     assert.match(panel, /const asked = askedPlaces\(lesson, turns, tx\);/);
     assert.match(panel, /aria-label=\{text\.askedLabel\(place\.n, place\.title\)\}\s*onClick=\{\(\) => onShowAsked\(place\.block\.id\)\}/);
     assert.match(panel, /const place = asked\.byTurn\.get\(turn\.id\) \?\? null;/);

@@ -318,7 +318,9 @@ export function askedPlace(
 
 /**
  * 「質問した場所」 in a tutor thread: the asked place of each finished answer (askedPlace), and the
- * latest such answer, which alone lists the place's sources (one list, not one per answer).
+ * first such answer, which alone lists the place's sources: one list, not one per answer, and it
+ * stays put (moving it to each new answer would pull the text up under the learner in browsers
+ * without scroll anchoring, such as Safari).
  */
 export function askedPlaces(
   lesson: Lesson,
@@ -332,7 +334,7 @@ export function askedPlaces(
     const place = askedPlace(lesson, turn.grounding, tx);
     if (!place) continue;
     byTurn.set(turn.id, place);
-    sourcesTurnId = turn.id;
+    sourcesTurnId ??= turn.id;
   }
   return { byTurn, sourcesTurnId };
 }

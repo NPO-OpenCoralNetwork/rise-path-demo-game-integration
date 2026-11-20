@@ -192,7 +192,8 @@ export function BlockSources({ sources }: { sources: readonly LessonSource[] }) 
   if (sources.length === 0) return null;
   return (
     <div className="rp-block-sources">
-      <p id={labelId} className="rp-block-sources-label">{copy[language].blockSources}</p>
+      {/* Read once, as the list's name (not again as text), as CiteMarks hides its label. */}
+      <p id={labelId} className="rp-block-sources-label" aria-hidden="true">{copy[language].blockSources}</p>
       <ol className="rp-block-sources-list" role="list" aria-labelledby={labelId}>
         {sources.map((source) => (
           <li key={source.id} className="rp-block-sources-item">

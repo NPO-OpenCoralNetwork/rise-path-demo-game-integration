@@ -571,6 +571,7 @@ describe('BlockSources: one block’s sources (under the tutor’s 質問した�
     assert.equal(textOf(label), 'この場所の出典');
     assert.ok(label.props.id, 'the label has an id');
     assert.equal(ol.props['aria-labelledby'], label.props.id);
+    assert.equal(label.props['aria-hidden'], 'true', 'read once, as the list’s name');
     assert.equal(ol.props.role, 'list');
     const items = elements(tree).filter((el) => el.type === 'li');
     assert.deepEqual(items.map((li) => textOf(byClass(li, 'rp-block-sources-n'))), ['1', '2', '3', '4']);

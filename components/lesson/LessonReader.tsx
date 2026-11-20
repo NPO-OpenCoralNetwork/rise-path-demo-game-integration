@@ -274,8 +274,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     jumpedAt.current = Date.now();
     scrollToElement(el);
     // Not the source numbers under the block (CiteMarks): the learner came to read the block. A
-    // block with nothing else to focus (a definitions list) takes the focus itself, for this visit,
-    // instead of letting it fall to <body>.
+    // block with nothing else to focus (a definitions list) takes the focus itself
+    // (focusForVisit), instead of letting it fall to <body>.
     const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href]:not(.rp-cite-num), input');
     if (focusable) focusable.focus({ preventScroll: true });
     else focusForVisit(el);

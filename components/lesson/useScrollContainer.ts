@@ -95,15 +95,13 @@ export function restoreOffsetInContainer(
 }
 
 /**
- * Focuses an element that takes no focus of its own (a block frame), for this visit only: it gets
- * tabindex="-1" until it loses the focus again, so it never joins the Tab order and later clicks
- * inside it do not focus it. An element that already has a tabindex keeps it.
+ * Focuses an element that takes no focus of its own (a block frame), without scrolling: it gets
+ * tabindex="-1", which never puts it in the Tab order. The attribute stays, like the section
+ * headings' tabIndex -1, so the browser (back from another window) or a dialog that closes can
+ * give the focus back to it. An element that already has a tabindex keeps its own.
  */
 export function focusForVisit(el: HTMLElement): void {
-  if (!el.hasAttribute('tabindex')) {
-    el.setAttribute('tabindex', '-1');
-    el.addEventListener('blur', () => el.removeAttribute('tabindex'), { once: true });
-  }
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
   el.focus({ preventScroll: true });
 }
 

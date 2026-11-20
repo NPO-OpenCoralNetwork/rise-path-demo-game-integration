@@ -28,7 +28,7 @@ import {
 /**
  * Inline AI tutor (WP-11, PLAN §5.7): the quoted excerpt, a streamed answer, suggestion chips
  * (simpler / another example / quiz me / make a card), a follow-up field and a 「質問した場所 §n」
- * chip that scrolls the text to the block the question was asked about. Under the latest answer,
+ * chip that scrolls the text to the block the question was asked about. Under the first answer,
  * the sources that block cites (「出典と検索」 step 6). The chip once read 「根拠」, but the server
  * only echoes the question's anchor: it says where the learner asked, not what the answer rests on.
  *
@@ -73,7 +73,7 @@ const copy = {
     stopped: 'Stopped.',
     retry: 'Try again',
     asked: (n: string) => `Asked about §${n}`,
-    askedLabel: (n: string, title: string) => `Show the part you asked about in the text: section ${n}, ${title}`,
+    askedLabel: (n: string, title: string) => `Asked about §${n}, ${title}: show it in the text`,
     demo: 'Demo answer (no AI key on the server)',
     truncated: 'The answer stopped at the length limit. Ask for the rest if you need it.',
     errors: {
@@ -485,8 +485,8 @@ function TutorBody({ tutor, layout, current, onShowAsked, inputRef, text, cardOp
     }
   };
 
-  // Under every finished answer, 「質問した場所 §n」; under the latest one, the sources that place
-  // cites.
+  // Under every finished answer, 「質問した場所 §n」; under the first one, the sources that place
+  // cites (askedPlaces).
   const asked = askedPlaces(lesson, turns, tx);
   const askedChip = (place: AskedPlace) => (
     <button
@@ -696,7 +696,7 @@ function TurnView({ turn, text, askedChip, askedSources, onRetry, question, repo
   text: Copy;
   /** 「質問した場所 §n」 (finished answers). */
   askedChip: React.ReactNode;
-  /** The sources the asked block cites (the latest finished answer only). */
+  /** The sources the asked block cites (the first finished answer only). */
   askedSources: React.ReactNode;
   onRetry?: () => void;
   /** The learner's question this answer belongs to (sent with a report). */
