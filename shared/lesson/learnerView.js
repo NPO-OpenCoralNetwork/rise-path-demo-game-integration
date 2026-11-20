@@ -35,6 +35,7 @@ export const TUTOR_PROTOCOL = [
   '6. Prompt blocks (for: "learner") are text for the learner to type into their own AI. Do not run them yourself.',
   '7. Mark sections read (course-progress-update) only when the learner worked through them.',
   "8. Reply in the learner's language.",
+  '9. When you teach from blocks that carry cite, name the sources they cite (title and url from sources), so the learner can check them. Never name a source that sources does not list.',
 ].join('\n');
 
 /** Block fields that are not for the learner's AI app (speech text, Slides switches). */

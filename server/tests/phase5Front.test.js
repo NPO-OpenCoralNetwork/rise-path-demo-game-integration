@@ -1722,7 +1722,8 @@ describe('LessonEnd: where the rating went (G32) and 「このレッスンを最
 
   it('the reader: sections keyed by drops (G16), the title focusable, LessonEnd and the header outside; only the learn route allows a reset', () => {
     const reader = readFile('components/lesson/LessonReader.tsx');
-    const keyed = /<React\.Fragment key=\{progress\.drops\}>\s*\{lesson\.sections\.map\(\(section\) => \{[\s\S]*?<\/React\.Fragment>\s*<LessonEnd next=\{next\} prev=\{prev\} backTo=\{backTo\} resettable=\{allowReset && syncable\} onLessonReset=\{onLessonReset\} \/>/;
+    // The sources list (「出典と検索」 5, lessonSources.test.js) sits between them, also outside.
+    const keyed = /<React\.Fragment key=\{progress\.drops\}>\s*\{lesson\.sections\.map\(\(section\) => \{[\s\S]*?<\/React\.Fragment>\s*(?:<LessonSources\b[^>]*\/>\s*)?<LessonEnd next=\{next\} prev=\{prev\} backTo=\{backTo\} resettable=\{allowReset && syncable\} onLessonReset=\{onLessonReset\} \/>/;
     assert.match(reader, keyed);
     assert.ok(reader.indexOf('<LessonHeader lesson={lesson} entry={entry} />') < reader.indexOf('<React.Fragment key={progress.drops}>'), 'the header stays mounted');
     assert.match(reader, /showSaveState=\{syncable\}/);

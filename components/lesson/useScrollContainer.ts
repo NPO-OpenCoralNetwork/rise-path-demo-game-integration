@@ -67,6 +67,33 @@ export function scrollElementIntoContainer(
   container.scrollTo({ top: Math.max(0, top), behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
 }
 
+/** How far `target` sits below the top edge of `container`, in px (to put it back there later). */
+export function offsetInContainer(container: HTMLElement, target: Element): number {
+  const containerTop = typeof document !== 'undefined' && container === document.documentElement
+    ? 0
+    : container.getBoundingClientRect().top;
+  return target.getBoundingClientRect().top - containerTop;
+}
+
+/**
+ * Scrolls `container` so `target` sits `offset` px below its top edge again (offsetInContainer),
+ * but in view: never under the sticky bar (at least READER_SCROLL_OFFSET plus the notice's
+ * `barExtra`) and never below the bottom (at most READER_SCROLL_OFFSET plus its own height above
+ * it, which keeps it clear of the phone's bottom bar; the screen may have turned or shrunk). The
+ * top wins on a screen too short for both.
+ */
+export function restoreOffsetInContainer(
+  container: HTMLElement,
+  target: Element,
+  offset: number,
+  { smooth = true }: { smooth?: boolean } = {},
+): void {
+  const lowest = container.clientHeight - READER_SCROLL_OFFSET - (target.getBoundingClientRect().height || 0);
+  const wanted = Math.max(READER_SCROLL_OFFSET + barExtra(container), Math.min(offset, lowest));
+  const top = container.scrollTop + offsetInContainer(container, target) - wanted;
+  container.scrollTo({ top: Math.max(0, top), behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
+}
+
 /**
  * Resolves the scroll container for a mounted element. Returns null on the first render.
  */

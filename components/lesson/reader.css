@@ -1988,6 +1988,149 @@
   }
 
   /* ---------------------------------------------------------------------------------------
+   * Sources (出典と検索 5): the numbers under a block that cites sources (CiteMarks) and the
+   * folded list after the last section (LessonSources).
+   * ------------------------------------------------------------------------------------- */
+
+  /* A quiet caption line that belongs to the block above it. */
+  .rp-cite {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 2px;
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-cite-label {
+    margin-right: 4px;
+  }
+
+  .rp-cite-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 4px;
+    border-radius: var(--radius-chip, 6px);
+    color: var(--rp-primary-text);
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color var(--rp-duration-fast) var(--rp-ease);
+  }
+
+  .rp-cite-num:hover {
+    background: var(--rp-sunken);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .rp-sources {
+    margin-top: 48px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rp-border);
+  }
+
+  .rp-sources-count {
+    font-weight: 400;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-prose .rp-sources-lead {
+    margin: 4px 0 12px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-prose .rp-sources-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* The number sits inside the item (not a list marker), so the mark of the source the learner
+     came to covers it too. */
+  .rp-sources-item {
+    display: grid;
+    grid-template-columns: 2em minmax(0, 1fr);
+    margin-inline: -8px;
+    padding: 8px;
+    border-radius: var(--radius-control, 10px);
+    transition: background-color var(--rp-duration-base) var(--rp-ease);
+  }
+
+  .rp-sources-item[data-target] {
+    background: var(--rp-primary-soft);
+  }
+
+  .rp-sources-n {
+    padding-right: 8px;
+    text-align: right;
+    font-weight: 700;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-sources-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .rp-sources-title,
+  .rp-sources-link {
+    font-weight: 600;
+    color: var(--rp-fg);
+    overflow-wrap: anywhere;
+  }
+
+  .rp-sources-link {
+    color: var(--rp-primary-text);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .rp-sources-link:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  .rp-sources-link svg {
+    display: inline;
+    margin-left: 4px;
+    vertical-align: -1px;
+  }
+
+  .rp-sources-meta {
+    font-size: 13px;
+    color: var(--rp-fg-3);
+    overflow-wrap: anywhere;
+  }
+
+  /* Publisher, host and date each move to the next line as a whole. */
+  .rp-sources-meta-part {
+    display: inline-block;
+    max-width: 100%;
+  }
+
+  .rp-sources-back {
+    margin-top: 2px;
+  }
+
+  /* The list unfolds before printing (useSourceJump); the way back means nothing on paper. */
+  @media print {
+    .rp-sources-back {
+      display: none;
+    }
+  }
+
+  /* ---------------------------------------------------------------------------------------
    * End of lesson
    * ------------------------------------------------------------------------------------- */
 

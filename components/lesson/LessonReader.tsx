@@ -16,6 +16,7 @@ import {
   figureNumbers,
   findGlossaryItem,
   glossaryItems,
+  lessonSources,
   resolveLText,
   resumeTarget,
   safeDecode,
@@ -30,6 +31,8 @@ import { nextPracticeBlockId, practiceProgress } from './blocks/blockText';
 import { LessonBar } from './LessonBar';
 import { LessonHeader, lessonTitleId } from './LessonHeader';
 import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
+import { LessonSources } from './LessonSources';
+import { useSourceJump } from './useSourceJump';
 import { ReaderStatus, shownReaderStatus, stallKeyOf, stallMessageOf, type ReaderStatusMessage } from './ReaderStatus';
 import { getProgressSaveView, isSyncableLesson, subscribeProgressSaveView } from './progressSyncClient';
 import { Outline } from './Outline';
@@ -52,6 +55,10 @@ import './reader.css';
  * AI tutor (WP-11): openTutor() requests that carry `lesson` stream into TutorPanel, a card at
  * the top of the margin at ≥1280px, a right drawer at 1024–1279px and a bottom sheet below
  * (also a drawer in focus mode, which hides the margin). The glossary card is MarginPanel.
+ *
+ * Sources (「出典と検索」 step 5): every block that cites sources shows their numbers under it
+ * (CiteMarks, from the block frame); a number opens the folded list after the last section
+ * (LessonSources) at that source, and the list leads back to where the learner was reading.
  *
  * Phase 5 (lessons the server stores): the LessonBar shows where the record is saved (SaveChip);
  * a status line under it (ReaderStatus) says when saving moved to "this device" or stopped with
@@ -193,9 +200,29 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const [resumed, setResumed] = useState(false);
   const sideReturnRef = useRef<HTMLElement | null>(null);
   const outlineReturnRef = useRef<HTMLElement | null>(null);
+  // Set while a programmatic (smooth) scroll runs, so passing sections do not count as reading.
+  const jumpedAt = useRef(0);
 
   const { container, scrollToElement, scrollToTop } = useScrollContainer(rootRef);
-  const progress = useLessonProgress({ courseSlug, lesson, title: lessonTitle, articleRef, container, trackPosition, recordLastLesson, courseTitle: course.title });
+  // The sources list (「出典と検索」 step 5). After a number led there, the resume position stays
+  // where the learner was reading (not the end of the lesson) until they are back in the lesson.
+  const sourceJump = useSourceJump({
+    container,
+    scrollToElement,
+    onScroll: () => {
+      jumpedAt.current = Date.now();
+    },
+  });
+  const progress = useLessonProgress({
+    courseSlug,
+    lesson,
+    title: lessonTitle,
+    articleRef,
+    container,
+    trackPosition: trackPosition && !sourceJump.holding,
+    recordLastLesson,
+    courseTitle: course.title,
+  });
   const initialProgress = useRef(progress.progress);
   // Synced progress that arrives after the reader opened (a new device) moves the resume
   // position, but only until the learner scrolls, taps or types.
@@ -206,6 +233,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const figures = useMemo(() => figureNumbers(lesson), [lesson]);
   const checks = useMemo(() => checkNumbers(lesson), [lesson]);
   const glossary = useMemo(() => glossaryItems(lesson, course), [lesson, course]);
+  const sourceList = useMemo(() => lessonSources(lesson, course), [lesson, course]);
   const selectedTerm = useMemo(
     () => glossary.find((item) => item.key === selectedTermKey) ?? null,
     [glossary, selectedTermKey],
@@ -227,9 +255,6 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
 
   // --- Scrolling ---------------------------------------------------------------------------
 
-  // Set while a programmatic (smooth) scroll runs, so passing sections do not count as reading.
-  const jumpedAt = useRef(0);
-
   const scrollToSection = useCallback((sectionId: string, { focus = true } = {}) => {
     const heading = document.getElementById(`s-${sectionId}-title`);
     if (!heading) return;
@@ -248,7 +273,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     if (!el) return;
     jumpedAt.current = Date.now();
     scrollToElement(el);
-    const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href], input');
+    // Not the source numbers under the block (CiteMarks): the learner came to read the block.
+    const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href]:not(.rp-cite-num), input');
     focusable?.focus({ preventScroll: true });
   }, [scrollToElement]);
 
@@ -384,13 +410,16 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   }, [progress.topBlockId, trackPosition, sections]);
 
   // LessonEnd started the lesson over (its dialog has closed): say so, go to the top and put
-  // focus on the title (the sections remounted empty; focus was on the dialog).
+  // focus on the title (the sections remounted empty; focus was on the dialog). The sources list
+  // folds and forgets a jump, like the rest of the page.
+  const resetSources = sourceJump.reset;
   const onLessonReset = useCallback(() => {
+    resetSources();
     messageCount.current += 1;
     showStatus({ kind: 'reset', id: messageCount.current });
     scrollToTop();
     document.getElementById(lessonTitleId(lesson.id))?.focus({ preventScroll: true });
-  }, [showStatus, scrollToTop, lesson.id]);
+  }, [showStatus, resetSources, scrollToTop, lesson.id]);
 
   // --- Tutor -------------------------------------------------------------------------------
 
@@ -593,13 +622,15 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     appearance: settings.theme,
     figures,
     checks,
+    sources: sourceList,
+    showSource: sourceJump.show,
     askTutor,
     askedBlockId: asked?.block.id ?? null,
     armedBlockId,
     setArmedBlockId,
     selectTerm,
     scrollToBlock,
-  }), [course, courseSlug, lesson, locale, fallback, tx, t, blockProgress, settings.theme, figures, checks, askTutor, asked, armedBlockId, selectTerm, scrollToBlock]);
+  }), [course, courseSlug, lesson, locale, fallback, tx, t, blockProgress, settings.theme, figures, checks, sourceList, sourceJump.show, askTutor, asked, armedBlockId, selectTerm, scrollToBlock]);
 
   const scope = { theme: settings.theme, world: course.world, lang: toBcp47(locale) };
   const outlineProps = {
@@ -800,6 +831,13 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
                 );
               })}
             </React.Fragment>
+            <LessonSources
+              sources={sourceList}
+              open={sourceJump.open}
+              onToggle={sourceJump.toggle}
+              target={sourceJump.target}
+              onBack={sourceJump.back}
+            />
             <LessonEnd next={next} prev={prev} backTo={backTo} resettable={allowReset && syncable} onLessonReset={onLessonReset} />
           </article>
 
