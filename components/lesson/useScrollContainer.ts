@@ -77,7 +77,10 @@ export function offsetInContainer(container: HTMLElement, target: Element): numb
 
 /**
  * Scrolls `container` so `target` sits `offset` px below its top edge again (offsetInContainer),
- * but never under the sticky bar: at least READER_SCROLL_OFFSET plus the notice's `barExtra`.
+ * but in view: never under the sticky bar (at least READER_SCROLL_OFFSET plus the notice's
+ * `barExtra`) and never below the bottom (at most READER_SCROLL_OFFSET plus its own height above
+ * it, which keeps it clear of the phone's bottom bar; the screen may have turned or shrunk). The
+ * top wins on a screen too short for both.
  */
 export function restoreOffsetInContainer(
   container: HTMLElement,
@@ -85,7 +88,8 @@ export function restoreOffsetInContainer(
   offset: number,
   { smooth = true }: { smooth?: boolean } = {},
 ): void {
-  const wanted = Math.max(offset, READER_SCROLL_OFFSET + barExtra(container));
+  const lowest = container.clientHeight - READER_SCROLL_OFFSET - (target.getBoundingClientRect().height || 0);
+  const wanted = Math.max(READER_SCROLL_OFFSET + barExtra(container), Math.min(offset, lowest));
   const top = container.scrollTop + offsetInContainer(container, target) - wanted;
   container.scrollTo({ top: Math.max(0, top), behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
 }

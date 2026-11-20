@@ -2123,6 +2123,13 @@
     margin-top: 2px;
   }
 
+  /* The list unfolds before printing (useSourceJump); the way back means nothing on paper. */
+  @media print {
+    .rp-sources-back {
+      display: none;
+    }
+  }
+
   /* ---------------------------------------------------------------------------------------
    * End of lesson
    * ------------------------------------------------------------------------------------- */

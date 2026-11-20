@@ -11,6 +11,7 @@ import {
   sourceHref,
   type LessonSourceList,
 } from './model';
+import type { SourceTarget } from './useSourceJump';
 
 /**
  * A lesson's sources in the reader (「出典と検索」 step 5).
@@ -22,6 +23,7 @@ import {
  * - LessonSources: the folded list after the last section, before the wrap-up: number, title (a
  *   link in a new tab when the URL is http(s)), publisher, host and the day it was checked. The
  *   source the learner came to is marked and offers the way back to where they were reading.
+ *   Its state (open, the jump, the way back) is useSourceJump's.
  *
  * Sources are numbered in the order the lesson first cites them (lessonSources in model.ts). The
  * AI tutor plays no part here, so a screen that reuses the blocks without it (training plan §4.6)
@@ -36,7 +38,7 @@ const copy = {
     citeName: (n: number, title: string) => `Source ${n}: ${title}`,
     title: 'Sources',
     count: (n: number) => ` (${n})`,
-    lead: 'What this lesson’s explanations are based on. The numbers match the ones under the lesson’s parts.',
+    lead: 'What this lesson’s explanations are based on. The numbers match the source numbers in the lesson.',
     checked: (year: number, month: number, day: number) => `Checked ${day} ${MONTHS[month - 1]} ${year}`,
     checkedRaw: (raw: string) => `Checked: ${raw}`,
     newTab: '(opens in a new tab)',
@@ -47,7 +49,7 @@ const copy = {
     citeName: (n: number, title: string) => `出典 ${n}：${title}`,
     title: '出典',
     count: (n: number) => `（${n}件）`,
-    lead: 'このレッスンの説明のもとにした資料です。番号は、本文のブロックの下にある番号と同じです。',
+    lead: 'このレッスンの説明のもとにした資料です。番号は、本文に付いている「出典」の番号と同じです。',
     checked: (year: number, month: number, day: number) => `${year}年${month}月${day}日に確認`,
     checkedRaw: (raw: string) => `確認：${raw}`,
     newTab: '（新しいタブで開きます）',
@@ -85,9 +87,6 @@ export function CiteMarks({ block }: { block: Block }) {
     </div>
   );
 }
-
-/** The source the learner jumped to, and the block they came from. */
-export type SourceTarget = { sourceId: string; blockId: string };
 
 type LessonSourcesProps = {
   sources: LessonSourceList;
@@ -138,7 +137,7 @@ export function LessonSources({ sources, open, onToggle, target, onBack }: Lesso
                     <a href={href} target="_blank" rel="noopener noreferrer" className="rp-sources-link">
                       {source.title}
                       <ExternalLink size={13} aria-hidden="true" />
-                      <span className="sr-only">{text.newTab}</span>
+                      <span className="sr-only"> {text.newTab}</span>
                     </a>
                   ) : (
                     <span className="rp-sources-title">{source.title}</span>
