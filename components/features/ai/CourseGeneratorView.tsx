@@ -9,6 +9,8 @@ import { addLearningEvent } from '../../../services/progressService';
 import { dailyLimitKind, dailyLimitResetAt, dailyLimitScope } from '../../../services/aiDailyLimit';
 import { aiRefusalOf, type AiRefusal } from '../../../services/safetyApi';
 import { AiNotice, AiRefusalNotice } from '../../ui/AiNotice';
+import { RestoredDraftPanel } from './RestoredDraftPanel';
+import type { RestoredDraftSource } from './restoredDraft';
 import ReactMarkdown from 'react-markdown';
 
 type UploadFailure = 'upload_limit' | 'upload_paused' | 'upload_too_large' | 'upload_unsupported' | 'upload_unreadable' | 'upload_not_indexed';
@@ -125,7 +127,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [curriculumId, setCurriculumId] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<string | null>(null); // 'requirements' | 'roadmap' | 'curriculum'
-  
+  // The draft restored on the way in: the restore message shows what its pending stage asks the
+  // learner to approve (RestoredDraftPanel), as the AI's own message is not saved with the draft.
+  const [restoredDraft, setRestoredDraft] = useState<(RestoredDraftSource & { title: string }) | null>(null);
+
   // File State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -310,6 +315,8 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         setCurriculumId(latest.id);
         setSessionId(latest.id);
         setPendingApproval(stage);
+        // The saved result of that stage (the requirements or the roadmap), shown under the message.
+        setRestoredDraft({ stage, title: latest.title, intake_json: latest.intake_json, modules_json: latest.modules_json });
         setMessages([{
           id: 'restored-draft',
           role: 'model',
@@ -338,6 +345,17 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
         : prev
     ));
   }, [t.initialMessage]);
+
+  // So does the restore message, as its panel (RestoredDraftPanel) does.
+  useEffect(() => {
+    if (!restoredDraft) return;
+    const text = t.restoredDraft(restoredDraft.title, restoredDraft.stage);
+    setMessages((prev) => (
+      prev.some((m) => m.id === 'restored-draft' && m.text !== text)
+        ? prev.map((m) => (m.id === 'restored-draft' ? { ...m, text } : m))
+        : prev
+    ));
+  }, [language, restoredDraft]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -542,6 +560,7 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
     setSessionId(null);
     setCurriculumId(null);
     setPendingApproval(null);
+    setRestoredDraft(null);
     setSelectedFile(null);
     setUploadedFile(null);
     setUploadNotice(null);
@@ -904,6 +923,10 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                   >
                                     {msg.text}
                                 </ReactMarkdown>
+                                {/* A restored draft: what its pending stage asks the learner to approve. */}
+                                {msg.id === 'restored-draft' && restoredDraft && (
+                                  <RestoredDraftPanel draft={restoredDraft} courseId={curriculumId ?? undefined} />
+                                )}
                                 {showAiNotice && (
                                   <AiNotice
                                     surface="course_generation"
@@ -1005,10 +1028,11 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                         <div className="mx-0 sm:mx-6 mb-6 animate-in fade-in zoom-in duration-300">
                             <div className="bg-white border border-indigo-100 rounded-3xl p-6 shadow-xl relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                                <h3 className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
-                                    <BrainCircuit size={16} className="text-indigo-500"/> 
+                                {/* h2, like the restored draft's panel above it: the card is not part of that panel. */}
+                                <h2 className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                    <BrainCircuit size={16} className="text-indigo-500" aria-hidden="true" />
                                     {language === 'jp' ? '承認が必要です' : 'Confirmation Required'}
-                                </h3>
+                                </h2>
                                 <p className="text-xs text-slate-500 mb-4">
                                     {language === 'jp' 
                                         ? `上記の内容（${pendingApproval === 'requirements' ? '学習要件' : pendingApproval === 'roadmap' ? 'ロードマップ' : 'カリキュラム'}）を確認してください。このまま進めますか？それとも修正が必要ですか？`
@@ -1025,13 +1049,15 @@ const CourseGeneratorView: React.FC<CourseGeneratorViewProps> = ({ onBack, onCou
                                     >
                                         <ThumbsUp size={14} /> {t.approve}
                                     </button>
-                                    <button 
+                                    {/* A change is typed in the composer and sent as a revision (handleSendMessage):
+                                        this takes the learner there. The composer is enabled whenever this button is. */}
+                                    <button
                                         type="button"
-                                        onClick={() => { /* Focus input for revision */ }}
+                                        onClick={() => inputRef.current?.focus()}
                                         disabled={composerLocked}
                                         className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     >
-                                        <ThumbsDown size={14} /> {t.revise}
+                                        <ThumbsDown size={14} aria-hidden="true" /> {t.revise}
                                     </button>
                                 </div>
                                 {/* Another topic is a new course, never a change to this draft (startNewCourse).
