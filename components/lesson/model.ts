@@ -2,7 +2,7 @@
  * Pure helpers for the lesson reader: text resolution, title parsing, progress maths and
  * outline state. No React or DOM imports, so server/tests can import this file directly.
  */
-import type { Block, Course, LText, Lesson, Md, Section } from '../../shared/lesson/schema.js';
+import type { Block, Course, LText, Lesson, Md, Section, Source } from '../../shared/lesson/schema.js';
 import { resolveText, toBcp47 } from '../../shared/lesson/text.js';
 import { LESSON_DONE_STATES, allBlocks, blockDone, quizAnswered } from '../../shared/lesson/progress.js';
 import type { LessonProgress, LessonStateName } from './progressStore.ts';
@@ -170,6 +170,110 @@ export function glossaryItems(lesson: Lesson, course?: Course | null): GlossaryI
 export function findGlossaryItem(items: readonly GlossaryItem[], term: string): GlossaryItem | undefined {
   const needle = term.trim().toLowerCase();
   return items.find((item) => item.key.toLowerCase() === needle || item.names.includes(needle));
+}
+
+// --- Sources ---------------------------------------------------------------------------------
+
+/** A source as the reader lists it (「出典と検索」 step 5). */
+export type LessonSource = {
+  /** Its number in the reader: 1, 2, … in the order the lesson first cites it. */
+  n: number;
+  id: string;
+  title: string;
+  url?: string;
+  publisher?: string;
+  checkedAt?: string;
+};
+
+export type LessonSourceList = {
+  /** In number order (items[n - 1] has number n). */
+  items: LessonSource[];
+  /** Source id → number. */
+  numbers: Map<string, number>;
+};
+
+/**
+ * The lesson's sources, numbered for the reader: the sources its blocks cite, in the order the
+ * lesson first cites them (reading order, like figure numbers), then its uncited sources. A block
+ * may cite the lesson's or the course's sources (validate.js accepts both); a course source is
+ * listed only when the lesson cites it, and the lesson's entry wins on a shared id, as does the
+ * first of two entries with the same id. Ids that name no source are skipped.
+ */
+export function lessonSources(lesson: Lesson, course?: Course | null): LessonSourceList {
+  const known = new Map<string, Source>();
+  for (const source of [...(lesson.sources ?? []), ...(course?.sources ?? [])]) {
+    if (!known.has(source.id)) known.set(source.id, source);
+  }
+  const items: LessonSource[] = [];
+  const numbers = new Map<string, number>();
+  const add = (id: string) => {
+    const source = known.get(id);
+    if (!source || numbers.has(id)) return;
+    const n = items.length + 1;
+    numbers.set(id, n);
+    items.push({
+      n,
+      id,
+      title: source.title,
+      ...(source.url !== undefined ? { url: source.url } : {}),
+      ...(source.publisher !== undefined ? { publisher: source.publisher } : {}),
+      ...(source.checkedAt !== undefined ? { checkedAt: source.checkedAt } : {}),
+    });
+  };
+  for (const block of allBlocks(lesson)) {
+    for (const id of block.cite ?? []) add(id);
+  }
+  for (const source of lesson.sources ?? []) add(source.id);
+  return { items, numbers };
+}
+
+/** The sources a block cites, once each and by number; ids the list does not know are left out. */
+export function citedSources(block: Block, list: LessonSourceList): LessonSource[] {
+  const numbers = new Set<number>();
+  for (const id of block.cite ?? []) {
+    const n = list.numbers.get(id);
+    if (n !== undefined) numbers.add(n);
+  }
+  return [...numbers].sort((a, b) => a - b).map((n) => list.items[n - 1]);
+}
+
+/** Element id of a source in the list (sections and blocks use #s- and #b-). */
+export const sourceAnchorId = (id: string): string => `rp-src-${id}`;
+
+/**
+ * A source URL to link: http(s) only. Lessons are data that AI apps and other tools can write, so
+ * javascript:, data:, relative and other URLs are shown without a link.
+ */
+export function sourceHref(url: string | undefined): string | null {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The host of a linked source (shown next to its publisher), or null. */
+export function sourceHost(url: string | undefined): string | null {
+  const href = sourceHref(url);
+  if (!href) return null;
+  try {
+    return new URL(href).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Year, month and day of an ISO date (2026-10-20, or the date of an ISO timestamp), else null. */
+export function isoDateParts(value: string | undefined): { year: number; month: number; day: number } | null {
+  const match = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(value) : null;
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { year, month, day };
 }
 
 // --- Inline markdown helpers ------------------------------------------------------------------

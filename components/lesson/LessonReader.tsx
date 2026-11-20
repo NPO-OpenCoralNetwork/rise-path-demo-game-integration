@@ -9,18 +9,26 @@ import { streamTutor, toLlmLocale } from '../../services/llmApi';
 import type { LessonEntry } from '../../content';
 import { ReaderContext, type AskTutorArgs, type ReaderContextValue } from './ReaderContext';
 import { useLessonProgress } from './useLessonProgress';
-import { scrollElementIntoContainer, useScrollContainer, READER_SCROLL_OFFSET } from './useScrollContainer';
+import {
+  offsetInContainer,
+  restoreOffsetInContainer,
+  scrollElementIntoContainer,
+  useScrollContainer,
+  READER_SCROLL_OFFSET,
+} from './useScrollContainer';
 import {
   blockPlainText,
   checkNumbers,
   figureNumbers,
   findGlossaryItem,
   glossaryItems,
+  lessonSources,
   resolveLText,
   resumeTarget,
   safeDecode,
   sectionByBlock,
   sectionStatuses,
+  sourceAnchorId,
   splitSectionTitle,
   type ContentLocale,
   type GlossaryItem,
@@ -30,6 +38,7 @@ import { nextPracticeBlockId, practiceProgress } from './blocks/blockText';
 import { LessonBar } from './LessonBar';
 import { LessonHeader, lessonTitleId } from './LessonHeader';
 import { LessonEnd, type LessonLinkInfo } from './LessonEnd';
+import { LessonSources, type SourceTarget } from './LessonSources';
 import { ReaderStatus, shownReaderStatus, stallKeyOf, stallMessageOf, type ReaderStatusMessage } from './ReaderStatus';
 import { getProgressSaveView, isSyncableLesson, subscribeProgressSaveView } from './progressSyncClient';
 import { Outline } from './Outline';
@@ -52,6 +61,10 @@ import './reader.css';
  * AI tutor (WP-11): openTutor() requests that carry `lesson` stream into TutorPanel, a card at
  * the top of the margin at ≥1280px, a right drawer at 1024–1279px and a bottom sheet below
  * (also a drawer in focus mode, which hides the margin). The glossary card is MarginPanel.
+ *
+ * Sources (「出典と検索」 step 5): every block that cites sources shows their numbers under it
+ * (CiteMarks, from the block frame); a number opens the folded list after the last section
+ * (LessonSources) at that source, and the list leads back to where the learner was reading.
  *
  * Phase 5 (lessons the server stores): the LessonBar shows where the record is saved (SaveChip);
  * a status line under it (ReaderStatus) says when saving moved to "this device" or stopped with
@@ -190,6 +203,10 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const [asked, setAsked] = useState<MarginAnchor>(null);
   const [armedBlockId, setArmedBlockId] = useState<string | null>(null);
   const [selectedTermKey, setSelectedTermKey] = useState<string | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  // The source a number led to, where the clicked number sat on screen (for the way back) and a
+  // count, so clicking the same number again moves to it again.
+  const [sourceJump, setSourceJump] = useState<(SourceTarget & { markTop: number | null; seq: number }) | null>(null);
   const [resumed, setResumed] = useState(false);
   const sideReturnRef = useRef<HTMLElement | null>(null);
   const outlineReturnRef = useRef<HTMLElement | null>(null);
@@ -206,6 +223,7 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
   const figures = useMemo(() => figureNumbers(lesson), [lesson]);
   const checks = useMemo(() => checkNumbers(lesson), [lesson]);
   const glossary = useMemo(() => glossaryItems(lesson, course), [lesson, course]);
+  const sourceList = useMemo(() => lessonSources(lesson, course), [lesson, course]);
   const selectedTerm = useMemo(
     () => glossary.find((item) => item.key === selectedTermKey) ?? null,
     [glossary, selectedTermKey],
@@ -571,6 +589,49 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     return () => root.removeAttribute('data-theme');
   }, [settings.theme]);
 
+  // --- Sources -----------------------------------------------------------------------------
+
+  // A number under a block (CiteMarks): unfold the list, then (in the effect, once it is open)
+  // move to that source. Stable, so the context does not change with it.
+  const showSource = useCallback((sourceId: string, blockId: string, from?: HTMLElement | null) => {
+    const markTop = from && container ? offsetInContainer(container, from) : null;
+    setSourcesOpen(true);
+    setSourceJump((jump) => ({ sourceId, blockId, markTop, seq: (jump?.seq ?? 0) + 1 }));
+  }, [container]);
+
+  // Below the sticky bar (and the offline notice's barExtra), like every other jump; focus goes to
+  // the source so a screen reader reads it and the next Tab reaches its link.
+  useEffect(() => {
+    if (!sourceJump) return;
+    const item = document.getElementById(sourceAnchorId(sourceJump.sourceId));
+    if (!item) return;
+    jumpedAt.current = Date.now();
+    scrollToElement(item);
+    item.focus({ preventScroll: true });
+    // Only a new jump (seq) moves the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceJump?.seq]);
+
+  // 「読んでいた場所に戻る」: the clicked number goes back to where it sat on screen (also when a
+  // figure above it has changed height meanwhile) and gets the focus again.
+  const backFromSource = useCallback((target: SourceTarget) => {
+    const markTop = sourceJump?.sourceId === target.sourceId ? sourceJump.markTop : null;
+    setSourceJump(null);
+    const block = document.getElementById(`b-${target.blockId}`);
+    if (!block) return;
+    const marks = Array.from(block.querySelectorAll<HTMLElement>('.rp-cite-num'));
+    const mark = marks.find((el) => el.dataset.cite === target.sourceId) ?? marks[0];
+    jumpedAt.current = Date.now();
+    if (mark && container && markTop !== null) restoreOffsetInContainer(container, mark, markTop);
+    else scrollToElement(block);
+    mark?.focus({ preventScroll: true });
+  }, [sourceJump, container, scrollToElement]);
+
+  const onSourcesToggle = useCallback((open: boolean) => {
+    setSourcesOpen(open);
+    if (!open) setSourceJump(null);
+  }, []);
+
   // --- Context -----------------------------------------------------------------------------
 
   // Blocks read answers and checks, never the active/top block ids, so the context only changes
@@ -593,13 +654,15 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     appearance: settings.theme,
     figures,
     checks,
+    sources: sourceList,
+    showSource,
     askTutor,
     askedBlockId: asked?.block.id ?? null,
     armedBlockId,
     setArmedBlockId,
     selectTerm,
     scrollToBlock,
-  }), [course, courseSlug, lesson, locale, fallback, tx, t, blockProgress, settings.theme, figures, checks, askTutor, asked, armedBlockId, selectTerm, scrollToBlock]);
+  }), [course, courseSlug, lesson, locale, fallback, tx, t, blockProgress, settings.theme, figures, checks, sourceList, showSource, askTutor, asked, armedBlockId, selectTerm, scrollToBlock]);
 
   const scope = { theme: settings.theme, world: course.world, lang: toBcp47(locale) };
   const outlineProps = {
@@ -800,6 +863,13 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
                 );
               })}
             </React.Fragment>
+            <LessonSources
+              sources={sourceList}
+              open={sourcesOpen}
+              onToggle={onSourcesToggle}
+              target={sourceJump}
+              onBack={backFromSource}
+            />
             <LessonEnd next={next} prev={prev} backTo={backTo} resettable={allowReset && syncable} onLessonReset={onLessonReset} />
           </article>
 

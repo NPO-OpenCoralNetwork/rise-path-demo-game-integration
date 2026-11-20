@@ -67,6 +67,29 @@ export function scrollElementIntoContainer(
   container.scrollTo({ top: Math.max(0, top), behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
 }
 
+/** How far `target` sits below the top edge of `container`, in px (to put it back there later). */
+export function offsetInContainer(container: HTMLElement, target: Element): number {
+  const containerTop = typeof document !== 'undefined' && container === document.documentElement
+    ? 0
+    : container.getBoundingClientRect().top;
+  return target.getBoundingClientRect().top - containerTop;
+}
+
+/**
+ * Scrolls `container` so `target` sits `offset` px below its top edge again (offsetInContainer),
+ * but never under the sticky bar: at least READER_SCROLL_OFFSET plus the notice's `barExtra`.
+ */
+export function restoreOffsetInContainer(
+  container: HTMLElement,
+  target: Element,
+  offset: number,
+  { smooth = true }: { smooth?: boolean } = {},
+): void {
+  const wanted = Math.max(offset, READER_SCROLL_OFFSET + barExtra(container));
+  const top = container.scrollTop + offsetInContainer(container, target) - wanted;
+  container.scrollTo({ top: Math.max(0, top), behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
+}
+
 /**
  * Resolves the scroll container for a mounted element. Returns null on the first render.
  */

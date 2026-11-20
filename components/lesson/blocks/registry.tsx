@@ -16,6 +16,7 @@ import ChecklistBlock from './ChecklistBlock';
 import SummaryBlock from './SummaryBlock';
 import AskTutorBlock from './AskTutorBlock';
 import UnknownBlock from './UnknownBlock';
+import { CiteMarks } from '../LessonSources';
 import './blocks.css';
 
 /**
@@ -57,7 +58,8 @@ export function isKnownBlockType(type: unknown): type is BlockType {
 
 /**
  * Renders one block inside its frame. The frame carries the anchor id (`#b-<id>`) and the
- * `data-rp-block` hook that progress tracking observes.
+ * `data-rp-block` hook that progress tracking observes, and puts the numbers of the sources the
+ * block cites under it (CiteMarks).
  */
 export const BlockView = React.memo(function BlockView({ block, section }: { block: Block; section: Section }) {
   const type: unknown = (block as { type?: unknown }).type;
@@ -72,6 +74,7 @@ export const BlockView = React.memo(function BlockView({ block, section }: { blo
       data-block-type={typeof type === 'string' ? type : 'unknown'}
     >
       {Renderer ? <Renderer block={block} section={section} /> : <UnknownBlock block={block} />}
+      <CiteMarks block={block} />
     </div>
   );
 });

@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 import type { Block, Course, LText, Lesson, Section } from '../../shared/lesson/schema.js';
 import type { TutorLearnerState, TutorMode } from '../../services/tutorBridge';
 import type { LessonProgressApi } from './useLessonProgress';
-import type { ContentLocale, ResolvedText } from './model';
+import type { ContentLocale, LessonSourceList, ResolvedText } from './model';
 
 export type AskTutorArgs = {
   message: string;
@@ -38,6 +38,13 @@ export type ReaderContextValue = {
   figures: Map<string, number>;
   /** 確認しよう n/total numbering for inline quizzes. */
   checks: { numbers: Map<string, number>; total: number };
+  /** The lesson's sources, numbered in the order the lesson first cites them (CiteMarks, LessonSources). */
+  sources: LessonSourceList;
+  /**
+   * Opens the sources list at one source. `blockId` (and `from`, the number that was clicked) say
+   * where the learner was reading, for the way back.
+   */
+  showSource: (sourceId: string, blockId: string, from?: HTMLElement | null) => void;
   askTutor: (args: AskTutorArgs) => void;
   /** Block the learner last asked the tutor about (highlighted, shown in the margin). */
   askedBlockId: string | null;
