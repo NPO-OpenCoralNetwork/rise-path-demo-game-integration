@@ -27,6 +27,12 @@ import {
   sourceHost,
   sourceHref,
 } from '../../components/lesson/model.ts';
+import {
+  BAR_EXTRA_PROPERTY,
+  READER_SCROLL_OFFSET,
+  offsetInContainer,
+  restoreOffsetInContainer,
+} from '../../components/lesson/useScrollContainer.ts';
 import { TUTOR_PROTOCOL } from '../../shared/lesson/learnerView.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -481,6 +487,62 @@ describe('wiring: the block frame, the reader context and the reader', () => {
     assert.ok(imports.length > 0);
     for (const line of imports) assert.doesNotMatch(line, /tutor/i, line);
     assert.doesNotMatch(src, /askTutor|openTutor/);
+  });
+});
+
+describe('the way back: the clicked number returns to where it sat on screen', () => {
+  /**
+   * A scroll container `top` px below the viewport's top, scrolled `scrollTop`, with the offline
+   * notice's extra bar height `extra` (set inline as OfflineReloadNotice does).
+   * @param {{ top?: number, scrollTop?: number, extra?: number }} [options]
+   */
+  function fakeContainer({ top = 0, scrollTop = 0, extra = 0 } = {}) {
+    /** @type {any[]} */
+    const calls = [];
+    return {
+      calls,
+      scrollTop,
+      style: { getPropertyValue: (/** @type {string} */ name) => (name === BAR_EXTRA_PROPERTY && extra ? `${extra}px` : '') },
+      getBoundingClientRect: () => ({ top }),
+      scrollTo(/** @type {any} */ options) { calls.push(options); },
+    };
+  }
+  /** An element whose top edge is `top` px below the viewport's top. @param {number} top */
+  const at = (top) => ({ getBoundingClientRect: () => ({ top }) });
+  /** @param {any} value */
+  const el = (value) => /** @type {any} */ (value);
+
+  it('measures from the container’s top edge, not the viewport’s', () => {
+    assert.equal(offsetInContainer(el(fakeContainer({ top: 50 })), el(at(350))), 300);
+  });
+
+  it('scrolls so the number sits at the remembered offset again (after the page moved)', () => {
+    const container = fakeContainer({ top: 50, scrollTop: 17000 });
+    restoreOffsetInContainer(el(container), el(at(-15000)), 474);
+    assert.deepEqual(container.calls, [{ top: 17000 - 15050 - 474, behavior: 'smooth' }]);
+  });
+
+  it('never leaves it under the sticky bar, also when the offline notice has made the bar taller', () => {
+    const container = fakeContainer({ scrollTop: 500, extra: 40 });
+    restoreOffsetInContainer(el(container), el(at(300)), 10);
+    assert.deepEqual(container.calls, [{ top: 500 + 300 - (READER_SCROLL_OFFSET + 40), behavior: 'smooth' }]);
+  });
+
+  it('never scrolls above the top, and moves without animation when asked or when motion is reduced', () => {
+    const container = fakeContainer({ scrollTop: 0 });
+    restoreOffsetInContainer(el(container), el(at(20)), 400, { smooth: false });
+    assert.deepEqual(container.calls, [{ top: 0, behavior: 'auto' }]);
+    const g = /** @type {any} */ (globalThis);
+    const before = g.window;
+    g.window = { matchMedia: () => ({ matches: true }) };
+    try {
+      const reduced = fakeContainer({ scrollTop: 100 });
+      restoreOffsetInContainer(el(reduced), el(at(500)), 200);
+      assert.deepEqual(reduced.calls, [{ top: 400, behavior: 'auto' }]);
+    } finally {
+      if (before === undefined) delete g.window;
+      else g.window = before;
+    }
   });
 });
 
