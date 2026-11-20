@@ -645,7 +645,10 @@ describe('daily caps on the API routes', () => {
         });
 
         it('reads the attached material first for a requirements revision too', async () => {
-            const pool = createMockPool();
+            // A revision needs the learner's own draft (courseRequirementsRevision.test.js).
+            const pool = createMockPool((sql) => (sql.startsWith('select intake_json from curricula')
+                ? { rowCount: 1, rows: [{ intake_json: { goal: 'SQL basics' } }] }
+                : undefined));
             setPoolForTests(pool);
             setGatewayForTests(fakeCourseGateway());
             await withServer(async (base) => {

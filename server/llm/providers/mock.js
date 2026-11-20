@@ -208,10 +208,13 @@ const localized = (jp, en) => ({ jp, en });
 
 /**
  * One JSON object per /api/v2/ai/generate stage (server/services/aiPrompts.js output formats),
- * so the course generator runs end to end without a key. `input` is { stage, message?, modules? }.
+ * so the course generator runs end to end without a key. `input` is { stage, message?, intake?,
+ * modules? }. A requirements revision sends the learner's feedback as `message` with the draft's
+ * stored `intake`, and keeps that intake (its goal included).
  */
 function mockCourseGenerate(input) {
-  const topic = String(input?.message || input?.intake?.goal || 'Rise Path').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Rise Path';
+  const storedGoal = typeof input?.intake?.goal === 'string' ? input.intake.goal : '';
+  const topic = String(storedGoal || input?.message || 'Rise Path').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Rise Path';
   if (input?.stage === 'roadmap') {
     return {
       message: `「${topic}」のロードマップ案です（デモ用の応答です）。\n\n- Module 1: 基本を知る\n- Module 2: 手を動かす\n- Module 3: まとめと振り返り`,
@@ -256,8 +259,10 @@ function mockCourseGenerate(input) {
       },
     };
   }
+  const revision = Boolean(input?.intake) && typeof input.intake === 'object' && !Array.isArray(input.intake);
+  const lead = revision ? `「${topic}」の学習要件を、修正の希望に合わせて見直した案です` : `「${topic}」の学習要件の案です`;
   return {
-    message: `「${topic}」の学習要件の案です（デモ用の応答です）。\n\n- 目標: ${topic} の基本を理解する\n- 期間: 4週間\n\nこの方向性で進めてよろしいでしょうか？`,
+    message: `${lead}（デモ用の応答です）。\n\n- 目標: ${topic} の基本を理解する\n- 期間: 4週間\n\nこの方向性で進めてよろしいでしょうか？`,
     intake: {
       goal: topic,
       target_audience: '初学者',
@@ -265,6 +270,7 @@ function mockCourseGenerate(input) {
       duration_weeks: 4,
       delivery_style: 'doc_chapter',
       constraints: '週に3〜5時間',
+      ...(revision ? input.intake : {}),
     },
   };
 }
