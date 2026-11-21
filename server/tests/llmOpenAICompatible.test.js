@@ -157,6 +157,23 @@ describe('gateway: where learner text may go', () => {
         await assert.rejects(gateway.generate({ task: 'tutor.chat', messages: userMessage }), (error) => error.code === 'no_provider');
     });
 
+    it('warns once at start when a route names it but OPENAI_BASE_URL or the model is missing', () => {
+        const warned = (env) => {
+            const warnings = [];
+            createGateway({ env, logger: { info: () => {}, warn: (message) => warnings.push(String(message)) } });
+            return warnings.filter((message) => message.includes('OpenAI-compatible'));
+        };
+        const noUrl = warned({ ANTHROPIC_API_KEY: 'anthropic-test', LLM_TASK_TUTOR_CHAT: 'openai', OPENAI_MODEL: MODEL });
+        assert.equal(noUrl.length, 1);
+        assert.match(noUrl[0], /^\[LLM\] tutor\.chat: routed to an OpenAI-compatible server/);
+        assert.equal(warned({ LLM_TASK_TUTOR_CHAT: 'openai', OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).length, 1);
+        assert.equal(warned({ LLM_TASK_TUTOR_CHAT: `openai:${MODEL}`, OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).length, 0);
+        assert.equal(warned({ OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).length, 0);
+        const forced = warned({ LLM_PROVIDER: 'openai', OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' });
+        assert.equal(forced.length, 1);
+        assert.ok(forced[0].includes('tutor.chat') && forced[0].includes('writing.feedback'));
+    });
+
     it('a per-task route to it falls back to Anthropic like any other route', async () => {
         const openai = fakeProvider('openai', { generate: () => { throw new LlmError('provider_unavailable', 'down', { provider: 'openai' }); } });
         const anthropic = fakeProvider('anthropic', { generate: () => okResult('anthropic', 'from Claude') });
@@ -220,6 +237,48 @@ describe('openai provider: one call', () => {
         });
         assert.equal(chatCompletionsUrl('http://h/v1'), 'http://h/v1/chat/completions');
         assert.equal(chatCompletionsUrl('http://h/v1//'), 'http://h/v1/chat/completions');
+    });
+
+    it('caps the limit at OPENAI_MAX_OUTPUT_TOKENS and leaves response_format out with OPENAI_RESPONSE_FORMAT=none', async () => {
+        await withServer(({ body, res }) => sendJson(res, 200, completion(body, '{"score":3}')), async (base, requests) => {
+            const env = {
+                NODE_ENV: 'production', LLM_PROVIDER: 'openai', OPENAI_BASE_URL: base, OPENAI_MODEL: MODEL, LLM_MAX_RETRIES: '0',
+                OPENAI_MAX_OUTPUT_TOKENS: '1000', OPENAI_RESPONSE_FORMAT: 'none',
+            };
+            const gateway = createGateway({ env, logger: quietLogger });
+            const result = await gateway.generate({ task: 'writing.feedback', schema: z.object({ score: z.number().int() }), messages: userMessage });
+            assert.deepEqual(result.data, { score: 3 });
+            const [{ body }] = requests;
+            assert.ok(resolveTaskRoute('writing.feedback', env).maxTokens > 1000);
+            assert.equal(body.max_completion_tokens, 1000);
+            assert.ok(!('response_format' in body));
+            assert.match(body.messages[0].content, /^Reply with one JSON object only/);
+        });
+        await withServer(({ body, res }) => sendJson(res, 200, completion(body, 'ok')), async (base, requests) => {
+            const limit = routeFor().maxTokens;
+            for (const maxOutputTokens of [limit + 1, '0', '-5', 'many', undefined]) await ask(provider(base, { maxOutputTokens }));
+            assert.deepEqual(requests.map((r) => r.body.max_completion_tokens), [limit, limit, limit, limit, limit]);
+            await ask(provider(base, { maxOutputTokens: 100, maxTokensField: 'max_tokens' }));
+            assert.equal(requests.at(-1).body.max_tokens, 100);
+            await ask(provider(base, { responseFormat: 'json_object' }), { schema: z.object({ a: z.string() }) });
+            assert.equal(requests.at(-1).body.response_format.type, 'json_schema');
+        });
+    });
+
+    it('joins turns in a row from one role into one message', async () => {
+        await withServer(({ body, res }) => sendJson(res, 200, completion(body, 'ok')), async (base, requests) => {
+            const messages = [
+                { role: 'user', content: 'first' }, { role: 'user', content: 'second' },
+                { role: 'assistant', content: 'a' }, { role: 'assistant', content: 'b' }, { role: 'user', content: 'third' },
+            ];
+            await ask(provider(base), { messages });
+            assert.deepEqual(requests[0].body.messages, [
+                { role: 'user', content: 'first\n\nsecond' },
+                { role: 'assistant', content: 'a\n\nb' },
+                { role: 'user', content: 'third' },
+            ]);
+            assert.equal(messages[0].content, 'first');
+        });
     });
 
     it('asks for JSON with response_format and the schema in the system message; the gateway validates and repairs', async () => {

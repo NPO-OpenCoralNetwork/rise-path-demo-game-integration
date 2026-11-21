@@ -107,6 +107,16 @@ export function warnIfGeminiKeyIgnored(env = process.env, logger = console) {
 }
 
 /**
+ * Logged at start for tasks routed to the OpenAI-compatible server while it has no URL or no model:
+ * they quietly use the other providers instead, which may not be where the operator meant learner
+ * text to go.
+ * @param {string[]} tasks
+ */
+export const openAIRouteUnusableWarning = (tasks) => `[LLM] ${tasks.join(', ')}: routed to an OpenAI-compatible server, `
+  + 'but OPENAI_BASE_URL or the model (OPENAI_MODEL, or LLM_TASK_<TASK>=openai:<model>) is not set, so these tasks use '
+  + 'the other configured providers instead (none when LLM_PROVIDER=openai). Set both, or remove the openai route.';
+
+/**
  * The request as sent to a provider: for a minor, MINOR_SAFETY goes last, as its own uncached
  * part (the cached prefix before it stays the same for adults and minors).
  * @param {LlmRequest} req
@@ -174,6 +184,13 @@ export function createGateway(options = {}) {
    */
   const isConfigured = (id) => (id === 'mock' ? true : id === 'openai' ? Boolean(baseURLs.openai) : Boolean(keys[id]));
 
+  // Once per process, like the Gemini warning above.
+  const unusableOpenAI = Object.keys(TASKS).filter((task) => {
+    const route = resolveTaskRoute(task, env);
+    return route.provider === 'openai' && !(isConfigured('openai') && route.model);
+  });
+  if (unusableOpenAI.length) logger.warn(openAIRouteUnusableWarning(unusableOpenAI));
+
   /** @type {Map<ProviderId, LlmProvider>} */
   const instances = new Map();
   /** @param {ProviderId} id */
@@ -188,6 +205,8 @@ export function createGateway(options = {}) {
         delayMs: Number.isFinite(mockDelayMs) ? mockDelayMs : undefined,
         serverFallbacks: env.LLM_ANTHROPIC_SERVER_FALLBACKS !== 'false',
         maxTokensField: env.OPENAI_MAX_TOKENS_FIELD,
+        maxOutputTokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+        responseFormat: env.OPENAI_RESPONSE_FORMAT,
       }));
     }
     return /** @type {LlmProvider} */ (instances.get(id));

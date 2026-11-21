@@ -13,9 +13,14 @@
  * - The output limit goes in `max_completion_tokens`, OpenAI's field (OpenAI's reasoning models refuse
  *   `max_tokens`). Servers that read only `max_tokens` (Ollama lists no `max_completion_tokens`) take
  *   OPENAI_MAX_TOKENS_FIELD=max_tokens.
+ * - The tasks' limits are set for Claude (up to 64k tokens for lesson.author); a model with a smaller
+ *   output limit may refuse them, so OPENAI_MAX_OUTPUT_TOKENS caps the limit sent.
  * - JSON: `response_format` json_schema, not strict (strict mode wants every property required), and
- *   the same schema in the system message for servers that ignore `response_format`. The gateway
- *   validates the reply with zod and asks once for a repair.
+ *   the same schema in the system message for servers that ignore `response_format`. A server or model
+ *   that refuses `response_format` takes OPENAI_RESPONSE_FORMAT=none. The gateway validates the reply
+ *   with zod and asks once for a repair.
+ * - Turns in a row from one role become one message, as for Gemini: some models' chat templates
+ *   refuse a user turn after a user turn.
  * - Long outputs (task `stream`, or maxTokens > 16k) stream even for generate(), so no single HTTP
  *   response has to arrive within the timeout. The timeout (LLM_TIMEOUT_MS) bounds the wait for the
  *   response, then each wait between streamed chunks.
@@ -37,6 +42,9 @@ const RETRY_STATUSES = new Set([408, 409, 429]);
 /** Fields a server may read the output limit from; the first is the default. */
 export const MAX_TOKENS_FIELDS = /** @type {const} */ (['max_completion_tokens', 'max_tokens']);
 
+/** How JSON is asked for (OPENAI_RESPONSE_FORMAT); the first is the default. */
+export const RESPONSE_FORMATS = /** @type {const} */ (['json_schema', 'none']);
+
 /**
  * `<base URL>/chat/completions`, with or without a slash at the end of the base URL.
  * @param {string} baseURL
@@ -53,19 +61,23 @@ const toSystemText = (system) => (typeof system === 'string' ? system : (system 
 const jsonInstruction = (schema) => `Reply with one JSON object only, and nothing else. It must match this JSON Schema:\n${JSON.stringify(schema)}`;
 
 /**
- * Chat messages: one system message (with the JSON instruction last), then the turns.
+ * Chat messages: one system message (with the JSON instruction last), then the turns, with turns in
+ * a row from one role joined into one message.
  * @param {LlmRequest} req
  * @param {Record<string, any> | null} schema
  */
 function toMessages(req, schema) {
   const system = [toSystemText(req.system), schema ? jsonInstruction(schema) : ''].filter(Boolean).join('\n\n');
-  return [
-    ...(system ? [{ role: 'system', content: system }] : []),
-    ...req.messages.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-    })),
-  ];
+  /** @type {Array<{ role: 'user' | 'assistant', content: string }>} */
+  const turns = [];
+  for (const m of req.messages) {
+    const role = m.role === 'assistant' ? 'assistant' : 'user';
+    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+    const last = turns[turns.length - 1];
+    if (last && last.role === role) last.content += `\n\n${content}`;
+    else turns.push({ role, content });
+  }
+  return [...(system ? [{ role: 'system', content: system }] : []), ...turns];
 }
 
 /** A schema name OpenAI accepts (letters, digits, `_` and `-`, at most 64). @param {string} task */
@@ -261,7 +273,7 @@ function readCompletion(json, route) {
 }
 
 /**
- * @param {{ apiKey?: string, baseURL?: string, timeoutMs?: number, maxRetries?: number, maxTokensField?: string, fetch?: typeof fetch }} options
+ * @param {{ apiKey?: string, baseURL?: string, timeoutMs?: number, maxRetries?: number, maxTokensField?: string, maxOutputTokens?: number | string, responseFormat?: string, fetch?: typeof fetch }} options
  */
 export function createOpenAICompatibleProvider(options) {
   const timeoutMs = options.timeoutMs ?? 120_000;
@@ -269,6 +281,11 @@ export function createOpenAICompatibleProvider(options) {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const wanted = typeof options.maxTokensField === 'string' ? options.maxTokensField.trim() : '';
   const maxTokensField = MAX_TOKENS_FIELDS.find((field) => field === wanted) ?? MAX_TOKENS_FIELDS[0];
+  // OPENAI_MAX_OUTPUT_TOKENS: a positive whole number caps the limit; anything else leaves the task's.
+  const cap = Number.parseInt(String(options.maxOutputTokens ?? ''), 10);
+  const maxOutputTokens = cap > 0 ? cap : Number.POSITIVE_INFINITY;
+  const wantedFormat = typeof options.responseFormat === 'string' ? options.responseFormat.trim() : '';
+  const responseFormat = RESPONSE_FORMATS.find((format) => format === wantedFormat) ?? RESPONSE_FORMATS[0];
   const url = options.baseURL ? chatCompletionsUrl(options.baseURL) : '';
   /** @type {Record<string, string>} */
   const headers = { 'Content-Type': 'application/json' };
@@ -284,8 +301,8 @@ export function createOpenAICompatibleProvider(options) {
     return {
       model: route.model,
       messages: toMessages(req, schema),
-      [maxTokensField]: route.maxTokens,
-      ...(schema ? { response_format: { type: 'json_schema', json_schema: { name: schemaName(req.task), schema, strict: false } } } : {}),
+      [maxTokensField]: Math.min(route.maxTokens, maxOutputTokens),
+      ...(schema && responseFormat === 'json_schema' ? { response_format: { type: 'json_schema', json_schema: { name: schemaName(req.task), schema, strict: false } } } : {}),
       ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
     };
   }

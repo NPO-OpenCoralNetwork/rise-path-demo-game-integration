@@ -170,6 +170,8 @@ flowchart TD
 | `OPENAI_API_KEY` | そのキー（手元のサーバーなら要らないこともあります） |
 | `OPENAI_MODEL` | 振り分けでモデルを書かなかったときに使うモデル |
 | `OPENAI_MAX_TOKENS_FIELD` | `max_completion_tokens` を読まないサーバー（Ollama）には `max_tokens` |
+| `OPENAI_MAX_OUTPUT_TOKENS` | 送る出力の上限の最大値。タスクの上限は Claude に合わせてあり、最大 64000 トークンです。モデルの上限がそれより小さいときは、その値を入れます |
+| `OPENAI_RESPONSE_FORMAT` | `response_format` を受け付けないサーバーやモデルには `none`。JSON の形はシステムメッセージだけで伝えます（答えの確かめはそのまま） |
 | `LLM_PROVIDER` | すべてのタスクを 1 つのプロバイダーに固定します: `anthropic`、`gemini`、`openai`、`mock` |
 | `LLM_TASK_<TASK>` | タスクごとの振り分け `provider[:model]`。例: `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5`、`LLM_TASK_TUTOR_CHAT=openai:使うモデル` |
 | `LLM_MOCK_FALLBACK` | `false` で、キーがないときのモックへの切り替えを止める |
@@ -184,7 +186,7 @@ flowchart TD
 
 **Gemini が既定でオフの理由。** [Gemini API 追加利用規約](https://ai.google.dev/gemini-api/terms)は、「18歳未満の人に向けた、または18歳未満の人が使う可能性が高い」サービスで API を使うことを禁じています。Rise Path は未成年も使うため、Gemini は `GEMINI_ALLOWED=true` のときだけ使います。オフのあいだ、アップロードした資料はベクトルなしで保存され、キーワード検索で見つかります（Gemini を許可したあとで `node scripts/rag/reembed.mjs` を実行すると埋め込みを作れます）。`/api/v2/image` は 503（`error_type: image_generation_unavailable`）を返します。
 
-**OpenAI 互換のサーバー（セルフホスト）。** `OPENAI_BASE_URL`（と `OPENAI_API_KEY`、`OPENAI_MODEL`）を入れて、すべてのタスクなら `LLM_PROVIDER=openai`、一部なら `LLM_TASK_<TASK>=openai[:model]` で振り分けます。振り分けがなければ何も送りません（代わりに使われることもありません）。文章のタスクだけを受け持ちます。RAG の埋め込みと画像生成は Gemini のままなので、Gemini がオフなら上に書いたとおりです。effort（考える量）の設定は送りません。そのサービスと契約するのは運営者で、18 歳未満の決まりを含めて規約を守るのも運営者です（`doc/brushup-2026/ai-access-plan.ja.md` 14 章）。
+**OpenAI 互換のサーバー（セルフホスト）。** `OPENAI_BASE_URL`（と `OPENAI_API_KEY`、`OPENAI_MODEL`）を入れて、すべてのタスクなら `LLM_PROVIDER=openai`、一部なら `LLM_TASK_<TASK>=openai[:model]` で振り分けます。振り分けがなければ何も送りません（代わりに使われることもありません）。振り分けたのに `OPENAI_BASE_URL` かモデルがないときは、起動時に警告を出し、そのタスクはほかのプロバイダーを使います。docker compose では `localhost` は app のコンテナを指すので、ホストのサーバーには `.env.example` のとおりにつなぎます。文章のタスクだけを受け持ちます。RAG の埋め込みと画像生成は Gemini のままなので、Gemini がオフなら上に書いたとおりです。effort（考える量）の設定は送りません。そのサービスと契約するのは運営者で、18 歳未満の決まりを含めて規約を守るのも運営者です（`doc/brushup-2026/ai-access-plan.ja.md` 14 章）。
 
 ---
 
