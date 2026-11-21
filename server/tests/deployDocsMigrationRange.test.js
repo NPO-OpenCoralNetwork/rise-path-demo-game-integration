@@ -125,16 +125,17 @@ describe('the VM runbooks follow server/migrations', () => {
 });
 
 describe('the plan: Phase 6 chapter', () => {
-    it('§10 is Phase 6, §11 Phase 7, §12 Phase 8 and §13 Phase 9, before やらないこと (14) and まだ分からないこと (15); its owner steps start with the deploy order of 020', () => {
+    it('§10 is Phase 6, §11 Phase 7, §12 Phase 8, §13 Phase 9 and §14 AI の提供の形, before やらないこと (15) and まだ分からないこと (16); its owner steps start with the deploy order of 020', () => {
         const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
         const headings = plan.split('\n').filter((line) => /^## \d+\. /.test(line)).map((line) => line.replace(/^## /, '').slice(0, 12));
-        assert.deepEqual(headings.slice(-7).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.', '14.', '15.']);
+        assert.deepEqual(headings.slice(-8).map((h) => h.split(' ')[0]), ['9.', '10.', '11.', '12.', '13.', '14.', '15.', '16.']);
         assert.match(plan, /^## 10\. Phase 6: /m);
         assert.match(plan, /^## 11\. Phase 7: /m);
         assert.match(plan, /^## 12\. Phase 8: /m);
         assert.match(plan, /^## 13\. Phase 9: /m);
-        assert.match(plan, /^## 14\. やらないこと$/m);
-        assert.match(plan, /^## 15\. まだ分からないこと$/m);
+        assert.match(plan, /^## 14\. AI の提供の形（クラウド版とセルフホスト版）$/m);
+        assert.match(plan, /^## 15\. やらないこと$/m);
+        assert.match(plan, /^## 16\. まだ分からないこと$/m);
         const order = plan.split('\n').find((line) => line.startsWith('1. **デプロイの順番**: migration 020 を'));
         assert.ok(order, '10.2 item 1');
         assert.match(order, /`api`・`mcp`・`mcp-public` を起動する前に/);
@@ -379,10 +380,10 @@ describe('the plan: Phase 5 deploy order and R12', () => {
 describe('the plan: Phase 9 chapter (design §8.5)', () => {
     const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
     const start = plan.indexOf('## 13. Phase 9: ');
-    const end = plan.indexOf('## 14. やらないこと');
+    const end = plan.indexOf('## 14. AI の提供の形');
     const chapter = plan.slice(start, end);
 
-    it('§13 holds 13.1–13.5 in order, after Phase 8 and before やらないこと, and sends the owner to the runbook', () => {
+    it('§13 holds 13.1–13.5 in order, after Phase 8 and before §14, and sends the owner to the runbook', () => {
         assert.ok(start > plan.indexOf('## 12. Phase 8: ') && end > start);
         assert.match(plan, /^## 13\. Phase 9: 最初の公開の準備（事前チェック、登録の閉じ方、控え、公開の手順書）$/m);
         const subsections = chapter.split('\n').filter((line) => line.startsWith('### ')).map((line) => line.split(' ')[1]);
@@ -404,5 +405,21 @@ describe('the plan: Phase 9 chapter (design §8.5)', () => {
         for (const must of ['`scripts/auth-check.mjs` と `smoke:edge --sign-in`', '保護者の同意の取り消しと AI アプリの切断の記録の当て直し', 'C16、D8、E1〜E4', '`byoa` の DB ロールの確かめ', '`pg_dump`', '書面で同意', '匿名のセッションを断るコード', '`mcp-server/sseUserAuth.js`', 'VB2 と事前チェックの C6']) {
             assert.ok(left.includes(must), `13.5: ${must}`);
         }
+    });
+});
+
+describe('the plan: AI provision chapter (14)', () => {
+    it('§14 holds 14.1–14.3 and K1–K3; やらないこと (15) points back to it', () => {
+        const plan = read('doc/brushup-2026/ai-access-plan.ja.md');
+        const start = plan.indexOf('## 14. AI の提供の形');
+        const end = plan.indexOf('## 15. やらないこと');
+        assert.ok(start > plan.indexOf('## 13. Phase 9: ') && end > start);
+        const chapter = plan.slice(start, end);
+        const subsections = chapter.split('\n').filter((line) => line.startsWith('### ')).map((line) => line.split(' ')[1]);
+        assert.deepEqual(subsections, ['14.1', '14.2', '14.3']);
+        for (const k of ['K1', 'K2', 'K3']) assert.match(chapter, new RegExp(`^- \\*\\*${k} `, 'm'), `14.1 ${k}`);
+        const donts = plan.slice(end, plan.indexOf('## 16. まだ分からないこと'));
+        assert.match(donts, /^- AI のモデルそのものを、そのまま売ること（転売）。[^\n]*（14 章）。$/m);
+        assert.match(donts, /^- 18 歳未満が使う環境で、Gemini を使うこと。[^\n]*（14 章）。$/m);
     });
 });
