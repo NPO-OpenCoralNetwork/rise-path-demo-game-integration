@@ -166,8 +166,12 @@ flowchart TD
 | `ANTHROPIC_API_KEY` | Anthropic を有効にします（すべてのタスクの既定） |
 | `GEMINI_ALLOWED` | ちょうど `true` のときだけ Gemini（チャット、RAG の埋め込み、画像生成）を使います。未設定やそれ以外の値ではオフです。Gemini のキーがあってもオフのままで、サーバーが警告を出します。18歳未満の人が使えない環境専用です |
 | `GEMINI_API_KEY`（または `GOOGLE_API_KEY`） | `GEMINI_ALLOWED=true` のとき、Gemini、RAG の埋め込み、画像生成を有効にします |
-| `LLM_PROVIDER` | すべてのタスクを 1 つのプロバイダーに固定します: `anthropic`、`gemini`、`mock` |
-| `LLM_TASK_<TASK>` | タスクごとの振り分け `provider[:model]`。例: `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` |
+| `OPENAI_BASE_URL` | OpenAI 互換のサーバー（Chat Completions API）。例: `https://api.openai.com/v1`、`https://openrouter.ai/api/v1`、自分で動かすモデルのサーバー。振り分けで `openai` を指したタスクだけが使います（下記） |
+| `OPENAI_API_KEY` | そのキー（手元のサーバーなら要らないこともあります） |
+| `OPENAI_MODEL` | 振り分けでモデルを書かなかったときに使うモデル |
+| `OPENAI_MAX_TOKENS_FIELD` | `max_completion_tokens` を読まないサーバー（Ollama）には `max_tokens` |
+| `LLM_PROVIDER` | すべてのタスクを 1 つのプロバイダーに固定します: `anthropic`、`gemini`、`openai`、`mock` |
+| `LLM_TASK_<TASK>` | タスクごとの振り分け `provider[:model]`。例: `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5`、`LLM_TASK_TUTOR_CHAT=openai:使うモデル` |
 | `LLM_MOCK_FALLBACK` | `false` で、キーがないときのモックへの切り替えを止める |
 | `LLM_TIMEOUT_MS` | リクエストのタイムアウト（既定 120000） |
 | `LLM_MAX_RETRIES` | プロバイダー呼び出しの再試行回数 |
@@ -179,6 +183,8 @@ flowchart TD
 **既定のモデル。** AI先生（`tutor.chat`）、作文フィードバック（`writing.feedback`）、コース生成（`course.generate`、`/api/v2/ai/generate`）は、既定で安価な Claude モデル（Claude Haiku）で動きます。1 日の上限（`server/middleware/dailyCaps.js`）もそのまま効きます。大きいモデルに戻したいタスクは、たとえば `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` のように設定します（`LLM_TASK_WRITING_FEEDBACK`、`LLM_TASK_COURSE_GENERATE` も同じ書き方です）。
 
 **Gemini が既定でオフの理由。** [Gemini API 追加利用規約](https://ai.google.dev/gemini-api/terms)は、「18歳未満の人に向けた、または18歳未満の人が使う可能性が高い」サービスで API を使うことを禁じています。Rise Path は未成年も使うため、Gemini は `GEMINI_ALLOWED=true` のときだけ使います。オフのあいだ、アップロードした資料はベクトルなしで保存され、キーワード検索で見つかります（Gemini を許可したあとで `node scripts/rag/reembed.mjs` を実行すると埋め込みを作れます）。`/api/v2/image` は 503（`error_type: image_generation_unavailable`）を返します。
+
+**OpenAI 互換のサーバー（セルフホスト）。** `OPENAI_BASE_URL`（と `OPENAI_API_KEY`、`OPENAI_MODEL`）を入れて、すべてのタスクなら `LLM_PROVIDER=openai`、一部なら `LLM_TASK_<TASK>=openai[:model]` で振り分けます。振り分けがなければ何も送りません（代わりに使われることもありません）。文章のタスクだけを受け持ちます。RAG の埋め込みと画像生成は Gemini のままなので、Gemini がオフなら上に書いたとおりです。effort（考える量）の設定は送りません。そのサービスと契約するのは運営者で、18 歳未満の決まりを含めて規約を守るのも運営者です（`doc/brushup-2026/ai-access-plan.ja.md` 14 章）。
 
 ---
 

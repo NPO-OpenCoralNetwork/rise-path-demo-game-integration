@@ -40,6 +40,14 @@ services:
       # Gemini API terms; only for deployments that people under 18 cannot reach).
       GEMINI_ALLOWED: ${GEMINI_ALLOWED:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # An OpenAI-compatible server (OpenAI, OpenRouter, a model server you run), used only when a
+      # route names it: LLM_PROVIDER=openai here, or an LLM_TASK_<TASK>=openai:<model> line you add
+      # (.env.example).
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_MAX_TOKENS_FIELD: ${OPENAI_MAX_TOKENS_FIELD:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
       NODE_ENV: production
       PORT: 3006
     depends_on:

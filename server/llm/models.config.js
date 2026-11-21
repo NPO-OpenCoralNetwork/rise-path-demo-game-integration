@@ -5,11 +5,16 @@
  * Routing per task:
  *   default table below (learner-facing tasks run on the cheap tier: Claude Haiku)
  *   ← LLM_TASK_<TASK>=provider[:model]   e.g. LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5
- *   ← LLM_PROVIDER=anthropic|gemini|mock (forces every task onto one provider)
+ *   ← LLM_PROVIDER=anthropic|gemini|openai|mock (forces every task onto one provider)
  *   ← request override (server code only; never taken from a request body)
  *
  * When the routed provider has no key, the gateway walks PROVIDER_FALLBACK_ORDER, then
  * falls back to `mock` outside production (LLM_MOCK_FALLBACK=false disables that).
+ *
+ * `openai` is any server with OpenAI's Chat Completions API (OpenAI, OpenRouter, a model server the
+ * operator runs), for self-hosting (doc/brushup-2026/ai-access-plan.ja.md 14 章 K3). The operator
+ * names its model (OPENAI_MODEL, or LLM_TASK_<TASK>=openai:<model>), so no model ID for it lives
+ * here. It serves only the tasks a route sends to it, never as a fallback.
  *
  * Gemini (chat, embeddings, image generation) is used only when GEMINI_ALLOWED is exactly
  * "true" (isGeminiAllowed). The Gemini API Additional Terms forbid services directed towards or
@@ -24,11 +29,11 @@
  */
 export const isGeminiAllowed = (env = process.env) => env?.GEMINI_ALLOWED === 'true';
 
-/** @typedef {'anthropic'|'gemini'|'mock'} ProviderId */
+/** @typedef {'anthropic'|'gemini'|'openai'|'mock'} ProviderId */
 /** @typedef {'authoring'|'general'|'cheap'} ModelTier */
 /** @typedef {'low'|'medium'|'high'|'xhigh'|'max'} Effort */
 
-export const PROVIDER_IDS = /** @type {const} */ (['anthropic', 'gemini', 'mock']);
+export const PROVIDER_IDS = /** @type {const} */ (['anthropic', 'gemini', 'openai', 'mock']);
 
 export const MODEL_IDS = Object.freeze({
   anthropic: Object.freeze({
@@ -63,6 +68,8 @@ export const OPENROUTER_IMAGE_MODEL_IDS = Object.freeze({
 const TIER_MODELS = Object.freeze({
   anthropic: { authoring: MODEL_IDS.anthropic.opus, general: MODEL_IDS.anthropic.sonnet, cheap: MODEL_IDS.anthropic.haiku },
   gemini: { authoring: MODEL_IDS.gemini.flash, general: MODEL_IDS.gemini.flash, cheap: MODEL_IDS.gemini.flashLite },
+  // Named by the operator (OPENAI_MODEL; resolveTaskRoute reads it), whatever the tier.
+  openai: { authoring: '', general: '', cheap: '' },
   mock: { authoring: MODEL_IDS.mock.default, general: MODEL_IDS.mock.default, cheap: MODEL_IDS.mock.default },
 });
 
@@ -77,7 +84,7 @@ export const ANTHROPIC_SERVER_FALLBACK_MODELS = new Set([MODEL_IDS.anthropic.opu
  * @typedef {Object} TaskConfig
  * @property {ModelTier} tier
  * @property {ProviderId} provider  default provider
- * @property {Effort} effort        Anthropic output_config.effort (Gemini maps it to thinkingLevel)
+ * @property {Effort} effort        Anthropic output_config.effort (Gemini maps it to thinkingLevel; not sent to openai)
  * @property {number} maxTokens     hard output ceiling; Anthropic thinking tokens count against it
  * @property {boolean} [stream]     long outputs: stream + finalMessage() even for non-streaming callers
  */
@@ -102,7 +109,10 @@ export const TASKS = Object.freeze({
   'course.generate': { tier: 'cheap', provider: 'anthropic', effort: 'low', maxTokens: 32000, stream: true },
 });
 
-/** Provider order tried when the routed provider is unconfigured or fails with a retryable error. */
+/**
+ * Provider order tried when the routed provider is unconfigured or fails with a retryable error.
+ * `openai` is not in it: learner text goes to an OpenAI-compatible server only where a route says so.
+ */
 export const PROVIDER_FALLBACK_ORDER = /** @type {const} */ (['anthropic', 'gemini']);
 
 /** @param {string} task */
@@ -117,6 +127,13 @@ export const isProviderId = (value) => typeof value === 'string' && /** @type {r
  * @param {ModelTier} tier
  */
 export const modelForTier = (provider, tier) => TIER_MODELS[provider][tier];
+
+/**
+ * The model an `openai` route asks for when it names none: OPENAI_MODEL ('' when unset; the gateway
+ * then skips the route).
+ * @param {Record<string, string | undefined>} env
+ */
+const openaiModel = (env) => (typeof env.OPENAI_MODEL === 'string' ? env.OPENAI_MODEL.trim() : '');
 
 /**
  * Parse "provider" or "provider:model".
@@ -136,7 +153,7 @@ export function parseProviderSpec(raw) {
  * @typedef {Object} TaskRoute
  * @property {string} task
  * @property {ProviderId} provider
- * @property {string} model
+ * @property {string} model           '' for an openai route with no model named (the gateway skips it)
  * @property {Effort} effort
  * @property {number} maxTokens
  * @property {boolean} stream
@@ -190,7 +207,7 @@ export function resolveTaskRoute(task, env, override = {}) {
   return {
     task,
     provider,
-    model: model || modelForTier(provider, config.tier),
+    model: model || (provider === 'openai' ? openaiModel(env) : modelForTier(provider, config.tier)),
     effort: override.effort || config.effort,
     maxTokens: override.maxTokens || config.maxTokens,
     stream: Boolean(config.stream),

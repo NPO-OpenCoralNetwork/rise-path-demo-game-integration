@@ -51,6 +51,7 @@ const SettingsApiKeyView: React.FC<SettingsApiKeyViewProps> = ({ onNavigate }) =
             providersTitle: 'Providers on this server',
             claude: 'Claude (Anthropic)',
             gemini: 'Gemini (Google)',
+            openai: 'OpenAI-compatible server',
             mock: 'Sample answers',
             configured: 'Configured',
             notConfigured: 'Not configured',
@@ -75,6 +76,7 @@ const SettingsApiKeyView: React.FC<SettingsApiKeyViewProps> = ({ onNavigate }) =
             providersTitle: 'このサーバーのプロバイダー',
             claude: 'Claude（Anthropic）',
             gemini: 'Gemini（Google）',
+            openai: 'OpenAI 互換のサーバー',
             mock: 'サンプル回答',
             configured: '設定済み',
             notConfigured: '未設定',
@@ -104,6 +106,8 @@ const SettingsApiKeyView: React.FC<SettingsApiKeyViewProps> = ({ onNavigate }) =
         ? [
             { key: 'anthropic', label: t.claude, active: status.providers.anthropic.configured, value: status.providers.anthropic.configured ? t.configured : t.notConfigured },
             { key: 'gemini', label: t.gemini, active: status.providers.gemini.configured, value: status.providers.gemini.configured ? t.configured : t.notConfigured },
+            // Self-hosting only: the row appears once the server has one.
+            ...(status.providers.openai?.configured ? [{ key: 'openai', label: t.openai, active: true, value: t.configured }] : []),
             { key: 'mock', label: t.mock, active: status.mock, value: status.mock ? t.on : t.offLabel },
         ]
         : [];

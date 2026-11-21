@@ -47,9 +47,9 @@
 - チューターなど「llm」枠の全体上限 1,500 回/日を Haiku で使い切ると、約 1 ドル/日です。
 - コース生成の全体上限 300 回/日（1 回は 1 段階）を Haiku で使い切ると、約 1.5 ドル/日です。
 - ゲストのチューター（全体 2,000 回/日、`server/llm/guestAccess.js:22-23`）を使い切ると、約 1.3 ドル/日です。
-- ただし、性格インサイトは中くらいのモデル（Sonnet 5.5）のままで、同じ「llm」枠を使います（`server/llm/models.config.js:95`）。枠がすべて性格インサイトに使われると、1 日の額はこれより大きくなります。【要確認: 性格インサイトも安いモデルにするか】
+- ただし、性格インサイトは中くらいのモデル（Sonnet 5.5）のままで、同じ「llm」枠を使います（`server/llm/models.config.js:102`）。枠がすべて性格インサイトに使われると、1 日の額はこれより大きくなります。【要確認: 性格インサイトも安いモデルにするか】
 
-まとめ: Sonnet から Haiku に替えると、ふつうの使い方で費用はおよそ 20 分の 1 になります。答えの質は下がる可能性があるので、いくつかのレッスンで試して確かめます。質が足りないタスクは、コードを変えずに `LLM_TASK_<タスク名>=anthropic:<モデル ID>` で戻せます（例: `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5`。`server/llm/models.config.js:109` と `:165-170`）。
+まとめ: Sonnet から Haiku に替えると、ふつうの使い方で費用はおよそ 20 分の 1 になります。答えの質は下がる可能性があるので、いくつかのレッスンで試して確かめます。質が足りないタスクは、コードを変えずに `LLM_TASK_<タスク名>=anthropic:<モデル ID>` で戻せます（例: `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5`。`server/llm/models.config.js:119` と `:182-187`）。
 
 ### 2.2 規約
 
@@ -73,7 +73,7 @@
 
 **Gemini を止めるスイッチ**
 
-- `GEMINI_ALLOWED` がちょうど `"true"` のときだけ Gemini を使います。未設定やほかの値なら、`GEMINI_API_KEY` があっても使いません（`server/llm/models.config.js:25`）。
+- `GEMINI_ALLOWED` がちょうど `"true"` のときだけ Gemini を使います。未設定やほかの値なら、`GEMINI_API_KEY` があっても使いません（`server/llm/models.config.js:30`）。
 - キーだけ設定されている場合は、AI の機能が最初に呼ばれたとき（AI の窓口を作るとき）に、ログに警告を出します（`server/llm/index.js`）。
 - 教材の埋め込み（意味検索）、画像生成も同じスイッチに従います（`tools/core/ragSearch.js:56`、`server/geminiBackendService.js:25`）。
 - off の間、アップロードした教材は文章だけ保存し、キーワード検索で探します（`server/ragService.js:121-129`、`:183-189`）。
@@ -81,8 +81,8 @@
 
 **安いモデルへの切り替え**
 
-- `tutor.chat`（AI チューター）と `writing.feedback`（作文フィードバック）を `cheap`（Claude Haiku 5.5）にしました（`server/llm/models.config.js:93-94`）。
-- 新しいタスク `course.generate`（`cheap`、`anthropic`、effort `low`、最大 32,000 トークン、ストリーム）を作り、コース生成の Gemini 直接呼び出しを置き換えました（`server/llm/models.config.js:102`、`server/services/aiGenerator.js:84`、`:268-283`）。プロンプトは JSON を 1 つだけ返すよう直しました（`server/services/aiPrompts.js`）。
+- `tutor.chat`（AI チューター）と `writing.feedback`（作文フィードバック）を `cheap`（Claude Haiku 5.5）にしました（`server/llm/models.config.js:100-101`）。
+- 新しいタスク `course.generate`（`cheap`、`anthropic`、effort `low`、最大 32,000 トークン、ストリーム）を作り、コース生成の Gemini 直接呼び出しを置き換えました（`server/llm/models.config.js:109`、`server/services/aiGenerator.js:84`、`:268-283`）。プロンプトは JSON を 1 つだけ返すよう直しました（`server/services/aiPrompts.js`）。
 - コース生成の失敗の扱いを、AI の窓口（ゲートウェイ）のエラーの種類で決めるようにしました。モデルが動く前の失敗なら、1 日の回数を返します（`server/routes/ai.js`）。
 
 **共有 Hermes を出さない**
@@ -112,7 +112,7 @@
 
 ### 3.2 変えていないこと
 
-- 性格インサイト（`assessment.insight`）は中くらいのモデル（Sonnet 5.5）のままです（`server/llm/models.config.js:95`）。
+- 性格インサイト（`assessment.insight`）は中くらいのモデル（Sonnet 5.5）のままです（`server/llm/models.config.js:102`）。
 - サーバーの `/api/v2/agent/chat` は残っています。`VITE_FEATURE_AGENT_CHAT=true` にして Hermes を動かさない限り使えません（`server.js:188-190`、`server/routes/agent.js`）。
 - 本番の MCP コンテナは管理者用の設定のままで、インターネットには出していません（`deploy/risepath-vm/docker-compose.yml:132`）。
 - Memanto（AI メモリ）は既定で止まったままです（`deploy/risepath-vm/stack.env.example:191`）。
@@ -155,8 +155,8 @@
 
 **確認（モデレーション）**
 
-- 18 歳未満の呼び出しには、子どもの安全の指示（`MINOR_SAFETY`）を最後に足します。キャッシュ（同じ指示文を安く再利用する仕組み）の対象にはしません（`server/llm/prompts/shared.js:63`、`server/llm/index.js:110-117`）。
-- 入力の確認: まずサーバーの中で、つらい気持ちの言葉と、携帯電話の番号・メールアドレス・住所を探します（`server/safety/prefilter.js`）。学習者が書いた文章は、送られてきたままの形と、プロンプトがデータを囲むタグ（チューターの 5 種類と、作文の `learner_text`）を外して AI に届く形の両方を調べます。そのため、これらのタグで電話番号や言葉を区切っても、タグの中に書いても見つけます（`server/safety/moderation.js:159-171`、`:386-392`）。ほかのタグや見えない文字、漢数字などで区切った書き方と、ブロックや問題の ID・レベルの 2 つの欄にまたがるタグ（学習者が入力する欄ではありません）は、Claude の確認に任せます。つらい気持ちの言葉は、本人のことと読める書き方（「死にたい」「虐待されていると思う」「I want to die」など）だけを探します。ほかの人のことや授業の話題として書いた文（「虐待されている子どもを助ける仕組み」「自殺を考える若者が増えている理由」など）や、ふだんのけが（「I cut myself while cooking」など）はここでは止めず、Claude の確認に任せます。住所は、丁目・番地・番か「1-2-3」の形、または「1-2」のあとに建物や部屋の言葉（「のマンション」「号室」など）や「に住んでいます」が続くときだけ止めます。「気温は20-25℃」「2-1で勝った」「第1-2問」のような範囲や点数は Claude に任せます。次に Claude の新しいタスク `safety.screen`（安いモデル、effort `low`、最大 2,048 トークン）で確かめます（`server/llm/models.config.js:99`、`server/safety/moderation.js:310-335`、`:356-429`）。チューターは、会話の履歴（12 件まで全部）やレッスンの本文もふくめ、送られてくる文章を全部まとめて、1 回の確認で確かめます（`server/safety/moderation.js:184-205`）。1 回の確認で読める長さ（8 万字）は、受け付けるいちばん長いリクエスト（チューターで約 6 万字）より長くしてあり、入力を分けて確かめることはしません。それより長い入力は、確認できないときと同じく止めます（`server/safety/moderation.js:48-55`、`:404-409`）。前に確認を通ったのとまったく同じリクエストだけは、もう一度は確かめません。一部でもちがえば、全部をまとめて確かめ直します（`server/safety/moderation.js:394-398`）。
+- 18 歳未満の呼び出しには、子どもの安全の指示（`MINOR_SAFETY`）を最後に足します。キャッシュ（同じ指示文を安く再利用する仕組み）の対象にはしません（`server/llm/prompts/shared.js:63`、`server/llm/index.js:115-122`）。
+- 入力の確認: まずサーバーの中で、つらい気持ちの言葉と、携帯電話の番号・メールアドレス・住所を探します（`server/safety/prefilter.js`）。学習者が書いた文章は、送られてきたままの形と、プロンプトがデータを囲むタグ（チューターの 5 種類と、作文の `learner_text`）を外して AI に届く形の両方を調べます。そのため、これらのタグで電話番号や言葉を区切っても、タグの中に書いても見つけます（`server/safety/moderation.js:159-171`、`:386-392`）。ほかのタグや見えない文字、漢数字などで区切った書き方と、ブロックや問題の ID・レベルの 2 つの欄にまたがるタグ（学習者が入力する欄ではありません）は、Claude の確認に任せます。つらい気持ちの言葉は、本人のことと読める書き方（「死にたい」「虐待されていると思う」「I want to die」など）だけを探します。ほかの人のことや授業の話題として書いた文（「虐待されている子どもを助ける仕組み」「自殺を考える若者が増えている理由」など）や、ふだんのけが（「I cut myself while cooking」など）はここでは止めず、Claude の確認に任せます。住所は、丁目・番地・番か「1-2-3」の形、または「1-2」のあとに建物や部屋の言葉（「のマンション」「号室」など）や「に住んでいます」が続くときだけ止めます。「気温は20-25℃」「2-1で勝った」「第1-2問」のような範囲や点数は Claude に任せます。次に Claude の新しいタスク `safety.screen`（安いモデル、effort `low`、最大 2,048 トークン）で確かめます（`server/llm/models.config.js:106`、`server/safety/moderation.js:310-335`、`:356-429`）。チューターは、会話の履歴（12 件まで全部）やレッスンの本文もふくめ、送られてくる文章を全部まとめて、1 回の確認で確かめます（`server/safety/moderation.js:184-205`）。1 回の確認で読める長さ（8 万字）は、受け付けるいちばん長いリクエスト（チューターで約 6 万字）より長くしてあり、入力を分けて確かめることはしません。それより長い入力は、確認できないときと同じく止めます（`server/safety/moderation.js:48-55`、`:404-409`）。前に確認を通ったのとまったく同じリクエストだけは、もう一度は確かめません。一部でもちがえば、全部をまとめて確かめ直します（`server/safety/moderation.js:394-398`）。
 - 答えの確認: チューターの答えは、18 歳未満には確認が終わってからまとめて届けます。作文フィードバック、性格インサイト、コース生成は、返す前・保存する前に確かめます（`server/routes/llm.js:107-159`、`:267-283`、`server/services/aiGenerator.js:78-81`）。
 - 確認の AI への渡し方: Claude には、メインの AI が読む文章（入力）と、学習者に見せる答えを、全部渡します。学習者が書いた部分はメインの AI に届く形（プロンプトが外すタグを外した形）、そのほかの部分は送られてきたままの形で、囲むときに削るものはありません。文章を囲むタグの名前は、呼び出しのたびに変わる乱数入りの名前（`screened_text_` と 12 けたの 16 進数）にして、文章の中にない名前を選びます。そのため、文章の中に `<screened_text …>` のようなタグを書いても、その部分は Claude にも届き、囲みを途中で閉じることもできません（`server/safety/moderation.js:285-335`）。
 - 確認できないとき（エラー、確認の AI が断った、本番で模擬の AI に回った、1 回の確認に入らないほど長い入力）は、18 歳未満の AI を止めます（`server/safety/moderation.js:310-335`、`:400-418`）。
@@ -1154,8 +1154,8 @@ Rise Path のコードは公開しているので（Apache-2.0）、団体が動
 ### 14.1 決めたこと（K1–K3、2026-11-21）
 
 - **K1 クラウド版の AI**: 団体が AI の会社と契約し、団体の鍵で、AI の窓口から呼びます。窓口は、Rise Path の AI の機能（チューター、作文のフィードバック、コースの生成など）の裏側にだけ使います。有料プランで売るのも、機能を 1 日に使える回数です（7 章）。外の人が好きな文を送って AI を呼べる API（OpenRouter のような形）としては出しません。これは AI のモデルの転売にあたり（15 章）、Anthropic の商用規約 D.4 は、承認のない転売を禁じています（2.2）。
-- **K2 クラウド版の Gemini**: 18 歳未満が使う環境（今の公開の環境）では使いません（1 章の 4）。使えるのは、18 歳未満が使えない別の環境だけで、その環境でだけ `GEMINI_ALLOWED=true` にします（`server/llm/models.config.js:14-17`）。1 つの環境の中で、一部の人や団体にだけ Gemini を使う形はとりません。Gemini API の規約が禁じている、「18 歳未満の個人がアクセスする可能性のある」サービスの一部にあたりうるからです。間に OpenRouter や Google Cloud（Vertex AI）をはさんでも、同じ決まりがかかります（14.2）。Gemini を使うときは、有料の枠で使います。無料の枠では、送った文と答えを Google が改良に使い、人が読むことがあるからです（14.2）。職業訓練の学校の環境では、訓練の画面に初めは AI 先生を付けず（[training-plan.ja.md](./training-plan.ja.md) の D6）、モデルの鍵も既定のまま入れません（同 4.7）。学校の環境で Gemini を使うかは、AI を付けるときに決めます。
-- **K3 セルフホスト版の AI**: 運営する人が、自分で AI の会社と契約し、鍵をサーバーの環境変数に入れます（`.env.example` の「LLM gateway」の節）。鍵をブラウザのコード（`VITE_*` の変数）に置く形は作りません（`AGENTS.md` の Don'ts）。運営する人が API の契約者になるので、Gemini の年齢の決まりなど、各社の規約を守る責任も、運営する人にあります。`GEMINI_ALLOWED` は、既定でオフのままにします。今つなげる会社は Anthropic と Gemini だけなので（`server/llm/providers/`）、OpenAI 互換のつなぎ口を 1 つ足します。URL と鍵とモデル名で、OpenAI、OpenRouter、自分で動かすモデルなどを選べるようにします。コードはこれからです（14.3）。
+- **K2 クラウド版の Gemini**: 18 歳未満が使う環境（今の公開の環境）では使いません（1 章の 4）。使えるのは、18 歳未満が使えない別の環境だけで、その環境でだけ `GEMINI_ALLOWED=true` にします（`server/llm/models.config.js:19-22`）。1 つの環境の中で、一部の人や団体にだけ Gemini を使う形はとりません。Gemini API の規約が禁じている、「18 歳未満の個人がアクセスする可能性のある」サービスの一部にあたりうるからです。間に OpenRouter や Google Cloud（Vertex AI）をはさんでも、同じ決まりがかかります（14.2）。Gemini を使うときは、有料の枠で使います。無料の枠では、送った文と答えを Google が改良に使い、人が読むことがあるからです（14.2）。職業訓練の学校の環境では、訓練の画面に初めは AI 先生を付けず（[training-plan.ja.md](./training-plan.ja.md) の D6）、モデルの鍵も既定のまま入れません（同 4.7）。学校の環境で Gemini を使うかは、AI を付けるときに決めます。
+- **K3 セルフホスト版の AI**: 運営する人が、自分で AI の会社と契約し、鍵をサーバーの環境変数に入れます（`.env.example` の「LLM gateway」の節）。鍵をブラウザのコード（`VITE_*` の変数）に置く形は作りません（`AGENTS.md` の Don'ts）。運営する人が API の契約者になるので、Gemini の年齢の決まりなど、各社の規約を守る責任も、運営する人にあります。`GEMINI_ALLOWED` は、既定でオフのままにします。Anthropic と Gemini のほかに、OpenAI 互換のつなぎ口を 1 つ足しました（`server/llm/providers/openaiCompatible.js`）。URL と鍵とモデル名（`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`）で、OpenAI、OpenRouter、自分で動かすモデルなどを選べます。使うのは、振り分け（`LLM_PROVIDER=openai` か `LLM_TASK_<TASK>=openai`）で指したタスクだけです。ほかの会社につながらないときの代わりには使いません（14.3）。
 
 ### 14.2 確かめた規約（2026-11-21）
 
@@ -1166,7 +1166,8 @@ Rise Path のコードは公開しているので（Apache-2.0）、団体が動
 
 ### 14.3 残っていること
 
-- OpenAI 互換のつなぎ口（K3）を作ります。作るときに、次を決めます。教材の検索の埋め込みも、OpenAI 互換で選べるようにするか（今は Gemini だけで、Gemini を使わない環境ではキーワードで探します。`tools/core/ragSearch.js:17-20`）。画像の生成（今は Gemini だけ。`server/llm/models.config.js:14`）をどうするか。今の窓口は Anthropic の設定（effort など。`server/llm/models.config.js:80`）に合わせてあるので、ほかのモデルでどこまで同じに動くかを試します。
+- OpenAI 互換のつなぎ口（K3）は、文章のタスク（チューター、作文のフィードバック、コースの生成など）だけを受け持ちます（2026-11-21、オーナーがおすすめの範囲で進めると決めました）。教材の検索の埋め込みは、今のまま Gemini だけです。Gemini を使わない環境では、キーワードで探します（`tools/core/ragSearch.js:17-20`）。OpenAI 互換の埋め込みを足すなら、別の変更にして、DB に入っているベクトルの長さと合うかを先に調べます。画像の生成も、Gemini だけのままです。effort（考える量）の設定は送りません。受け付けないモデルやサーバーがあるからです。クラウド版では使いません。本番の前の確認（C4、`scripts/deploy/preflight-rules.mjs`）が、Anthropic 以外への振り分けを止めます。GPT をクラウド版で使うかは、OpenAI の未成年の決まりを確かめてから決めます（16 章）。
+- OpenAI 互換のつなぎ口は、テストの中の代わりのサーバー（`server/tests/llmOpenAICompatible.test.js`）と、手元で動かした Ollama（0.40.11）と llama.cpp のサーバーで確かめました（2026-11-21。小さいモデル qwen2.5:0.5b で、文の生成、少しずつの表示、JSON の形の答え、出力の上限）。Ollama は `max_completion_tokens` を読まないので、`OPENAI_MAX_TOKENS_FIELD=max_tokens` が要ります（読まないと、上限なしで答えます）。OpenAI や OpenRouter のサービスには、まだつないでいません。チューターや作文のフィードバックの答えが、Claude のときとどこまで同じ質になるかも、まだ試していません。今の窓口の指示や上限は、Claude に合わせてあるからです。
 - クラウド版を、ほかの団体にも出すかは決めていません。出すなら、団体ごとの上限と請求（今の 1 日の上限は、人・IP・全体ごとです。`server/middleware/dailyCaps.js`）と、ほかの団体の利用者の個人の情報を預かる取り決めが要ります。
 - AI の窓口と AI の会社のあいだに OpenRouter などをはさむときは、データの送り先の一覧（[../legal/ai-data-inventory.ja.md](../legal/ai-data-inventory.ja.md)）と、未成年の安全対策（4 章）を見直します。
 - まだ確かめていないこと（職業訓練の受講者に 18 歳未満が入りうるか、GPT を足すときの OpenAI の決まり）は、16 章にあります。

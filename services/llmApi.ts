@@ -89,7 +89,7 @@ const postJson = async <T>(path: string, body: unknown, signal?: AbortSignal): P
 // --- Status ---------------------------------------------------------------------
 
 export interface LlmTaskStatus {
-  provider: 'anthropic' | 'gemini' | 'mock' | null;
+  provider: 'anthropic' | 'gemini' | 'openai' | 'mock' | null;
   model: string | null;
   effort: string;
   fallback: string[];
@@ -103,6 +103,8 @@ export interface LlmStatus {
   providers: {
     anthropic: { configured: boolean };
     gemini: { configured: boolean };
+    /** An OpenAI-compatible server (self-hosting). Missing from an API older than the page. */
+    openai?: { configured: boolean };
     mock: { available: boolean; forced: boolean };
   };
   tasks: Record<string, LlmTaskStatus>;
