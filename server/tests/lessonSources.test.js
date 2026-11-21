@@ -31,6 +31,7 @@ import {
 } from '../../components/lesson/model.ts';
 import {
   BAR_EXTRA_PROPERTY,
+  BLOCK_FOCUS_TARGETS,
   READER_SCROLL_OFFSET,
   offsetInContainer,
   restoreOffsetInContainer,
@@ -564,14 +565,14 @@ describe('BlockSources: one block’s sources (under the tutor’s 質問した�
   /** @param {any} el @param {string} name */
   const byClass = (el, name) => elements(el).find((child) => classesOf(child).includes(name));
 
-  it('lists them by their numbers in the lesson, as a list named by its label', () => {
+  it('lists them by their numbers in the lesson, under a label read as text', () => {
     const tree = renderBlockSources(cited);
     const label = byClass(tree, 'rp-block-sources-label');
     const ol = elements(tree).find((el) => el.type === 'ol');
     assert.equal(textOf(label), 'この場所の出典');
-    assert.ok(label.props.id, 'the label has an id');
-    assert.equal(ol.props['aria-labelledby'], label.props.id);
-    assert.equal(label.props['aria-hidden'], 'true', 'read once, as the list’s name');
+    assert.equal(label.type, 'p');
+    assert.equal(label.props['aria-hidden'], undefined, 'screen readers that never announce a list’s name still hear it');
+    assert.equal(ol.props['aria-labelledby'], undefined, 'and others do not hear it twice');
     assert.equal(ol.props.role, 'list');
     const items = elements(tree).filter((el) => el.type === 'li');
     assert.deepEqual(items.map((li) => textOf(byClass(li, 'rp-block-sources-n'))), ['1', '2', '3', '4']);
@@ -652,14 +653,9 @@ describe('wiring: the block frame, the reader context and the reader', () => {
   });
 
   it('a jump to a block (the glossary’s 本文で見る, the tutor’s chip) does not put the focus on its source numbers', () => {
-    const src = readFile('components/lesson/LessonReader.tsx');
-    const start = src.indexOf('const scrollToBlock = useCallback');
-    assert.ok(start > 0);
-    const body = src.slice(start, src.indexOf('}, [scrollToElement]);', start));
-    const selector = /querySelector<HTMLElement>\('([^']+)'\)/.exec(body)?.[1] ?? '';
-    const parts = selector.split(',').map((part) => part.trim());
-    assert.ok(parts.includes('a[href]:not(.rp-cite-num)'), selector);
-    assert.ok(!parts.includes('a[href]'), selector);
+    const parts = BLOCK_FOCUS_TARGETS.split(',').map((part) => part.trim());
+    assert.ok(parts.includes('a[href]:not(.rp-cite-num)'), BLOCK_FOCUS_TARGETS);
+    assert.ok(!parts.includes('a[href]'), BLOCK_FOCUS_TARGETS);
   });
 
   it('nothing in the sources UI depends on the AI tutor', () => {

@@ -2169,10 +2169,13 @@
 
   .rp-block-sources-item {
     display: grid;
-    grid-template-columns: 1.5em minmax(0, 1fr);
+    grid-template-columns: 2em minmax(0, 1fr);
   }
 
+  /* Room for two digits (source 10, 11 …) before the title, as in the lesson's list. */
   .rp-block-sources-n {
+    padding-right: 6px;
+    text-align: right;
     font-weight: 700;
     color: var(--rp-fg-3);
   }

@@ -105,6 +105,21 @@ export function focusForVisit(el: HTMLElement): void {
   el.focus({ preventScroll: true });
 }
 
+/** What a jump to a block focuses first: its own controls, never the source numbers under it (CiteMarks). */
+export const BLOCK_FOCUS_TARGETS = 'h3, [tabindex], button, a[href]:not(.rp-cite-num), input';
+
+/**
+ * Moves the focus into a block after a jump (本文で見る, the tutor's chip): its first control that
+ * takes the focus, else the block itself (focusForVisit). A card's <h3> without a tabindex matches
+ * first and takes nothing, so the focus would stay on whatever asked for the jump, or fall to
+ * <body>.
+ */
+export function focusBlock(el: HTMLElement): void {
+  const target = el.querySelector<HTMLElement>(BLOCK_FOCUS_TARGETS);
+  target?.focus({ preventScroll: true });
+  if (!target || el.ownerDocument.activeElement !== target) focusForVisit(el);
+}
+
 /**
  * Resolves the scroll container for a mounted element. Returns null on the first render.
  */

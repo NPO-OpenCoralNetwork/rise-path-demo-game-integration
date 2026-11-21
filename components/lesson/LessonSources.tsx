@@ -188,13 +188,13 @@ export function SourceTitle({ source }: { source: LessonSource }) {
  */
 export function BlockSources({ sources }: { sources: readonly LessonSource[] }) {
   const { language } = useLanguage();
-  const labelId = useId();
   if (sources.length === 0) return null;
   return (
     <div className="rp-block-sources">
-      {/* Read once, as the list's name (not again as text), as CiteMarks hides its label. */}
-      <p id={labelId} className="rp-block-sources-label" aria-hidden="true">{copy[language].blockSources}</p>
-      <ol className="rp-block-sources-list" role="list" aria-labelledby={labelId}>
+      {/* Read as text before the list. Not the list's name as well: some screen readers (NVDA's
+          browse mode, TalkBack) never announce a list's name, and others would read it twice. */}
+      <p className="rp-block-sources-label">{copy[language].blockSources}</p>
+      <ol className="rp-block-sources-list" role="list">
         {sources.map((source) => (
           <li key={source.id} className="rp-block-sources-item">
             <span className="rp-block-sources-n tabular">{source.n}</span>

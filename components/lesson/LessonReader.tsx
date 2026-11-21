@@ -9,7 +9,7 @@ import { streamTutor, toLlmLocale } from '../../services/llmApi';
 import type { LessonEntry } from '../../content';
 import { ReaderContext, type AskTutorArgs, type ReaderContextValue } from './ReaderContext';
 import { useLessonProgress } from './useLessonProgress';
-import { focusForVisit, scrollElementIntoContainer, useScrollContainer, READER_SCROLL_OFFSET } from './useScrollContainer';
+import { focusBlock, scrollElementIntoContainer, useScrollContainer, READER_SCROLL_OFFSET } from './useScrollContainer';
 import {
   blockPlainText,
   checkNumbers,
@@ -273,12 +273,8 @@ export default function LessonReader({ course, courseSlug, lesson, backTo, entry
     if (!el) return;
     jumpedAt.current = Date.now();
     scrollToElement(el);
-    // Not the source numbers under the block (CiteMarks): the learner came to read the block. A
-    // block with nothing else to focus (a definitions list) takes the focus itself
-    // (focusForVisit), instead of letting it fall to <body>.
-    const focusable = el.querySelector<HTMLElement>('h3, [tabindex], button, a[href]:not(.rp-cite-num), input');
-    if (focusable) focusable.focus({ preventScroll: true });
-    else focusForVisit(el);
+    // Its first control that takes the focus (not the source numbers under it), else the block itself.
+    focusBlock(el);
   }, [scrollToElement]);
 
   useEffect(() => {

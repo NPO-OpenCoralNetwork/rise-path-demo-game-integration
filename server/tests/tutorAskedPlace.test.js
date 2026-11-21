@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { askedPlace, askedPlaces } from '../../components/lesson/model.ts';
-import { focusForVisit } from '../../components/lesson/useScrollContainer.ts';
+import { BLOCK_FOCUS_TARGETS, focusBlock, focusForVisit } from '../../components/lesson/useScrollContainer.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** @param {string} rel */
@@ -142,6 +142,63 @@ describe('focusForVisit: a block with nothing to focus takes the focus itself', 
   });
 });
 
+describe('focusBlock: after a jump, the block’s first control that takes the focus, else the block', () => {
+  /**
+   * A block whose first match for BLOCK_FOCUS_TARGETS is `target` (or nothing). `takes`: whether the
+   * target takes the focus (a button does; an <h3> without a tabindex does not).
+   * @param {{ target?: boolean, takes?: boolean }} [options]
+   */
+  function fakeBlock({ target = true, takes = true } = {}) {
+    const doc = { activeElement: /** @type {any} */ (null) };
+    /** @type {any[]} */
+    const log = [];
+    const attributes = new Map();
+    const control = {
+      focus: (/** @type {any} */ options) => {
+        log.push(['control.focus', options]);
+        if (takes) doc.activeElement = control;
+      },
+    };
+    const block = {
+      ownerDocument: doc,
+      querySelector: (/** @type {string} */ selector) => {
+        log.push(['query', selector]);
+        return target ? control : null;
+      },
+      hasAttribute: (/** @type {string} */ name) => attributes.has(name),
+      setAttribute: (/** @type {string} */ name, /** @type {string} */ value) => attributes.set(name, value),
+      focus: (/** @type {any} */ options) => {
+        log.push(['block.focus', options]);
+        doc.activeElement = block;
+      },
+    };
+    return { block, control, doc, log, attributes };
+  }
+
+  it('focuses the first control that takes the focus, and leaves the block alone', () => {
+    const page = fakeBlock();
+    focusBlock(/** @type {any} */ (page.block));
+    assert.deepEqual(page.log, [['query', BLOCK_FOCUS_TARGETS], ['control.focus', { preventScroll: true }]]);
+    assert.equal(page.doc.activeElement, page.control);
+    assert.equal(page.attributes.has('tabindex'), false);
+  });
+
+  it('focuses the block when the first match takes nothing (a card’s <h3>), so the focus does not stay on the chip', () => {
+    const page = fakeBlock({ takes: false });
+    focusBlock(/** @type {any} */ (page.block));
+    assert.deepEqual(page.log.slice(1), [['control.focus', { preventScroll: true }], ['block.focus', { preventScroll: true }]]);
+    assert.equal(page.doc.activeElement, page.block);
+    assert.equal(page.attributes.get('tabindex'), '-1');
+  });
+
+  it('focuses the block when it has nothing to focus (a definitions list)', () => {
+    const page = fakeBlock({ target: false });
+    focusBlock(/** @type {any} */ (page.block));
+    assert.deepEqual(page.log.slice(1), [['block.focus', { preventScroll: true }]]);
+    assert.equal(page.doc.activeElement, page.block);
+  });
+});
+
 describe('wiring: the tutor panel and the reader', () => {
   const panel = readFile('components/lesson/TutorPanel.tsx');
   const reader = readFile('components/lesson/LessonReader.tsx');
@@ -181,7 +238,8 @@ describe('wiring: the tutor panel and the reader', () => {
     assert.doesNotMatch(reader, /onShowSource|showTutorSource/);
     const start = reader.indexOf('const scrollToBlock = useCallback');
     const body = reader.slice(start, reader.indexOf('}, [scrollToElement]);', start));
-    assert.match(body, /if \(focusable\) focusable\.focus\(\{ preventScroll: true \}\);\s*else focusForVisit\(el\);/);
+    assert.match(body, /scrollToElement\(el\);\s*(\/\/[^\n]*\n\s*)*focusBlock\(el\);/);
+    assert.doesNotMatch(body, /querySelector/, 'the focus target is focusBlock’s (tested above)');
   });
 });
 
@@ -197,6 +255,7 @@ describe('reader.css: the focused block and one block’s sources', () => {
     const part = css.slice(css.indexOf('.rp-block-sources {'), css.indexOf('End of lesson'));
     assert.ok(part.length > 0);
     assert.match(part, /\.rp-block-sources-list \{[^}]*list-style: none;/);
+    assert.match(part, /\.rp-block-sources-item \{\s*display: grid;\s*grid-template-columns: 2em minmax\(0, 1fr\);/, 'room for two digits');
     assert.doesNotMatch(part, /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
   });
 });
