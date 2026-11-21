@@ -80,8 +80,15 @@ export function MarginPanel({ asked, current, glossary, selectedTerm, onSelectTe
                 type="button"
                 className="rp-link-btn"
                 onClick={() => {
-                  scrollToBlock(selectedTerm.blockId!);
-                  onDone?.();
+                  const blockId = selectedTerm.blockId!;
+                  if (!onDone) {
+                    scrollToBlock(blockId);
+                    return;
+                  }
+                  // In a sheet: let it close (and return focus) before moving the focus to the
+                  // block, as the outline does; otherwise the focus goes back to the term.
+                  onDone();
+                  window.requestAnimationFrame(() => scrollToBlock(blockId));
                 }}
               >
                 <CornerDownRight size={14} aria-hidden="true" />{text.showInText}

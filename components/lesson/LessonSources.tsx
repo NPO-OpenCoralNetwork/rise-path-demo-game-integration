@@ -9,6 +9,7 @@ import {
   sourceAnchorId,
   sourceHost,
   sourceHref,
+  type LessonSource,
   type LessonSourceList,
 } from './model';
 import type { SourceTarget } from './useSourceJump';
@@ -24,10 +25,13 @@ import type { SourceTarget } from './useSourceJump';
  *   link in a new tab when the URL is http(s)), publisher, host and the day it was checked. The
  *   source the learner came to is marked and offers the way back to where they were reading.
  *   Its state (open, the jump, the way back) is useSourceJump's.
+ * - BlockSources: the sources one block cites, as a short numbered list (step 6: the AI tutor
+ *   shows it under 「質問した場所」). SourceTitle, the title as a new-tab link when the URL is
+ *   http(s), serves both lists.
  *
  * Sources are numbered in the order the lesson first cites them (lessonSources in model.ts). The
- * AI tutor plays no part here, so a screen that reuses the blocks without it (training plan §4.6)
- * keeps the sources.
+ * AI tutor plays no part here (it uses BlockSources, not the other way round), so a screen that
+ * reuses the blocks without it (training plan §4.6) keeps the sources.
  */
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -43,6 +47,7 @@ const copy = {
     checkedRaw: (raw: string) => `Checked: ${raw}`,
     newTab: '(opens in a new tab)',
     back: 'Back to where you were reading',
+    blockSources: 'Sources for this part',
   },
   jp: {
     cite: (_count: number) => '出典',
@@ -54,6 +59,7 @@ const copy = {
     checkedRaw: (raw: string) => `確認：${raw}`,
     newTab: '（新しいタブで開きます）',
     back: '読んでいた場所に戻る',
+    blockSources: 'この場所の出典',
   },
 } as const;
 
@@ -133,15 +139,7 @@ export function LessonSources({ sources, open, onToggle, target, onBack }: Lesso
               >
                 <span className="rp-sources-n tabular">{source.n}</span>
                 <span className="rp-sources-body">
-                  {href ? (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="rp-sources-link">
-                      {source.title}
-                      <ExternalLink size={13} aria-hidden="true" />
-                      <span className="sr-only"> {text.newTab}</span>
-                    </a>
-                  ) : (
-                    <span className="rp-sources-title">{source.title}</span>
-                  )}
+                  <SourceTitle source={source} />
                   {meta.length > 0 ? (
                     <span className="rp-sources-meta">
                       {/* Each part wraps as a whole (a phone broke 「2026年10月20日｜に確認」), and the
@@ -167,5 +165,46 @@ export function LessonSources({ sources, open, onToggle, target, onBack }: Lesso
         </ol>
       </details>
     </section>
+  );
+}
+
+/** A source's title: a link that opens in a new tab when its URL is http(s), else plain text. */
+export function SourceTitle({ source }: { source: LessonSource }) {
+  const { language } = useLanguage();
+  const href = sourceHref(source.url);
+  if (!href) return <span className="rp-sources-title">{source.title}</span>;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="rp-sources-link">
+      {source.title}
+      <ExternalLink size={13} aria-hidden="true" />
+      <span className="sr-only"> {copy[language].newTab}</span>
+    </a>
+  );
+}
+
+/**
+ * The sources one block cites (citedSources), numbered as in the list, with their publishers.
+ * Nothing when the block cites none.
+ */
+export function BlockSources({ sources }: { sources: readonly LessonSource[] }) {
+  const { language } = useLanguage();
+  if (sources.length === 0) return null;
+  return (
+    <div className="rp-block-sources">
+      {/* Read as text before the list. Not the list's name as well: some screen readers (NVDA's
+          browse mode, TalkBack) never announce a list's name, and others would read it twice. */}
+      <p className="rp-block-sources-label">{copy[language].blockSources}</p>
+      <ol className="rp-block-sources-list" role="list">
+        {sources.map((source) => (
+          <li key={source.id} className="rp-block-sources-item">
+            <span className="rp-block-sources-n tabular">{source.n}</span>
+            <span>
+              <SourceTitle source={source} />
+              {source.publisher ? <span className="rp-block-sources-meta">{` · ${source.publisher}`}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

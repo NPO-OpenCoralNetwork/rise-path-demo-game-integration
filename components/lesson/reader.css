@@ -808,6 +808,18 @@
     margin-top: 24px;
   }
 
+  /* A jump to a block with nothing else to focus focuses the frame itself (focusForVisit), like
+     the section headings: a ring only for the keyboard. */
+  .rp-block:focus {
+    outline: none;
+  }
+
+  .rp-block:focus-visible {
+    outline: 2px solid var(--rp-focus);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+
   /* Prose blocks read as one flow: tighter rhythm between consecutive paragraphs. */
   .rp-block[data-block-type="markdown"] + .rp-block[data-block-type="markdown"] {
     margin-top: 16px;
@@ -2128,6 +2140,48 @@
     .rp-sources-back {
       display: none;
     }
+  }
+
+  /* One block's sources (BlockSources), under the tutor's 「質問した場所」 (出典と検索 6). The
+     titles keep the list's .rp-sources-link / .rp-sources-title. */
+  .rp-block-sources {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--rp-fg-2);
+  }
+
+  .rp-block-sources-label {
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-block-sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rp-block-sources-item {
+    display: grid;
+    grid-template-columns: 2em minmax(0, 1fr);
+  }
+
+  /* Room for two digits (source 10, 11 …) before the title, as in the lesson's list. */
+  .rp-block-sources-n {
+    padding-right: 6px;
+    text-align: right;
+    font-weight: 700;
+    color: var(--rp-fg-3);
+  }
+
+  .rp-block-sources-meta {
+    color: var(--rp-fg-3);
   }
 
   /* ---------------------------------------------------------------------------------------

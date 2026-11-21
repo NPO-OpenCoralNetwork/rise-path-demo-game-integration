@@ -31,6 +31,7 @@ import {
 } from '../../components/lesson/model.ts';
 import {
   BAR_EXTRA_PROPERTY,
+  BLOCK_FOCUS_TARGETS,
   READER_SCROLL_OFFSET,
   offsetInContainer,
   restoreOffsetInContainer,
@@ -352,7 +353,7 @@ let ui = null;
 /** @type {any} */
 let hooks = null;
 before(async () => {
-  const code = await bundleUi("export { CiteMarks, LessonSources } from './components/lesson/LessonSources';");
+  const code = await bundleUi("export { BlockSources, CiteMarks, LessonSources, SourceTitle } from './components/lesson/LessonSources';");
   ui = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
   const hookCode = await bundleUi("export { useSourceJump } from './components/lesson/useSourceJump';", HOOK_STUBS);
   hooks = await import(`data:text/javascript;base64,${Buffer.from(hookCode).toString('base64')}`);
@@ -544,6 +545,80 @@ describe('LessonSources: the folded list at the end of the lesson', () => {
   });
 });
 
+/**
+ * @param {readonly any[]} sources
+ * @param {{ language?: 'jp' | 'en' }} [options]
+ */
+function renderBlockSources(sources, { language = 'jp' } = {}) {
+  Object.assign(globalThis, { __language: language });
+  try {
+    return expand(ui.BlockSources({ sources }));
+  } finally {
+    // @ts-ignore test globals
+    delete globalThis.__language;
+  }
+}
+
+describe('BlockSources: one block’s sources (under the tutor’s 質問した場所, step 6)', () => {
+  const list = lessonSources(LIST_LESSON);
+  const cited = citedSources(LIST_LESSON.sections[0].blocks[0], list);
+  /** @param {any} el @param {string} name */
+  const byClass = (el, name) => elements(el).find((child) => classesOf(child).includes(name));
+
+  it('lists them by their numbers in the lesson, under a label read as text', () => {
+    const tree = renderBlockSources(cited);
+    const label = byClass(tree, 'rp-block-sources-label');
+    const ol = elements(tree).find((el) => el.type === 'ol');
+    assert.equal(textOf(label), 'この場所の出典');
+    assert.equal(label.type, 'p');
+    assert.equal(label.props['aria-hidden'], undefined, 'screen readers that never announce a list’s name still hear it');
+    assert.equal(ol.props['aria-labelledby'], undefined, 'and others do not hear it twice');
+    assert.equal(ol.props.role, 'list');
+    const items = elements(tree).filter((el) => el.type === 'li');
+    assert.deepEqual(items.map((li) => textOf(byClass(li, 'rp-block-sources-n'))), ['1', '2', '3', '4']);
+    assert.equal(textOf(byClass(renderBlockSources(cited, { language: 'en' }), 'rp-block-sources-label')), 'Sources for this part');
+  });
+
+  it('links an http(s) source in a new tab as the list does, shows other titles as text, with the publisher', () => {
+    const items = elements(renderBlockSources(cited)).filter((el) => el.type === 'li');
+    const links = items.map((li) => elements(li).filter((el) => el.type === 'a'));
+    assert.equal(links[0].length, 1);
+    assert.equal(links[0][0].props.href, 'https://code.claude.com/docs/en/quickstart');
+    assert.equal(links[0][0].props.target, '_blank');
+    assert.equal(links[0][0].props.rel, 'noopener noreferrer');
+    assert.equal(textOf(links[0][0]), 'Quickstart （新しいタブで開きます）');
+    for (const none of links.slice(1)) assert.equal(none.length, 0, 'javascript:, relative and missing URLs are not links');
+    assert.equal(textOf(byClass(items[0], 'rp-block-sources-meta')), ' · Anthropic');
+    assert.equal(textOf(byClass(items[1], 'rp-block-sources-meta')), ' · Nobody');
+    assert.equal(byClass(items[3], 'rp-block-sources-meta'), undefined, 'no publisher, no dot');
+  });
+
+  it('shows the sources it is given, keeping their numbers, and nothing for none', () => {
+    const one = citedSources(md('x', ['relative']), list);
+    const items = elements(renderBlockSources(one)).filter((el) => el.type === 'li');
+    assert.equal(items.length, 1);
+    assert.equal(textOf(items[0]), '3A relative link');
+    assert.equal(renderBlockSources([]), null);
+  });
+
+  it('SourceTitle: the same title for both lists (link or text)', () => {
+    Object.assign(globalThis, { __language: 'en' });
+    try {
+      const link = expand(ui.SourceTitle({ source: list.items[0] }));
+      assert.equal(link.type, 'a');
+      assert.deepEqual(classesOf(link), ['rp-sources-link']);
+      assert.equal(textOf(link), 'Quickstart (opens in a new tab)');
+      const plain = expand(ui.SourceTitle({ source: list.items[1] }));
+      assert.equal(plain.type, 'span');
+      assert.deepEqual(classesOf(plain), ['rp-sources-title']);
+      assert.equal(textOf(plain), 'A script link');
+    } finally {
+      // @ts-ignore test globals
+      delete globalThis.__language;
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------------------------------
@@ -578,14 +653,9 @@ describe('wiring: the block frame, the reader context and the reader', () => {
   });
 
   it('a jump to a block (the glossary’s 本文で見る, the tutor’s chip) does not put the focus on its source numbers', () => {
-    const src = readFile('components/lesson/LessonReader.tsx');
-    const start = src.indexOf('const scrollToBlock = useCallback');
-    assert.ok(start > 0);
-    const body = src.slice(start, src.indexOf('}, [scrollToElement]);', start));
-    const selector = /querySelector<HTMLElement>\('([^']+)'\)/.exec(body)?.[1] ?? '';
-    const parts = selector.split(',').map((part) => part.trim());
-    assert.ok(parts.includes('a[href]:not(.rp-cite-num)'), selector);
-    assert.ok(!parts.includes('a[href]'), selector);
+    const parts = BLOCK_FOCUS_TARGETS.split(',').map((part) => part.trim());
+    assert.ok(parts.includes('a[href]:not(.rp-cite-num)'), BLOCK_FOCUS_TARGETS);
+    assert.ok(!parts.includes('a[href]'), BLOCK_FOCUS_TARGETS);
   });
 
   it('nothing in the sources UI depends on the AI tutor', () => {
