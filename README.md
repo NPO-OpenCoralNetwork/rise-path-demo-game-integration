@@ -166,8 +166,14 @@ Every model call goes through the server gateway in `server/llm/`; the browser n
 | `ANTHROPIC_API_KEY` | Enables the Anthropic provider (the default for every task) |
 | `GEMINI_ALLOWED` | Gemini (chat, RAG embeddings, image generation) is used only when this is exactly `true`. Unset or anything else is off, even when a Gemini key is set (the server logs a warning). Only for deployments that people under 18 cannot reach |
 | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Enables the Gemini provider, RAG embeddings and image generation when `GEMINI_ALLOWED=true` |
-| `LLM_PROVIDER` | Forces every task onto one provider: `anthropic`, `gemini` or `mock` |
-| `LLM_TASK_<TASK>` | Per-task route, `provider[:model]`, e.g. `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` |
+| `OPENAI_BASE_URL` | An OpenAI-compatible server (Chat Completions API), e.g. `https://api.openai.com/v1`, `https://openrouter.ai/api/v1`, or a model server you run. Used only by the tasks a route sends to `openai` (below) |
+| `OPENAI_API_KEY` | Its key (a local server may need none) |
+| `OPENAI_MODEL` | The model to ask for when a route names none |
+| `OPENAI_MAX_TOKENS_FIELD` | `max_tokens` for a server that does not read `max_completion_tokens` (Ollama) |
+| `OPENAI_MAX_OUTPUT_TOKENS` | Caps the output limit sent (the tasks ask for up to 64000 tokens, set for Claude); set it to your model's limit if that is smaller |
+| `OPENAI_RESPONSE_FORMAT` | `none` for a server or model that refuses `response_format`: JSON is then asked for in the system message only (the reply is still checked) |
+| `LLM_PROVIDER` | Forces every task onto one provider: `anthropic`, `gemini`, `openai` or `mock` |
+| `LLM_TASK_<TASK>` | Per-task route, `provider[:model]`, e.g. `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` or `LLM_TASK_TUTOR_CHAT=openai:your-model` |
 | `LLM_MOCK_FALLBACK` | `false` turns off the mock fallback when the routed provider has no key |
 | `LLM_TIMEOUT_MS` | Request timeout (default 120000) |
 | `LLM_MAX_RETRIES` | SDK retry count for provider calls |
@@ -179,6 +185,8 @@ Every model call goes through the server gateway in `server/llm/`; the browser n
 **Default models.** The AI tutor (`tutor.chat`), writing feedback (`writing.feedback`) and course generation (`course.generate`, `/api/v2/ai/generate`) run on the cheap Claude model (Claude Haiku), within the daily caps in `server/middleware/dailyCaps.js`. To move one back to the larger model, set for example `LLM_TASK_TUTOR_CHAT=anthropic:claude-sonnet-5-5` (likewise `LLM_TASK_WRITING_FEEDBACK`, `LLM_TASK_COURSE_GENERATE`).
 
 **Why Gemini is off by default.** The [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) forbid using the API in a service "directed towards or is likely to be accessed by individuals under the age of 18", and minors use Rise Path. So Gemini is used only when `GEMINI_ALLOWED=true`. With it off, uploaded materials are stored without vectors and found by keyword search (`node scripts/rag/reembed.mjs` embeds them later, once Gemini is allowed), and `/api/v2/image` answers 503 with `error_type: image_generation_unavailable`.
+
+**OpenAI-compatible servers (self-hosting).** Set `OPENAI_BASE_URL` (and `OPENAI_API_KEY`, `OPENAI_MODEL`), then `LLM_PROVIDER=openai` for every task or `LLM_TASK_<TASK>=openai[:model]` for some. Without such a route nothing is sent there: it is never a fallback. A route to it without `OPENAI_BASE_URL` or a model is logged as a warning at start, and those tasks use the other providers. With docker compose, `localhost` is the app container: reach a server on the host as `.env.example` says. It runs the text tasks; RAG embeddings and image generation stay on Gemini, so with Gemini off they work as described above. Rise Path sends no effort setting to it. You contract with that service and keep its terms, including any rules on users under 18 (`doc/brushup-2026/ai-access-plan.ja.md`, chapter 14).
 
 ---
 

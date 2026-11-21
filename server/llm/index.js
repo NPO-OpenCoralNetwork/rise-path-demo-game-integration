@@ -15,6 +15,10 @@
  * isGeminiAllowed: the Gemini API terms exclude services that people under 18 use). A key set
  * without it is ignored, reported as unconfigured, and logged once as a warning.
  *
+ * The OpenAI-compatible provider (`openai`: OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL; for
+ * self-hosting, doc/brushup-2026/ai-access-plan.ja.md 14 章 K3) serves only the tasks that
+ * LLM_PROVIDER or LLM_TASK_<TASK> route to it, never as a fallback: a URL or key alone sends nothing.
+ *
  * Minors (Phase 0.5): a request with `audience: 'minor'` gets the MINOR_SAFETY system part
  * (prompts/shared.js) appended after its own parts, uncached, so every task a minor reaches
  * carries the child-safety rules from this one place. The route decides the audience
@@ -33,6 +37,7 @@ import { MINOR_SAFETY } from './prompts/shared.js';
 import { createAnthropicProvider } from './providers/anthropic.js';
 import { createGeminiProvider } from './providers/gemini.js';
 import { createMockProvider } from './providers/mock.js';
+import { createOpenAICompatibleProvider } from './providers/openaiCompatible.js';
 
 /** @typedef {import('./models.config.js').ProviderId} ProviderId */
 /** @typedef {import('./models.config.js').TaskRoute} TaskRoute */
@@ -102,6 +107,16 @@ export function warnIfGeminiKeyIgnored(env = process.env, logger = console) {
 }
 
 /**
+ * Logged at start for tasks routed to the OpenAI-compatible server while it has no URL or no model:
+ * they quietly use the other providers instead, which may not be where the operator meant learner
+ * text to go.
+ * @param {string[]} tasks
+ */
+export const openAIRouteUnusableWarning = (tasks) => `[LLM] ${tasks.join(', ')}: routed to an OpenAI-compatible server, `
+  + 'but OPENAI_BASE_URL or the model (OPENAI_MODEL, or LLM_TASK_<TASK>=openai:<model>) is not set, so these tasks use '
+  + 'the other configured providers instead (none when LLM_PROVIDER=openai). Set both, or remove the openai route.';
+
+/**
  * The request as sent to a provider: for a minor, MINOR_SAFETY goes last, as its own uncached
  * part (the cached prefix before it stays the same for adults and minors).
  * @param {LlmRequest} req
@@ -138,6 +153,15 @@ export function createGateway(options = {}) {
   const keys = {
     anthropic: cleanKey(env.ANTHROPIC_API_KEY),
     gemini: isGeminiAllowed(env) ? rawGeminiKey(env) : '',
+    openai: cleanKey(env.OPENAI_API_KEY),
+  };
+  /**
+   * Endpoints: Anthropic's optional proxy, and the OpenAI-compatible server (that provider needs one).
+   * @type {Partial<Record<ProviderId, string>>}
+   */
+  const baseURLs = {
+    anthropic: cleanKey(env.ANTHROPIC_BASE_URL) || undefined,
+    openai: cleanKey(env.OPENAI_BASE_URL) || undefined,
   };
   // The process-wide gateway is built once, so this is one warning per process.
   warnIfGeminiKeyIgnored(env, logger);
@@ -148,12 +172,24 @@ export function createGateway(options = {}) {
   const factories = {
     anthropic: createAnthropicProvider,
     gemini: createGeminiProvider,
+    openai: createOpenAICompatibleProvider,
     mock: createMockProvider,
     ...options.providers,
   };
 
-  /** @param {ProviderId} id */
-  const isConfigured = (id) => (id === 'mock' ? true : Boolean(keys[id]));
+  /**
+   * The OpenAI-compatible server counts once OPENAI_BASE_URL is set (a local one may need no key),
+   * the others once their key is set.
+   * @param {ProviderId} id
+   */
+  const isConfigured = (id) => (id === 'mock' ? true : id === 'openai' ? Boolean(baseURLs.openai) : Boolean(keys[id]));
+
+  // Once per process, like the Gemini warning above.
+  const unusableOpenAI = Object.keys(TASKS).filter((task) => {
+    const route = resolveTaskRoute(task, env);
+    return route.provider === 'openai' && !(isConfigured('openai') && route.model);
+  });
+  if (unusableOpenAI.length) logger.warn(openAIRouteUnusableWarning(unusableOpenAI));
 
   /** @type {Map<ProviderId, LlmProvider>} */
   const instances = new Map();
@@ -163,11 +199,14 @@ export function createGateway(options = {}) {
       const factory = factories[id];
       instances.set(id, factory({
         apiKey: id === 'mock' ? '' : keys[id],
-        baseURL: id === 'anthropic' ? cleanKey(env.ANTHROPIC_BASE_URL) || undefined : undefined,
+        baseURL: baseURLs[id],
         maxRetries: Number.parseInt(env.LLM_MAX_RETRIES || '', 10) >= 0 ? Number.parseInt(env.LLM_MAX_RETRIES || '', 10) : undefined,
         timeoutMs,
         delayMs: Number.isFinite(mockDelayMs) ? mockDelayMs : undefined,
         serverFallbacks: env.LLM_ANTHROPIC_SERVER_FALLBACKS !== 'false',
+        maxTokensField: env.OPENAI_MAX_TOKENS_FIELD,
+        maxOutputTokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+        responseFormat: env.OPENAI_RESPONSE_FORMAT,
       }));
     }
     return /** @type {LlmProvider} */ (instances.get(id));
@@ -192,7 +231,8 @@ export function createGateway(options = {}) {
         candidates.push({ ...primary, provider, model: modelForTier(provider, primary.tier), source: 'default' });
       }
     }
-    const routes = candidates.filter((route) => isConfigured(route.provider));
+    // An openai route also needs a model name (OPENAI_MODEL or openai:<model>); the others always have one.
+    const routes = candidates.filter((route) => isConfigured(route.provider) && Boolean(route.model));
     if (!routes.length && allowMockFallback(env)) {
       routes.push({ ...primary, provider: 'mock', model: modelForTier('mock', primary.tier), source: 'default' });
     }
@@ -408,7 +448,9 @@ export function createGateway(options = {}) {
           tasks[task] = { provider: null, model: null, effort: TASKS[task].effort, fallback: [] };
         }
       }
-      const anyConfigured = Boolean(keys.anthropic || keys.gemini);
+      // The OpenAI-compatible server counts only when a task is routed to it.
+      const anyConfigured = Boolean(keys.anthropic || keys.gemini)
+        || Object.values(tasks).some((route) => route.provider === 'openai');
       return {
         ok: anyConfigured || usesMock,
         mock: usesMock,
@@ -416,6 +458,7 @@ export function createGateway(options = {}) {
         providers: {
           anthropic: { configured: Boolean(keys.anthropic) },
           gemini: { configured: Boolean(keys.gemini), allowed: isGeminiAllowed(env) },
+          openai: { configured: isConfigured('openai') },
           mock: { available: allowMockFallback(env) || forced === 'mock', forced: forced === 'mock' },
         },
         tasks,
